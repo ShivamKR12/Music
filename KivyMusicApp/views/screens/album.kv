@@ -1,0 +1,30 @@
+<AlbumScreen>
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+            MDTopAppBarTitle:
+                text: "Album"
+                
+        MDScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                
+                FitImage:
+                    source: ""
+                    size_hint_y: None
+                    height: "250dp"
+                    
+                MDList:
+                    MDListItem:
+                        MDListItemLeadingIcon:
+                            icon: "music-note"
+                        MDListItemHeadlineText:
+                            text: "Track 1"
+                        MDListItemSupportingText:
+                            text: "3:45"

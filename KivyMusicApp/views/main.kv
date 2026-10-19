@@ -1,0 +1,135 @@
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+
+#:include views/screens/home.kv
+#:include views/screens/search.kv
+#:include views/screens/library.kv
+#:include views/screens/settings.kv
+#:include views/screens/player.kv
+#:include views/screens/analytics.kv
+#:include views/screens/wrapped.kv
+#:include views/screens/notifications.kv
+#:include views/screens/recently_played.kv
+#:include views/screens/album.kv
+#:include views/screens/artist.kv
+#:include views/screens/playlist.kv
+#:include views/screens/browse.kv
+#:include views/screens/podcasts.kv
+#:include views/screens/mood.kv
+#:include views/screens/equalizer.kv
+#:include views/screens/listen_together.kv
+#:include views/screens/auth.kv
+
+
+
+<LibraryGridCard@MDCard>:
+    style: "elevated"
+    radius: [dp(16)]
+    ripple_behavior: True
+    padding: "16dp"
+    spacing: "8dp"
+    orientation: "vertical"
+    icon: "music"
+    text: "Title"
+    text_color: "black"
+    icon_color: "black"
+    MDIcon:
+        icon: root.icon
+        
+        text_color: root.icon_color
+        font_size: "32sp"
+    MDLabel:
+        text: root.text
+        font_style: "Title"
+        role: "medium"
+        
+        text_color: root.text_color
+        bold: True
+
+MDBoxLayout:
+    orientation: "vertical"
+    md_bg_color: app.theme_cls.backgroundColor
+
+    MDScreenManager:
+        id: screen_manager
+        transition: __import__('kivy.uix.screenmanager').uix.screenmanager.FadeTransition()
+
+        HomeScreen:
+        SearchScreen:
+        LibraryScreen:
+        SettingsScreen:
+        PlayerScreen:
+        AnalyticsScreen:
+        WrappedScreen:
+        NotificationScreen:
+        RecentlyPlayedScreen:
+        AlbumScreen:
+        ArtistScreen:
+        PlaylistScreen:
+        BrowseScreen:
+        PodcastsScreen:
+        MoodScreen:
+        EqualizerScreen:
+        ListenTogetherScreen:
+        AuthScreen:
+
+    # Global Mini Player
+    MDBoxLayout:
+        id: mini_player
+        adaptive_height: True
+        padding: ["8dp", "0dp", "8dp", "8dp"]
+        opacity: 1 if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played"] else 0
+        size_hint_y: None if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played"] else 0
+        height: self.minimum_height if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played"] else 0
+        MDCard:
+            style: "elevated"
+            size_hint_y: None
+            height: "64dp"
+            md_bg_color: app.theme_cls.surfaceContainerHighestColor
+            on_release: screen_manager.current = "player"
+            radius: [dp(16)]
+            ripple_behavior: True
+            MDBoxLayout:
+                padding: "8dp"
+                spacing: "12dp"
+                FitImage:
+                    source: "album_art.png"
+                    size_hint: None, None
+                    size: "48dp", "48dp"
+                    radius: [dp(8)]
+                MDBoxLayout:
+                    orientation: "vertical"
+                    pos_hint: {"center_y": .5}
+                    MDLabel:
+                        text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
+                        font_style: "Body"
+                        role: "large"
+                    MDLabel:
+                        text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                MDIconButton:
+                    icon: "favorite-border"
+                    pos_hint: {"center_y": .5}
+                MDIconButton:
+                    icon: "pause" if app.player_controller.is_playing else "play"
+                    pos_hint: {"center_y": .5}
+                    on_release: app.player_controller.toggle_play()
+
+    MDBottomAppBar:
+        id: bottom_nav
+        opacity: 1 if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played", "settings"] else 0
+        size_hint_y: None if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played", "settings"] else 0
+        height: dp(80) if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played", "settings"] else 0
+        MDActionBottomAppBarButton:
+            icon: "home"
+            active: screen_manager.current == "home"
+            on_release: screen_manager.current = "home"
+        MDActionBottomAppBarButton:
+            icon: "magnify"
+            active: screen_manager.current == "search"
+            on_release: screen_manager.current = "search"
+        MDActionBottomAppBarButton:
+            icon: "music-box-multiple"
+            active: screen_manager.current == "library"
+            on_release: screen_manager.current = "library"

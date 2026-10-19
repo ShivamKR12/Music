@@ -1,0 +1,51 @@
+<ListenTogetherScreen>
+
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "24dp"
+        spacing: "24dp"
+
+        MDLabel:
+            text: "Listen Together Room"
+            font_style: "Display"
+            role: "small"
+            halign: "center"
+            adaptive_height: True
+
+        MDLabel:
+            text: "Members"
+            font_style: "Title"
+            role: "large"
+            adaptive_height: True
+            
+        ScrollView:
+            MDList:
+                id: member_list
+                MDListItem:
+                    MDListItemHeadlineText:
+                        text: "User 1 (Host)"
+                MDListItem:
+                    MDListItemHeadlineText:
+                        text: "User 2"
+
+        MDLabel:
+            text: "Current Queue"
+            font_style: "Title"
+            role: "large"
+            adaptive_height: True
+
+        ScrollView:
+            MDList:
+                id: queue_list
+                MDListItem:
+                    MDListItemHeadlineText:
+                        text: "Track 1"
+                MDListItem:
+                    MDListItemHeadlineText:
+                        text: "Track 2"
+
+        MDButton:
+            style: "elevated"
+            pos_hint: {"center_x": .5}
+            MDButtonText:
+                text: "Leave Room"

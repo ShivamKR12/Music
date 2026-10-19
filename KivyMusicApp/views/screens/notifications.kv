@@ -1,0 +1,47 @@
+<NotificationScreen>:
+    name: "notifications"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.root.ids.screen_manager.current = "home"
+            MDTopAppBarTitle:
+                text: "Notifications"
+                
+        MDScrollView:
+            MDList:
+                MDListItem:
+                    MDListItemLeadingIcon:
+                        icon: "album"
+                    MDListItemHeadlineText:
+                        text: "New Release from Gippy Grewal"
+                    MDListItemSupportingText:
+                        text: "Check out the new album!"
+                    MDListItemTertiaryText:
+                        text: "2 hours ago"
+                        
+                MDListItem:
+                    MDListItemLeadingIcon:
+                        icon: "playlist-star"
+                    MDListItemHeadlineText:
+                        text: "Your weekly mix is ready"
+                    MDListItemSupportingText:
+                        text: "Made just for you"
+                    MDListItemTertiaryText:
+                        text: "1 day ago"
+                        
+                MDListItem:
+                    MDListItemLeadingIcon:
+                        icon: "ticket-confirmation"
+                    MDListItemHeadlineText:
+                        text: "Concert near you"
+                    MDListItemSupportingText:
+                        text: "Yo Yo Honey Singh is playing in your city"
+                    MDListItemTertiaryText:
+                        text: "3 days ago"
+

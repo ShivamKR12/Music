@@ -1,0 +1,53 @@
+<SearchScreen>:
+    name: "search"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.root.ids.screen_manager.current = "home"
+            MDTopAppBarTitle:
+                text: "Search"
+                
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: "16dp"
+            spacing: "16dp"
+            
+            MDTextField:
+                mode: "outlined"
+                MDTextFieldHintText:
+                    text: "Search for song..."
+                MDTextFieldLeadingIcon:
+                    icon: "magnify"
+                    
+            MDBoxLayout:
+                adaptive_height: True
+                MDLabel:
+                    text: "Recent searches"
+                    font_style: "Title"
+                    role: "medium"
+                    adaptive_height: True
+                MDButton:
+                    style: "text"
+                    MDButtonText:
+                        text: "Clear search history"
+                        
+            RecycleView:
+                id: search_history_list
+                viewclass: "SearchHistoryItem"
+                data: [{"text": "unstoppable"}, {"text": "haryanvi songs"}]
+                RecycleBoxLayout:
+                    default_size: None, dp(72)
+                    default_size_hint: 1, None
+                    size_hint_y: None
+                    height: self.minimum_height
+                    orientation: 'vertical'
+                    spacing: dp(8)
+                        
+            MDWidget:
+                # Filler

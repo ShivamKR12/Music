@@ -1,0 +1,188 @@
+<AnalyticsScreen>:
+    name: "analytics"
+    md_bg_color: app.theme_cls.backgroundColor
+    
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.root.ids.screen_manager.current = "library"
+            MDTopAppBarTitle:
+                text: "Analytics"
+                font_style: "Headline"
+                role: "large"
+                
+        MDScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "16dp"
+                spacing: "24dp"
+                adaptive_height: True
+                
+                MDLabel:
+                    text: "Your Listening Habits"
+                    font_style: "Title"
+                    role: "large"
+                    adaptive_height: True
+                    
+                # A card representing a Bar Chart using Box Layouts
+                MDCard:
+                    style: "elevated"
+                    orientation: "vertical"
+                    padding: "16dp"
+                    spacing: "16dp"
+                    size_hint_y: None
+                    height: "250dp"
+                    
+                    MDLabel:
+                        text: "Weekly Playtime (hours)"
+                        font_style: "Title"
+                        role: "medium"
+                        adaptive_height: True
+                        
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        spacing: "8dp"
+                        # Monday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 0.5
+                            MDLabel:
+                                text: "M"
+                                halign: "center"
+                                adaptive_height: True
+                        # Tuesday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 0.8
+                            MDLabel:
+                                text: "T"
+                                halign: "center"
+                                adaptive_height: True
+                        # Wednesday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 0.3
+                            MDLabel:
+                                text: "W"
+                                halign: "center"
+                                adaptive_height: True
+                        # Thursday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 0.7
+                            MDLabel:
+                                text: "T"
+                                halign: "center"
+                                adaptive_height: True
+                        # Friday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 0.9
+                            MDLabel:
+                                text: "F"
+                                halign: "center"
+                                adaptive_height: True
+                        # Saturday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 1.0
+                            MDLabel:
+                                text: "S"
+                                halign: "center"
+                                adaptive_height: True
+                        # Sunday
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            MDBoxLayout:
+                            MDBoxLayout:
+                                md_bg_color: app.theme_cls.primaryColor
+                                size_hint_y: 0.6
+                            MDLabel:
+                                text: "S"
+                                halign: "center"
+                                adaptive_height: True
+
+                # A card for a Pie chart using Canvas
+                MDCard:
+                    style: "elevated"
+                    orientation: "vertical"
+                    padding: "16dp"
+                    spacing: "16dp"
+                    size_hint_y: None
+                    height: "250dp"
+                    
+                    MDLabel:
+                        text: "Top Genres"
+                        font_style: "Title"
+                        role: "medium"
+                        adaptive_height: True
+                        
+                    MDFloatLayout:
+                        canvas:
+                            # Segment 1 (Pop)
+                            Color:
+                                rgba: app.theme_cls.primaryColor
+                            Ellipse:
+                                pos: self.center_x - dp(75), self.center_y - dp(75)
+                                size: dp(150), dp(150)
+                                angle_start: 0
+                                angle_end: 180
+                            # Segment 2 (Hip-hop)
+                            Color:
+                                rgba: app.theme_cls.secondaryColor
+                            Ellipse:
+                                pos: self.center_x - dp(75), self.center_y - dp(75)
+                                size: dp(150), dp(150)
+                                angle_start: 180
+                                angle_end: 270
+                            # Segment 3 (Rock)
+                            Color:
+                                rgba: app.theme_cls.tertiaryColor
+                            Ellipse:
+                                pos: self.center_x - dp(75), self.center_y - dp(75)
+                                size: dp(150), dp(150)
+                                angle_start: 270
+                                angle_end: 360
+                    
+                    MDBoxLayout:
+                        adaptive_height: True
+                        spacing: "8dp"
+                        MDLabel:
+                            text: "Pop (50%)"
+                            
+                            text_color: app.theme_cls.primaryColor
+                            halign: "center"
+                        MDLabel:
+                            text: "Hip-hop (25%)"
+                            
+                            text_color: app.theme_cls.secondaryColor
+                            halign: "center"
+                        MDLabel:
+                            text: "Rock (25%)"
+                            
+                            text_color: app.theme_cls.tertiaryColor
+                            halign: "center"
+

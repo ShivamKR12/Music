@@ -1,0 +1,71 @@
+<SettingsScreen>:
+    name: "settings"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.root.ids.screen_manager.current = "home"
+            MDTopAppBarTitle:
+                text: "Settings"
+                
+        MDScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: "24dp"
+                spacing: "24dp"
+
+                MDList:
+                    MDListItem:
+                        MDListItemHeadlineText:
+                            text: "Audio Quality"
+                        MDListItemSupportingText:
+                            text: "High (320kbps)"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                            
+                    MDListItem:
+                        MDListItemHeadlineText:
+                            text: "Download over Wi-Fi only"
+                        MDListItemSupportingText:
+                            text: "Save mobile data"
+                        MDListItemTrailingCheckbox:
+                            active: True
+
+                    MDListItem:
+                        MDListItemHeadlineText:
+                            text: "Dark Mode"
+                        MDListItemSupportingText:
+                            text: "Toggle app theme"
+                        MDListItemTrailingCheckbox:
+                            active: True
+                            
+                    MDListItem:
+                        MDListItemHeadlineText:
+                            text: "SponsorBlock"
+                        MDListItemSupportingText:
+                            text: "Skip non-music segments"
+                        MDListItemTrailingCheckbox:
+                            active: True
+                            
+                    MDListItem:
+                        MDListItemHeadlineText:
+                            text: "Equalizer"
+                        MDListItemSupportingText:
+                            text: "Adjust audio frequencies"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                            
+                    MDListItem:
+                        MDListItemHeadlineText:
+                            text: "Clear Cache"
+                        MDListItemSupportingText:
+                            text: "Free up storage space"
+                        MDListItemTrailingIcon:
+                            icon: "delete-outline"
+

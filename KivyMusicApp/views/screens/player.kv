@@ -1,0 +1,114 @@
+<PlayerScreen>:
+    name: "player"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "chevron-down"
+                    on_release: app.root.ids.screen_manager.current = "home"
+            MDTopAppBarTitle:
+                text: "NOW PLAYING"
+                font_style: "Body"
+                role: "small"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "dots-vertical"
+
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: "24dp"
+            spacing: "16dp"
+
+            MDCarousel:
+                id: album_carousel
+                size_hint: 1, 1
+                pos_hint: {"center_x": .5}
+                layouts: "uncontained"
+                uncontained_item_width: "280dp"
+                on_index: app.on_carousel_index(self.index)
+
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                spacing: "8dp"
+                MDLabel:
+                    text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
+                    font_style: "Headline"
+                    role: "small"
+                    halign: "center"
+                    adaptive_height: True
+                MDLabel:
+                    text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
+                    font_style: "Body"
+                    role: "medium"
+                    halign: "center"
+                    text_color: app.theme_cls.onSurfaceVariantColor
+                    adaptive_height: True
+
+            MDBoxLayout:
+                adaptive_height: True
+                MDLabel:
+                    text: app.player_controller.active_track.formatted_current_time if app.player_controller.active_track else "00:00"
+                    font_style: "Body"
+                    role: "small"
+                    text_color: app.theme_cls.onSurfaceVariantColor
+                    adaptive_width: True
+                MDSlider:
+                    value: app.player_controller.active_track.current_time if app.player_controller.active_track else 0
+                    min: 0
+                    max: app.player_controller.active_track.duration if app.player_controller.active_track else 100
+                    on_value: if app.player_controller.active_track: app.player_controller.active_track.current_time = self.value
+                    size_hint_y: None
+                    height: "4dp"
+                    pos_hint: {"center_y": .5}
+                MDLabel:
+                    text: app.player_controller.active_track.formatted_duration if app.player_controller.active_track else "00:00"
+                    font_style: "Body"
+                    role: "small"
+                    text_color: app.theme_cls.onSurfaceVariantColor
+                    adaptive_width: True
+
+            MDBoxLayout:
+                adaptive_height: True
+                spacing: "16dp"
+                pos_hint: {"center_x": .5}
+
+                MDIconButton:
+                    icon: "shuffle"
+                    pos_hint: {"center_y": .5}
+                MDIconButton:
+                    icon: "skip-previous"
+                    pos_hint: {"center_y": .5}
+                    on_release: app.player_controller.prev_track()
+                    
+                MDFabButton:
+                    icon: "pause" if app.player_controller.is_playing else "play"
+                    style: "standard"
+                    color_map: "tertiary"
+                    pos_hint: {"center_y": .5}
+                    on_release: app.player_controller.toggle_play()
+
+                MDIconButton:
+                    icon: "skip-next"
+                    pos_hint: {"center_y": .5}
+                    on_release: app.player_controller.next_track()
+                MDIconButton:
+                    icon: "repeat"
+                    pos_hint: {"center_y": .5}
+                    
+            MDBoxLayout:
+                adaptive_height: True
+                spacing: "16dp"
+                pos_hint: {"center_x": .5}
+                MDIconButton:
+                    icon: "information-outline"
+                MDIconButton:
+                    icon: "playlist-plus"
+                MDIconButton:
+                    icon: "text-box-outline"
+                    on_release: app.show_lyrics()
+

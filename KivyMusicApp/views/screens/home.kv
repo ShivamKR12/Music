@@ -1,0 +1,103 @@
+<HomeScreen>:
+    name: "home"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarTitle:
+                text: "KivyMusicApp"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "bell-outline"
+                    on_release: app.root.ids.screen_manager.current = "notifications"
+                MDActionTopAppBarButton:
+                    icon: "history"
+                    on_release: app.root.ids.screen_manager.current = "recently_played"
+                MDActionTopAppBarButton:
+                    icon: "cog-outline"
+                    on_release: app.root.ids.screen_manager.current = "settings"
+        
+        MDScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: "16dp"
+                spacing: "24dp"
+
+                # Mood Chips
+                MDScrollView:
+                    size_hint_y: None
+                    height: "48dp"
+                    do_scroll_y: False
+                    do_scroll_x: True
+                    MDBoxLayout:
+                        adaptive_width: True
+                        spacing: "8dp"
+                        MDChip:
+                            type: "filter"
+                            active: True
+                            md_bg_color: app.theme_cls.primaryColor
+                            MDChipText:
+                                text: "All"
+                                
+                                text_color: app.theme_cls.onPrimaryColor
+                        MDChip:
+                            type: "filter"
+                            MDChipText:
+                                text: "Relax"
+                        MDChip:
+                            type: "filter"
+                            MDChipText:
+                                text: "Sleep"
+                        MDChip:
+                            type: "filter"
+                            MDChipText:
+                                text: "Energize"
+                        MDChip:
+                            type: "filter"
+                            MDChipText:
+                                text: "Sad"
+
+                MDLabel:
+                    text: "Trending community playlists"
+                    font_style: "Title"
+                    role: "large"
+                    adaptive_height: True
+
+                RecycleView:
+                    id: trending_list
+                    viewclass: "HomeCardItem"
+                    size_hint_y: None
+                    height: "172dp"
+                    data: [{"text": f"Playlist {i}"} for i in range(10)]
+                    RecycleBoxLayout:
+                        default_size: dp(140), dp(140)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: 'horizontal'
+                        spacing: dp(16)
+                        padding: [dp(16), dp(16)]
+
+                MDLabel:
+                    text: "Featured playlists for you"
+                    font_style: "Title"
+                    role: "large"
+                    adaptive_height: True
+
+                RecycleView:
+                    id: featured_list
+                    viewclass: "HomeCardItem"
+                    size_hint_y: None
+                    height: "172dp"
+                    data: [{"text": f"Featured {i}"} for i in range(10)]
+                    RecycleBoxLayout:
+                        default_size: dp(140), dp(140)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: 'horizontal'
+                        spacing: dp(16)
+                        padding: [dp(16), dp(16)]

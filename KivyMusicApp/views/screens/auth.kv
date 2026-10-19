@@ -1,0 +1,46 @@
+<AuthScreen>
+
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "24dp"
+        spacing: "24dp"
+        pos_hint: {"center_x": .5, "center_y": .5}
+        adaptive_height: True
+
+        MDLabel:
+            text: "Link Accounts"
+            font_style: "Display"
+            role: "small"
+            halign: "center"
+            adaptive_height: True
+
+        MDButton:
+            style: "filled"
+            pos_hint: {"center_x": .5}
+            MDButtonText:
+                text: "Login with Spotify"
+
+        MDButton:
+            style: "filled"
+            pos_hint: {"center_x": .5}
+            MDButtonText:
+                text: "Login with Last.fm"
+
+        MDButton:
+            style: "filled"
+            pos_hint: {"center_x": .5}
+            MDButtonText:
+                text: "Login with Discord"
+
+        MDLabel:
+            text: "QR Sync"
+            font_style: "Title"
+            role: "large"
+            halign: "center"
+            adaptive_height: True
+
+        MDButton:
+            style: "outlined"
+            pos_hint: {"center_x": .5}
+            MDButtonText:
+                text: "Show QR Code"

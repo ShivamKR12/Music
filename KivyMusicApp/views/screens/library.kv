@@ -1,0 +1,144 @@
+<LibraryScreen>:
+    name: "library"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDFloatLayout:
+        MDBoxLayout:
+            orientation: "vertical"
+            
+            MDTopAppBar:
+                type: "small"
+                MDTopAppBarTitle:
+                    text: "Library"
+                    font_style: "Headline"
+                    role: "large"
+                MDTopAppBarTrailingButtonContainer:
+                    MDActionTopAppBarButton:
+                        icon: "plus-circle-outline"
+                        on_release: app.show_add_playlist_dialog()
+
+            MDScrollView:
+                MDBoxLayout:
+                    orientation: "vertical"
+                    padding: "16dp"
+                    spacing: "24dp"
+                    adaptive_height: True
+
+                    # Library Chips
+                    MDScrollView:
+                        size_hint_y: None
+                        height: "48dp"
+                        do_scroll_y: False
+                        do_scroll_x: True
+                        MDBoxLayout:
+                            adaptive_width: True
+                            spacing: "8dp"
+                            MDChip:
+                                type: "filter"
+                                active: True
+                                md_bg_color: app.theme_cls.primaryColor
+                                MDChipText:
+                                    text: "Your library"
+                                    
+                                    text_color: app.theme_cls.onPrimaryColor
+                            MDChip:
+                                type: "filter"
+                                MDChipText:
+                                    text: "KivyMusicApp Charts"
+                            MDChip:
+                                type: "filter"
+                                MDChipText:
+                                    text: "Your Local Playlists"
+
+                    # 2x3 Custom Grid
+                    MDGridLayout:
+                        cols: 2
+                        adaptive_height: True
+                        spacing: "16dp"
+                        row_default_height: "80dp"
+                        row_force_default: True
+                        
+                        LibraryGridCard:
+                            icon: "heart"
+                            text: "Favorite"
+                            md_bg_color: get_color_from_hex("#ff5252") # Red
+                            text_color: "white"
+                            icon_color: "white"
+                        LibraryGridCard:
+                            icon: "account-multiple"
+                            text: "Followed"
+                            md_bg_color: get_color_from_hex("#ffd740") # Yellow
+                        LibraryGridCard:
+                            icon: "play-circle-outline"
+                            text: "Most Played"
+                            md_bg_color: get_color_from_hex("#18ffff") # Cyan
+                        LibraryGridCard:
+                            icon: "download"
+                            text: "Downloaded"
+                            md_bg_color: get_color_from_hex("#69f0ae") # Green
+                        LibraryGridCard:
+                            icon: "chart-bar"
+                            text: "Analytics"
+                            md_bg_color: get_color_from_hex("#b388ff") # Purple
+                            on_release: app.root.ids.screen_manager.current = "analytics"
+                        LibraryGridCard:
+                            icon: "star-shooting"
+                            text: "Wrapped 2026"
+                            md_bg_color: get_color_from_hex("#ff4081") # Pink
+                            text_color: "white"
+                            icon_color: "white"
+                            on_release: app.root.ids.screen_manager.current = "wrapped"
+                        LibraryGridCard:
+                            icon: "account-music"
+                            text: "Artists"
+                            on_release: app.root.ids.screen_manager.current = "artist"
+                        LibraryGridCard:
+                            icon: "album"
+                            text: "Albums"
+                            on_release: app.root.ids.screen_manager.current = "album"
+                        LibraryGridCard:
+                            icon: "playlist-music"
+                            text: "Playlists"
+                            on_release: app.root.ids.screen_manager.current = "playlist"
+                        LibraryGridCard:
+                            icon: "podcast"
+                            text: "Podcasts"
+                            on_release: app.root.ids.screen_manager.current = "podcasts"
+                        LibraryGridCard:
+                            icon: "compass"
+                            text: "Browse"
+                            on_release: app.root.ids.screen_manager.current = "browse"
+                        LibraryGridCard:
+                            icon: "emoticon-happy-outline"
+                            text: "Moods"
+                            on_release: app.root.ids.screen_manager.current = "mood"
+                        LibraryGridCard:
+                            icon: "equalizer"
+                            text: "Equalizer"
+                            on_release: app.root.ids.screen_manager.current = "equalizer"
+                        LibraryGridCard:
+                            icon: "account-group"
+                            text: "Listen Together"
+                            on_release: app.root.ids.screen_manager.current = "listen_together"
+                        LibraryGridCard:
+                            icon: "login"
+                            text: "Auth/Login"
+                            on_release: app.root.ids.screen_manager.current = "auth"
+
+                    MDLabel:
+                        text: "Recently Added"
+                        font_style: "Title"
+                        role: "large"
+                        adaptive_height: True
+
+                    RecycleView:
+                        id: library_list
+                        viewclass: "TrackListItem"
+                        size_hint_y: None
+                        height: dp(72) * len(self.data) + dp(16) * len(self.data)
+                        RecycleBoxLayout:
+                            default_size: None, dp(72)
+                            default_size_hint: 1, None
+                            size_hint_y: None
+                            height: self.minimum_height
+                            orientation: 'vertical'
+                            spacing: dp(16)

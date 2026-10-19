@@ -1,0 +1,101 @@
+<WrappedScreen>:
+    name: "wrapped"
+    md_bg_color: "black" # A distinct, dark background for wrapped
+    
+    MDFloatLayout:
+        MDCarousel:
+            id: wrapped_carousel
+            layouts: "full-screen-horizontal"
+            
+            # Slide 1: Welcome
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "24dp"
+                spacing: "16dp"
+                md_bg_color: get_color_from_hex("#1DB954")
+                
+                MDLabel:
+                    text: "Your 2026 Wrapped"
+                    font_style: "Display"
+                    role: "large"
+                    
+                    text_color: "white"
+                    halign: "center"
+                    bold: True
+                MDLabel:
+                    text: "Swipe to begin."
+                    font_style: "Title"
+                    role: "medium"
+                    
+                    text_color: "white"
+                    halign: "center"
+                    
+            # Slide 2: Top Artist
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "24dp"
+                spacing: "16dp"
+                md_bg_color: get_color_from_hex("#FF4081")
+                
+                MDLabel:
+                    text: "You couldn't get enough of..."
+                    font_style: "Headline"
+                    role: "medium"
+                    
+                    text_color: "white"
+                    halign: "center"
+                FitImage:
+                    source: "album_art.png"
+                    radius: [dp(24)]
+                    size_hint_y: 0.6
+                MDLabel:
+                    text: "Gippy Grewal"
+                    font_style: "Display"
+                    role: "medium"
+                    
+                    text_color: "white"
+                    halign: "center"
+                    bold: True
+                    
+            # Slide 3: Top Song
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "24dp"
+                spacing: "16dp"
+                md_bg_color: get_color_from_hex("#7E57C2")
+                
+                MDLabel:
+                    text: "Your #1 Song was..."
+                    font_style: "Headline"
+                    role: "medium"
+                    
+                    text_color: "white"
+                    halign: "center"
+                MDLabel:
+                    text: "Angreji Beat"
+                    font_style: "Display"
+                    role: "large"
+                    
+                    text_color: "white"
+                    halign: "center"
+                    bold: True
+                MDLabel:
+                    text: "Played 420 times"
+                    font_style: "Title"
+                    role: "large"
+                    
+                    text_color: "white"
+                    halign: "center"
+
+        # Overlay Back button and Progress
+        MDTopAppBar:
+            type: "small"
+            pos_hint: {"top": 1}
+            md_bg_color: 0, 0, 0, 0 # Transparent
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "close"
+                    theme_icon_color: "Custom"
+                    icon_color: "white"
+                    on_release: app.root.ids.screen_manager.current = "library"
+

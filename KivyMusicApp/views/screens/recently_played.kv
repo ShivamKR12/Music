@@ -1,0 +1,28 @@
+<RecentlyPlayedScreen>:
+    name: "recently_played"
+    md_bg_color: app.theme_cls.backgroundColor
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.root.ids.screen_manager.current = "home"
+            MDTopAppBarTitle:
+                text: "Recently Played"
+                
+        RecycleView:
+            id: recent_list
+            viewclass: "TrackListItem"
+            data: [{"title": f"Song {i}", "artist": "Various Artists"} for i in range(1, 21)]
+            RecycleBoxLayout:
+                default_size: None, dp(72)
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height
+                orientation: 'vertical'
+                spacing: dp(16)
+                padding: "16dp"
+

@@ -1,0 +1,62 @@
+<ArtistScreen>
+    MDBoxLayout:
+        orientation: "vertical"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+            MDTopAppBarTitle:
+                text: "Artist Profile"
+                
+        MDScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: "16dp"
+                spacing: "16dp"
+                
+                FitImage:
+                    source: ""
+                    size_hint: None, None
+                    size: "150dp", "150dp"
+                    pos_hint: {"center_x": .5}
+                    
+                MDLabel:
+                    text: "Top Tracks"
+                    bold: True
+                    adaptive_height: True
+                    
+                MDScrollView:
+                    size_hint_y: None
+                    height: "100dp"
+                    do_scroll_y: False
+                    MDBoxLayout:
+                        adaptive_width: True
+                        spacing: "8dp"
+                        MDCard:
+                            size_hint: None, None
+                            size: "150dp", "100dp"
+                            MDLabel:
+                                text: "Track 1"
+                                halign: "center"
+                                
+                MDLabel:
+                    text: "Albums"
+                    bold: True
+                    adaptive_height: True
+                    
+                MDScrollView:
+                    size_hint_y: None
+                    height: "150dp"
+                    do_scroll_y: False
+                    MDBoxLayout:
+                        adaptive_width: True
+                        spacing: "8dp"
+                        MDCard:
+                            size_hint: None, None
+                            size: "150dp", "150dp"
+                            MDLabel:
+                                text: "Album 1"
+                                halign: "center"

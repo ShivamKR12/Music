@@ -1,0 +1,67 @@
+<EqualizerScreen>:
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "16dp"
+        spacing: "16dp"
+
+        MDLabel:
+            text: "10-Band Equalizer"
+            font_style: "Headline"
+            role: "small"
+            adaptive_height: True
+
+        MDBoxLayout:
+            orientation: "horizontal"
+            spacing: "8dp"
+
+            # 10 Bands
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+            MDSlider:
+                orientation: "vertical"
+
+        MDBoxLayout:
+            orientation: "horizontal"
+            adaptive_height: True
+            spacing: "16dp"
+            pos_hint: {"center_y": 0.5}
+
+            MDLabel:
+                text: "Reverb Config"
+                adaptive_height: True
+                pos_hint: {"center_y": 0.5}
+
+            MDSwitch:
+                active: False
+                pos_hint: {"center_y": 0.5}
+
+        MDBoxLayout:
+            orientation: "horizontal"
+            adaptive_height: True
+            spacing: "16dp"
+
+            MDLabel:
+                text: "AutoEq Profile"
+                adaptive_height: True
+                pos_hint: {"center_y": 0.5}
+
+            MDButton:
+                pos_hint: {"center_y": 0.5}
+                MDButtonText:
+                    text: "Pick Profile..."
