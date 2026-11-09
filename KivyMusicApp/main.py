@@ -7,7 +7,9 @@ if platform in ('win', 'macosx', 'linux'):
     Config.set('graphics', 'fullscreen', False)
 
 import os
+import threading
 from kivy.lang import Builder
+from kivy.clock import Clock
 from kivy.properties import StringProperty
 from kivymd.app import MDApp
 from kivy.core.window import Window
@@ -31,7 +33,20 @@ from kivymd.uix.list import (
     MDListItemTrailingIcon
 )
 
-from models.track_model import PlaylistModel
+from models.database import (
+    init_db,
+    add_track,
+    get_all_tracks,
+    get_playlist_tracks,
+    add_playlist,
+    get_all_playlists,
+    is_favorite,
+    toggle_favorite,
+    add_search_history,
+    get_search_history,
+    clear_search_history,
+)
+from models.track_model import TrackModel, PlaylistModel
 from controllers.player_controller import PlayerController
 from views.screens import HomeScreen, SearchScreen, LibraryScreen, SettingsScreen, PlayerScreen, FavoritesScreen
 from views.components import (
@@ -58,6 +73,7 @@ class MusicApp(MDApp):
         self.screen_history = []
         
         # MVC Initialization
+        init_db()
         self.playlist_model = PlaylistModel()
         self.player_controller = PlayerController()
         self.player_controller.set_playlist(self.playlist_model)
@@ -104,7 +120,14 @@ class MusicApp(MDApp):
             sm = self.root.ids.screen_manager
             if sm.current != screen_name:
                 self.screen_history.append(sm.current)
-                sm.current = screen_name
+                if sm.width == 0 or sm.height == 0:
+                    from kivy.uix.screenmanager import NoTransition
+                    prev_trans = sm.transition
+                    sm.transition = NoTransition()
+                    sm.current = screen_name
+                    sm.transition = prev_trans
+                else:
+                    sm.current = screen_name
                 self.sync_nav_bar(screen_name)
 
     def go_back(self, target=None):
@@ -199,6 +222,7 @@ class MusicApp(MDApp):
         # Simulate asynchronous heavy operation (e.g., fetching from yt-dlp)
         from kivy.clock import Clock
         Clock.schedule_once(self.load_data_async, 0.05)
+        Clock.schedule_once(lambda dt: self.load_search_history_from_db(), 0.1)
         
     def load_data_async(self, dt):
         try:
@@ -237,41 +261,56 @@ class MusicApp(MDApp):
         from kivymd.uix.fitimage import FitImage
         from kivy.metrics import dp
 
-        carousel.clear_widgets()
-        for track in self.playlist_model.tracks:
-            card = MDCard(
-                style="elevated",
-                radius=[dp(24)],
-                size_hint=(None, None),
-                size=(dp(280), dp(280)),
-                pos_hint={"center_x": .5, "center_y": .5},
-                ripple_behavior=True,
-                on_release=lambda *args: self.show_lyrics()
-            )
-            image = FitImage(source=track.album_art, radius=[dp(24)])
-            card.add_widget(image)
-            carousel.add_widget(card)
-        self._player_carousel_initialized = True
+        self._updating_carousel = True
+        try:
+            carousel.clear_widgets()
+            for track in self.playlist_model.tracks:
+                card = MDCard(
+                    style="elevated",
+                    radius=[dp(24)],
+                    size_hint=(None, None),
+                    size=(dp(280), dp(280)),
+                    pos_hint={"center_x": .5, "center_y": .5},
+                    ripple_behavior=True,
+                    on_release=lambda *args: self.show_lyrics()
+                )
+                image = FitImage(source=track.album_art, radius=[dp(24)])
+                card.add_widget(image)
+                carousel.add_widget(card)
+            self._player_carousel_initialized = True
+        finally:
+            self._updating_carousel = False
 
     def on_carousel_index(self, index):
-        if index >= 0 and index < len(self.playlist_model.tracks):
+        if index is None or getattr(self, "_updating_carousel", False):
+            return
+        if 0 <= index < len(self.playlist_model.tracks):
             track = self.playlist_model.tracks[index]
             if track != self.player_controller.active_track:
                 self.play_selected_track(track)
 
     def play_selected_track(self, track):
         self.ensure_player_carousel()
+        if track not in self.playlist_model.tracks:
+            self.playlist_model.add_track(track)
         self.player_controller.set_track(track)
         self.switch_screen("player")
-        self.player_controller.toggle_play()
+        self.player_controller.play()
         
         # Sync Carousel
-        player_screen = self.root.ids.screen_manager.get_screen("player")
-        carousel = player_screen.ids.album_carousel
-        if track in self.playlist_model.tracks:
-            idx = self.playlist_model.tracks.index(track)
-            if carousel.index != idx:
-                carousel.index = idx
+        try:
+            player_screen = self.root.ids.screen_manager.get_screen("player")
+            carousel = player_screen.ids.album_carousel
+            if track in self.playlist_model.tracks:
+                idx = self.playlist_model.tracks.index(track)
+                if carousel.index != idx:
+                    self._updating_carousel = True
+                    try:
+                        carousel.index = idx
+                    finally:
+                        self._updating_carousel = False
+        except Exception:
+            pass
 
     def file_manager_open(self):
         if self.file_manager is None:
@@ -332,6 +371,12 @@ class MusicApp(MDApp):
         )
         self.quality_dialog.open()
 
+    def create_playlist_action(self):
+        playlist_name = f"My Mix #{len(get_all_playlists()) + 1}"
+        add_playlist(playlist_name)
+        if self.dialog:
+            self.dialog.dismiss()
+
     def show_add_playlist_dialog(self):
         if not self.dialog:
             self.dialog = MDDialog(
@@ -339,7 +384,7 @@ class MusicApp(MDApp):
                 MDDialogSupportingText(text="Do you want to create a new playlist?"),
                 MDDialogButtonContainer(
                     MDButton(MDButtonText(text="CANCEL"), style="text", on_release=lambda x: self.dialog.dismiss()),
-                    MDButton(MDButtonText(text="CREATE"), style="text", on_release=lambda x: self.dialog.dismiss()),
+                    MDButton(MDButtonText(text="CREATE"), style="text", on_release=lambda x: self.create_playlist_action()),
                 ),
             )
         self.dialog.open()
@@ -461,26 +506,156 @@ class MusicApp(MDApp):
             self.switch_screen(mapping[filter_name])
 
     def show_favorites(self):
-        """Navigate to the dedicated Favorite Songs screen."""
+        """Navigate to the dedicated Favorite Songs screen and sync with SQLite."""
+        self.sync_favorites_screen()
         self.switch_screen("favorites")
+
+    def sync_favorites_screen(self):
+        """Populate the favorites screen list with liked tracks from SQLite."""
+        if not hasattr(self, "root") or not self.root:
+            return
+        try:
+            fav_screen = self.root.ids.screen_manager.get_screen("favorites")
+            if "favorites_track_list" not in fav_screen.ids:
+                return
+            container = fav_screen.ids.favorites_track_list
+            fav_tracks = get_playlist_tracks("Favorites")
+            if fav_tracks:
+                container.clear_widgets()
+                for t_dict in fav_tracks:
+                    track_obj = TrackModel.from_dict(t_dict)
+                    def on_sel(instance, t=track_obj):
+                        self.play_selected_track(t)
+                    item = MDListItem(
+                        MDListItemLeadingIcon(
+                            icon="heart",
+                            theme_icon_color="Custom",
+                            icon_color=self.theme_cls.primaryColor,
+                        ),
+                        MDListItemHeadlineText(text=track_obj.title),
+                        MDListItemSupportingText(text=f"{track_obj.artist} • {track_obj.formatted_duration}"),
+                        MDListItemTrailingIcon(icon="dots-vertical"),
+                        on_release=on_sel,
+                    )
+                    container.add_widget(item)
+        except Exception as e:
+            print("Error syncing favorites screen:", e)
 
     def show_downloaded(self):
         """Open file manager or filter downloaded items."""
         self.file_manager_open()
 
+    def load_search_history_from_db(self):
+        """Populate the search screen history list from SQLite."""
+        try:
+            if hasattr(self, "root") and self.root:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_history_list" in search_screen.ids:
+                    history = get_search_history()
+                    if history:
+                        search_screen.ids.search_history_list.data = [{"text": q} for q in history]
+        except Exception:
+            pass
+
+    def clear_search_history(self):
+        """Wipe search history from SQLite and UI."""
+        clear_search_history()
+        try:
+            if hasattr(self, "root") and self.root:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_history_list" in search_screen.ids:
+                    search_screen.ids.search_history_list.data = []
+        except Exception:
+            pass
+
+    def clear_search_results(self):
+        """Clear current online search results and restore recent searches view."""
+        try:
+            if hasattr(self, "root") and self.root:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_results_list" in search_screen.ids:
+                    search_screen.ids.search_results_list.data = []
+        except Exception:
+            pass
+
     def perform_search(self, query: str):
-        """Execute search query and prepend to search history."""
+        """Execute real search query via yt-dlp, update search history in SQLite and display results."""
         if not query or not str(query).strip():
             return
         q = str(query).strip()
-        search_screen = self.root.ids.screen_manager.get_screen("search")
-        if "search_input" in search_screen.ids:
-            search_screen.ids.search_input.text = q
-        if "search_history_list" in search_screen.ids:
-            rv = search_screen.ids.search_history_list
-            existing = [item["text"].lower() for item in rv.data]
-            if q.lower() not in existing:
-                rv.data.insert(0, {"text": q})
+        add_search_history(q)
+        try:
+            search_screen = self.root.ids.screen_manager.get_screen("search")
+            if "search_input" in search_screen.ids:
+                search_screen.ids.search_input.text = q
+            if "search_history_list" in search_screen.ids:
+                rv = search_screen.ids.search_history_list
+                existing = [item["text"].lower() for item in rv.data]
+                if q.lower() not in existing:
+                    rv.data.insert(0, {"text": q})
+            if "search_status_label" in search_screen.ids:
+                search_screen.ids.search_status_label.text = f"Searching for '{q}'..."
+        except Exception:
+            pass
+
+        import threading
+        threading.Thread(target=self._async_yt_search, args=(q,), daemon=True).start()
+
+    def _async_yt_search(self, query: str):
+        from yt_dlp import YoutubeDL
+        from services.audio_engine import SilentLogger
+        ydl_opts = {
+            'quiet': True,
+            'noplaylist': True,
+            'extract_flat': True,
+            'socket_timeout': 10,
+            'logger': SilentLogger(),
+        }
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                res = ydl.extract_info(f"ytsearch8:{query}", download=False)
+                entries = res.get('entries', []) if res else []
+            Clock.schedule_once(lambda dt: self._on_search_results(entries, query), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self._on_search_error(str(e)), 0)
+
+    def _on_search_results(self, entries, query):
+        try:
+            search_screen = self.root.ids.screen_manager.get_screen("search")
+            if "search_status_label" in search_screen.ids:
+                search_screen.ids.search_status_label.text = f"Results for '{query}' ({len(entries)})"
+
+            rv_data = []
+            for entry in entries:
+                vid = entry.get("id", "")
+                title = entry.get("title", "Unknown Title")
+                artist = entry.get("uploader") or entry.get("channel") or "YouTube"
+                dur = int(entry.get("duration", 0) or 180)
+                track_obj = TrackModel(
+                    video_id=vid,
+                    title=title,
+                    artist=artist,
+                    url=f"https://www.youtube.com/watch?v={vid}" if vid else "",
+                    duration=dur,
+                    album_art="album_art.png"
+                )
+                rv_data.append({
+                    "title": title,
+                    "artist": f"{artist} • {track_obj.formatted_duration}",
+                    "track_obj": track_obj
+                })
+            if "search_results_list" in search_screen.ids:
+                search_screen.ids.search_results_list.data = rv_data
+        except Exception as e:
+            print("Error rendering search results:", e)
+
+    def _on_search_error(self, err_msg):
+        try:
+            search_screen = self.root.ids.screen_manager.get_screen("search")
+            if "search_status_label" in search_screen.ids:
+                search_screen.ids.search_status_label.text = f"Search error ({err_msg[:30]})"
+        except Exception:
+            pass
 
     def show_lyrics(self):
         if not self.player_controller.active_track:
@@ -571,6 +746,11 @@ class MusicApp(MDApp):
                 self.queue_list_widget.add_widget(item)
 
         self.queue_sheet.set_state("open")
+
+    def on_stop(self):
+        """Clean up audio streams, threads, and background workers on application exit."""
+        if hasattr(self, "player_controller") and self.player_controller:
+            self.player_controller.stop()
 
 if __name__ == '__main__':
     MusicApp().run()

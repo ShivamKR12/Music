@@ -122,6 +122,7 @@
                     md_bg_color: app.theme_cls.surfaceContainerLowColor
 
                     MDList:
+                        id: favorites_track_list
                         MDListItem:
                             on_release: if len(app.playlist_model.tracks) > 0: app.play_selected_track(app.playlist_model.tracks[0])
                             MDListItemLeadingIcon:

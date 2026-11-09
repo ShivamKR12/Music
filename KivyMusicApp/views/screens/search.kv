@@ -28,7 +28,7 @@
                     icon: "magnify"
                 MDTextFieldTrailingIcon:
                     icon: "close"
-                    on_touch_down: if self.collide_point(*args[1].pos): search_input.text = ""
+                    on_touch_down: if self.collide_point(*args[1].pos): search_input.text = ""; app.clear_search_results()
 
             # Browse Category Chips
             DirectionalHorizontalScrollView:
@@ -44,50 +44,84 @@
                     spacing: "8dp"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Pop"
+                        on_release: search_input.text = "Pop"; app.perform_search("Pop")
                         MDChipText:
                             text: "Pop"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Hip-Hop"
+                        on_release: search_input.text = "Hip-Hop"; app.perform_search("Hip-Hop")
                         MDChipText:
                             text: "Hip-Hop"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Rock"
+                        on_release: search_input.text = "Rock"; app.perform_search("Rock")
                         MDChipText:
                             text: "Rock"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Bollywood"
+                        on_release: search_input.text = "Bollywood"; app.perform_search("Bollywood")
                         MDChipText:
                             text: "Bollywood"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Punjabi"
+                        on_release: search_input.text = "Punjabi"; app.perform_search("Punjabi")
                         MDChipText:
                             text: "Punjabi"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Indie"
+                        on_release: search_input.text = "Indie"; app.perform_search("Indie")
                         MDChipText:
                             text: "Indie"
                     MDChip:
                         type: "suggestion"
-                        on_release: search_input.text = "Podcasts"
+                        on_release: search_input.text = "Podcasts"; app.perform_search("Podcasts")
                         MDChipText:
                             text: "Podcasts"
 
+            # Results Section Header
             MDBoxLayout:
+                id: results_header_box
                 adaptive_height: True
+                opacity: 1 if search_results_list.data else 0
+                height: self.minimum_height if search_results_list.data else 0
+                MDLabel:
+                    id: search_status_label
+                    text: "Search Results"
+                    font_style: "Title"
+                    role: "medium"
+                    bold: True
+                    adaptive_height: True
+
+            # Results List
+            RecycleView:
+                id: search_results_list
+                viewclass: "TrackListItem"
+                data: []
+                size_hint_y: 1 if self.data else None
+                height: dp(260) if self.data else 0
+                opacity: 1 if self.data else 0
+                RecycleBoxLayout:
+                    default_size: None, dp(64)
+                    default_size_hint: 1, None
+                    size_hint_y: None
+                    height: self.minimum_height
+                    orientation: 'vertical'
+                    spacing: dp(8)
+
+            MDBoxLayout:
+                id: history_header_box
+                adaptive_height: True
+                opacity: 1 if not search_results_list.data else 0
+                height: self.minimum_height if not search_results_list.data else 0
                 MDLabel:
                     text: "Recent searches"
                     font_style: "Title"
                     role: "medium"
+                    bold: True
                     adaptive_height: True
                 MDButton:
                     style: "text"
-                    on_release: search_history_list.data = []
+                    on_release: app.clear_search_history()
                     MDButtonText:
                         text: "Clear search history"
                         
@@ -95,6 +129,9 @@
                 id: search_history_list
                 viewclass: "SearchHistoryItem"
                 data: [{"text": "unstoppable"}, {"text": "haryanvi songs"}]
+                size_hint_y: 1 if not search_results_list.data else None
+                height: dp(200) if not search_results_list.data else 0
+                opacity: 1 if not search_results_list.data else 0
                 RecycleBoxLayout:
                     default_size: None, dp(56)
                     default_size_hint: 1, None
