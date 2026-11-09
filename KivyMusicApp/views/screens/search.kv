@@ -9,22 +9,75 @@
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "arrow-left"
-                    on_release: app.root.ids.screen_manager.current = "home"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Search"
                 
         MDBoxLayout:
             orientation: "vertical"
-            padding: "16dp"
+            padding: ["16dp", "16dp", "16dp", "24dp"]
             spacing: "16dp"
             
             MDTextField:
+                id: search_input
                 mode: "outlined"
+                on_text_validate: app.perform_search(self.text)
                 MDTextFieldHintText:
-                    text: "Search for song..."
+                    text: "Search songs, artists, podcasts..."
                 MDTextFieldLeadingIcon:
                     icon: "magnify"
-                    
+                MDTextFieldTrailingIcon:
+                    icon: "close"
+                    on_touch_down: if self.collide_point(*args[1].pos): search_input.text = ""
+
+            # Browse Category Chips
+            DirectionalHorizontalScrollView:
+                size_hint_y: None
+                height: "48dp"
+                do_scroll_y: False
+                do_scroll_x: True
+                bar_width: "2dp"
+                MDBoxLayout:
+                    adaptive_size: True
+                    height: "48dp"
+                    padding: ["8dp", "8dp", "8dp", "8dp"]
+                    spacing: "8dp"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Pop"
+                        MDChipText:
+                            text: "Pop"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Hip-Hop"
+                        MDChipText:
+                            text: "Hip-Hop"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Rock"
+                        MDChipText:
+                            text: "Rock"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Bollywood"
+                        MDChipText:
+                            text: "Bollywood"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Punjabi"
+                        MDChipText:
+                            text: "Punjabi"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Indie"
+                        MDChipText:
+                            text: "Indie"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: search_input.text = "Podcasts"
+                        MDChipText:
+                            text: "Podcasts"
+
             MDBoxLayout:
                 adaptive_height: True
                 MDLabel:
@@ -34,6 +87,7 @@
                     adaptive_height: True
                 MDButton:
                     style: "text"
+                    on_release: search_history_list.data = []
                     MDButtonText:
                         text: "Clear search history"
                         
@@ -42,12 +96,9 @@
                 viewclass: "SearchHistoryItem"
                 data: [{"text": "unstoppable"}, {"text": "haryanvi songs"}]
                 RecycleBoxLayout:
-                    default_size: None, dp(72)
+                    default_size: None, dp(56)
                     default_size_hint: 1, None
                     size_hint_y: None
                     height: self.minimum_height
                     orientation: 'vertical'
                     spacing: dp(8)
-                        
-            MDWidget:
-                # Filler

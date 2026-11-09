@@ -1,13 +1,22 @@
 import argparse
 import inspect
+import os
 import sys
 import yt_dlp
+
+DEFAULT_OUTPUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "docs",
+    "api",
+    "yt-dlp_api.md"
+)
 
 def generate(output: str) -> None:
     print("yt-dlp API Reference Generator")
     print("=" * 31)
     print("Generating from local yt_dlp module...")
 
+    os.makedirs(os.path.dirname(output), exist_ok=True)
     with open(output, "w", encoding="utf-8") as f:
         f.write("# yt-dlp API Reference\n\n")
         f.write("> Automatically generated from yt_dlp Python docstrings.\n")
@@ -47,10 +56,9 @@ def generate(output: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a Markdown yt-dlp API reference.")
-    parser.add_argument("-o", "--output", default="ytdlp_api.md", help="Output filename")
+    parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT, help="Output filename")
     args = parser.parse_args()
     generate(args.output)
 
 if __name__ == "__main__":
     main()
-

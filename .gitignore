@@ -47,6 +47,9 @@ cache/
 .buildozer/
 bin/
 
+# Test outputs
+test_results.json
+
 # OS / Editor Files
 .DS_Store
 Thumbs.db

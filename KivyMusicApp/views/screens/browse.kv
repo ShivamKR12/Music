@@ -1,29 +1,196 @@
-<BrowseScreen>
+<BrowseScreen>:
+    name: "browse"
+    md_bg_color: app.theme_cls.backgroundColor
+
     MDBoxLayout:
         orientation: "vertical"
         
         MDTopAppBar:
             type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
-                text: "Browse"
-                
+                text: "Explore & Browse"
+
         MDScrollView:
             MDGridLayout:
                 cols: 2
                 adaptive_height: True
-                padding: "16dp"
+                padding: ["16dp", "16dp", "16dp", "32dp"]
                 spacing: "16dp"
-                
+
                 MDCard:
+                    style: "elevated"
                     size_hint_y: None
-                    height: "120dp"
+                    height: "130dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "8dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("album")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "new-box"
+                        font_size: "32sp"
+                        theme_text_color: "Custom"
+                        text_color: [1, 0.4, 0.4, 1]
                     MDLabel:
                         text: "New Releases"
-                        halign: "center"
-                        
-                MDCard:
-                    size_hint_y: None
-                    height: "120dp"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
                     MDLabel:
-                        text: "Charts"
-                        halign: "center"
+                        text: "Fresh tracks & albums"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "130dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "8dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "chart-line"
+                        font_size: "32sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.3, 0.7, 1, 1]
+                    MDLabel:
+                        text: "Top Charts"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Most played worldwide"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "130dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "8dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("mood")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "emoticon-happy-outline"
+                        font_size: "32sp"
+                        theme_text_color: "Custom"
+                        text_color: [1, 0.8, 0.2, 1]
+                    MDLabel:
+                        text: "Moods & Genres"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Music for every moment"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "130dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "8dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("podcasts")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "podcast"
+                        font_size: "32sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.4, 0.9, 0.6, 1]
+                    MDLabel:
+                        text: "Podcasts"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Shows, talks & stories"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "130dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "8dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "radio"
+                        font_size: "32sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.8, 0.4, 1, 1]
+                    MDLabel:
+                        text: "Radio Stations"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Endless curated mixes"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "130dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "8dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "music-box-multiple"
+                        font_size: "32sp"
+                        theme_text_color: "Custom"
+                        text_color: [1, 0.5, 0.8, 1]
+                    MDLabel:
+                        text: "Community Picks"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Trending playlists"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor

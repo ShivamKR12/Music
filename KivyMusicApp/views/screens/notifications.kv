@@ -9,13 +9,14 @@
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "arrow-left"
-                    on_release: app.root.ids.screen_manager.current = "home"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Notifications"
                 
         MDScrollView:
             MDList:
                 MDListItem:
+                    on_release: app.switch_screen("album")
                     MDListItemLeadingIcon:
                         icon: "album"
                     MDListItemHeadlineText:
@@ -26,6 +27,7 @@
                         text: "2 hours ago"
                         
                 MDListItem:
+                    on_release: app.switch_screen("playlist")
                     MDListItemLeadingIcon:
                         icon: "playlist-star"
                     MDListItemHeadlineText:
@@ -36,6 +38,7 @@
                         text: "1 day ago"
                         
                 MDListItem:
+                    on_release: app.switch_screen("artist")
                     MDListItemLeadingIcon:
                         icon: "ticket-confirmation"
                     MDListItemHeadlineText:

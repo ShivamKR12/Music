@@ -9,7 +9,7 @@
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "arrow-left"
-                    on_release: app.root.ids.screen_manager.current = "home"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Settings"
                 
@@ -22,38 +22,47 @@
 
                 MDList:
                     MDListItem:
+                        on_release: app.show_audio_quality_dialog()
                         MDListItemHeadlineText:
                             text: "Audio Quality"
                         MDListItemSupportingText:
-                            text: "High (320kbps)"
+                            text: app.selected_audio_quality
                         MDListItemTrailingIcon:
                             icon: "chevron-right"
                             
                     MDListItem:
+                        on_release: wifi_checkbox.active = not wifi_checkbox.active
                         MDListItemHeadlineText:
                             text: "Download over Wi-Fi only"
                         MDListItemSupportingText:
                             text: "Save mobile data"
                         MDListItemTrailingCheckbox:
+                            id: wifi_checkbox
                             active: True
 
                     MDListItem:
+                        on_release: dark_checkbox.active = not dark_checkbox.active
                         MDListItemHeadlineText:
                             text: "Dark Mode"
                         MDListItemSupportingText:
                             text: "Toggle app theme"
                         MDListItemTrailingCheckbox:
-                            active: True
+                            id: dark_checkbox
+                            active: app.theme_cls.theme_style == "Dark"
+                            on_active: app.toggle_theme_style(self.active)
                             
                     MDListItem:
+                        on_release: sponsor_checkbox.active = not sponsor_checkbox.active
                         MDListItemHeadlineText:
                             text: "SponsorBlock"
                         MDListItemSupportingText:
                             text: "Skip non-music segments"
                         MDListItemTrailingCheckbox:
+                            id: sponsor_checkbox
                             active: True
                             
                     MDListItem:
+                        on_release: app.switch_screen("equalizer")
                         MDListItemHeadlineText:
                             text: "Equalizer"
                         MDListItemSupportingText:
@@ -62,6 +71,7 @@
                             icon: "chevron-right"
                             
                     MDListItem:
+                        on_release: app.show_clear_cache_dialog()
                         MDListItemHeadlineText:
                             text: "Clear Cache"
                         MDListItemSupportingText:

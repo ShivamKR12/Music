@@ -1,46 +1,132 @@
-<AuthScreen>
+<AuthScreen>:
+    name: "auth"
+    md_bg_color: app.theme_cls.backgroundColor
 
     MDBoxLayout:
         orientation: "vertical"
-        padding: "24dp"
-        spacing: "24dp"
-        pos_hint: {"center_x": .5, "center_y": .5}
-        adaptive_height: True
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.go_back()
+            MDTopAppBarTitle:
+                text: "Account & Sync"
 
-        MDLabel:
-            text: "Link Accounts"
-            font_style: "Display"
-            role: "small"
-            halign: "center"
-            adaptive_height: True
+        MDScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: ["24dp", "16dp", "24dp", "32dp"]
+                spacing: "20dp"
 
-        MDButton:
-            style: "filled"
-            pos_hint: {"center_x": .5}
-            MDButtonText:
-                text: "Login with Spotify"
+                # Header Icon & Description
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    spacing: "8dp"
 
-        MDButton:
-            style: "filled"
-            pos_hint: {"center_x": .5}
-            MDButtonText:
-                text: "Login with Last.fm"
+                    MDIcon:
+                        icon: "account-sync-outline"
+                        font_size: "48sp"
+                        pos_hint: {"center_x": .5}
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.primaryColor
 
-        MDButton:
-            style: "filled"
-            pos_hint: {"center_x": .5}
-            MDButtonText:
-                text: "Login with Discord"
+                    MDLabel:
+                        text: "Account & Sync"
+                        font_style: "Headline"
+                        role: "small"
+                        halign: "center"
+                        adaptive_height: True
+                        bold: True
 
-        MDLabel:
-            text: "QR Sync"
-            font_style: "Title"
-            role: "large"
-            halign: "center"
-            adaptive_height: True
+                    MDLabel:
+                        text: "Link external services for scrobbling and rich presence, or sync your library across devices."
+                        font_style: "Body"
+                        role: "small"
+                        halign: "center"
+                        adaptive_height: True
+                        text_color: app.theme_cls.onSurfaceVariantColor
 
-        MDButton:
-            style: "outlined"
-            pos_hint: {"center_x": .5}
-            MDButtonText:
-                text: "Show QR Code"
+                # Streaming & Social Services Card
+                MDCard:
+                    style: "elevated"
+                    radius: [dp(20)]
+                    padding: "20dp"
+                    spacing: "16dp"
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDLabel:
+                        text: "Streaming & Social"
+                        font_style: "Title"
+                        role: "medium"
+                        adaptive_height: True
+                        bold: True
+
+                    MDButton:
+                        style: "filled"
+                        size_hint_x: 1
+                        height: "48dp"
+                        on_release: app.show_auth_dialog("Spotify")
+                        MDButtonIcon:
+                            icon: "spotify"
+                        MDButtonText:
+                            text: "Login with Spotify"
+
+                    MDButton:
+                        style: "tonal"
+                        size_hint_x: 1
+                        height: "48dp"
+                        on_release: app.show_auth_dialog("Last.fm")
+                        MDButtonIcon:
+                            icon: "radio-tower"
+                        MDButtonText:
+                            text: "Login with Last.fm"
+
+                    MDButton:
+                        style: "tonal"
+                        size_hint_x: 1
+                        height: "48dp"
+                        on_release: app.show_auth_dialog("Discord")
+                        MDButtonIcon:
+                            icon: "discord"
+                        MDButtonText:
+                            text: "Login with Discord"
+
+                # Local Device QR Sync Card
+                MDCard:
+                    style: "elevated"
+                    radius: [dp(20)]
+                    padding: "20dp"
+                    spacing: "12dp"
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDLabel:
+                        text: "Device Session Sync"
+                        font_style: "Title"
+                        role: "medium"
+                        adaptive_height: True
+                        bold: True
+
+                    MDLabel:
+                        text: "Instantly mirror your queue and preferences to another device using a QR code."
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDButton:
+                        style: "outlined"
+                        size_hint_x: 1
+                        height: "48dp"
+                        on_release: app.show_auth_dialog("QR Sync")
+                        MDButtonIcon:
+                            icon: "qrcode-scan"
+                        MDButtonText:
+                            text: "Scan or Show QR Code"

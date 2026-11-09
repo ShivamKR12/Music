@@ -1,4 +1,7 @@
-<PlaylistScreen>
+<PlaylistScreen>:
+    name: "playlist"
+    md_bg_color: app.theme_cls.backgroundColor
+
     MDBoxLayout:
         orientation: "vertical"
         
@@ -7,24 +10,172 @@
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "arrow-left"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Playlist"
-                
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "heart-outline"
+                MDActionTopAppBarButton:
+                    icon: "share-variant-outline"
+                MDActionTopAppBarButton:
+                    icon: "dots-vertical"
+
         MDScrollView:
-            MDGridLayout:
-                cols: 2
+            MDBoxLayout:
+                orientation: "vertical"
                 adaptive_height: True
-                padding: "16dp"
-                spacing: "16dp"
-                
+                padding: ["16dp", "16dp", "16dp", "32dp"]
+                spacing: "20dp"
+
+                # Playlist Header Card
                 MDCard:
+                    style: "elevated"
                     size_hint_y: None
-                    height: "150dp"
+                    adaptive_height: True
+                    radius: [dp(24)]
+                    padding: "20dp"
+                    spacing: "16dp"
+                    orientation: "vertical"
+                    md_bg_color: app.theme_cls.surfaceContainerColor
+
+                    FitImage:
+                        source: "album_art2.png"
+                        size_hint: None, None
+                        size: "180dp", "180dp"
+                        radius: [dp(16)]
+                        pos_hint: {"center_x": .5}
+
                     MDBoxLayout:
                         orientation: "vertical"
-                        FitImage:
-                            source: ""
+                        adaptive_height: True
+                        spacing: "4dp"
                         MDLabel:
-                            text: "Track 1"
+                            text: "Chillwave & Lo-Fi Beats"
+                            font_style: "Headline"
+                            role: "small"
+                            bold: True
                             halign: "center"
                             adaptive_height: True
+                        MDLabel:
+                            text: "Curated by KivyMusic"
+                            font_style: "Title"
+                            role: "medium"
+                            halign: "center"
+                            theme_text_color: "Custom"
+                            text_color: app.theme_cls.primaryColor
+                            adaptive_height: True
+                        MDLabel:
+                            text: "Public Playlist • 25 tracks • 1 hr 18 min"
+                            font_style: "Body"
+                            role: "small"
+                            halign: "center"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_height: True
+
+                    MDBoxLayout:
+                        adaptive_size: True
+                        spacing: "8dp"
+                        pos_hint: {"center_x": .5}
+                        MDButton:
+                            style: "filled"
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDButtonIcon:
+                                icon: "play"
+                            MDButtonText:
+                                text: "Play All"
+                        MDButton:
+                            style: "tonal"
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDButtonIcon:
+                                icon: "shuffle"
+                            MDButtonText:
+                                text: "Shuffle"
+                        MDIconButton:
+                            style: "outlined"
+                            icon: "download-outline"
+                            pos_hint: {"center_y": .5}
+
+                # Section Header: Tracks
+                MDLabel:
+                    text: "Tracks"
+                    font_style: "Title"
+                    role: "medium"
+                    bold: True
+                    adaptive_height: True
+
+                # Tracks List Card
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    adaptive_height: True
+                    radius: [dp(20)]
+                    padding: ["0dp", "8dp", "0dp", "8dp"]
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDList:
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Midnight Study Session"
+                            MDListItemSupportingText:
+                                text: "Lo-Fi Collective • 2:48"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Rainy Window Coffee"
+                            MDListItemSupportingText:
+                                text: "Acoustic Beats • 3:12"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Distant Neon Lights"
+                            MDListItemSupportingText:
+                                text: "Tokyo Chill • 3:35"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Slow Sunday Morning"
+                            MDListItemSupportingText:
+                                text: "Cozy Tape • 2:54"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Stargazing from the Roof"
+                            MDListItemSupportingText:
+                                text: "Deep Sleep • 4:02"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Fading Memories"
+                            MDListItemSupportingText:
+                                text: "Dreamcatcher • 3:20"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"

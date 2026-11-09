@@ -45,13 +45,18 @@ class WrappedScreen(MDScreen):
 
     def advance_slide(self, dt):
         carousel = self.ids.wrapped_carousel
-        # carousel.children has the slides in MDCarousel (or maybe widgets property is better)
+        # Advance slide using native Carousel load_next
         max_slides = 3 # Hardcoding to 3 since we have exactly 3 slides
         if carousel.index < max_slides - 1:
-            carousel.index += 1
+            carousel.load_next()
         else:
             # End of wrapped, return to library
-            self.manager.current = "library"
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if app:
+                app.go_back()
+            elif self.manager:
+                self.manager.current = "library"
 
 class AlbumScreen(MDScreen): pass
 class ArtistScreen(MDScreen): pass
@@ -62,3 +67,4 @@ class MoodScreen(MDScreen): pass
 class EqualizerScreen(MDScreen): pass
 class ListenTogetherScreen(MDScreen): pass
 class AuthScreen(MDScreen): pass
+class FavoritesScreen(MDScreen): pass

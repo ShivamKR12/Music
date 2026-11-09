@@ -1,4 +1,7 @@
-<ArtistScreen>
+<ArtistScreen>:
+    name: "artist"
+    md_bg_color: app.theme_cls.backgroundColor
+
     MDBoxLayout:
         orientation: "vertical"
         
@@ -7,56 +10,273 @@
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "arrow-left"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Artist Profile"
-                
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "share-variant-outline"
+
         MDScrollView:
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: "16dp"
-                spacing: "16dp"
-                
-                FitImage:
-                    source: ""
-                    size_hint: None, None
-                    size: "150dp", "150dp"
-                    pos_hint: {"center_x": .5}
-                    
+                padding: ["16dp", "16dp", "16dp", "32dp"]
+                spacing: "20dp"
+
+                # Artist Header Card
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    adaptive_height: True
+                    radius: [dp(24)]
+                    padding: "20dp"
+                    spacing: "14dp"
+                    orientation: "vertical"
+                    md_bg_color: app.theme_cls.surfaceContainerColor
+
+                    FitImage:
+                        source: "album_art.png"
+                        size_hint: None, None
+                        size: "130dp", "130dp"
+                        radius: [dp(65)]
+                        pos_hint: {"center_x": .5}
+
+                    MDBoxLayout:
+                        orientation: "vertical"
+                        adaptive_height: True
+                        spacing: "4dp"
+                        MDLabel:
+                            text: "Synthwave Collective"
+                            font_style: "Headline"
+                            role: "small"
+                            bold: True
+                            halign: "center"
+                            adaptive_height: True
+
+                        MDBoxLayout:
+                            adaptive_size: True
+                            pos_hint: {"center_x": .5}
+                            spacing: "6dp"
+                            MDIcon:
+                                icon: "check-decagram"
+                                font_size: "16sp"
+                                theme_text_color: "Custom"
+                                text_color: app.theme_cls.primaryColor
+                            MDLabel:
+                                text: "Verified Artist"
+                                font_style: "Label"
+                                role: "medium"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: app.theme_cls.primaryColor
+                                adaptive_size: True
+
+                        MDLabel:
+                            text: "1,420,890 Monthly Listeners"
+                            font_style: "Body"
+                            role: "small"
+                            halign: "center"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_height: True
+
+                    MDBoxLayout:
+                        adaptive_size: True
+                        spacing: "8dp"
+                        pos_hint: {"center_x": .5}
+                        MDButton:
+                            style: "filled"
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDButtonIcon:
+                                icon: "play"
+                            MDButtonText:
+                                text: "Play"
+                        MDButton:
+                            style: "tonal"
+                            MDButtonIcon:
+                                icon: "heart-outline"
+                            MDButtonText:
+                                text: "Follow"
+                        MDIconButton:
+                            style: "outlined"
+                            icon: "radio-tower"
+                            pos_hint: {"center_y": .5}
+
+                # Section Header: Top Tracks
                 MDLabel:
                     text: "Top Tracks"
+                    font_style: "Title"
+                    role: "medium"
                     bold: True
                     adaptive_height: True
-                    
-                MDScrollView:
+
+                # Top Tracks List Card
+                MDCard:
+                    style: "elevated"
                     size_hint_y: None
-                    height: "100dp"
-                    do_scroll_y: False
-                    MDBoxLayout:
-                        adaptive_width: True
-                        spacing: "8dp"
-                        MDCard:
-                            size_hint: None, None
-                            size: "150dp", "100dp"
-                            MDLabel:
-                                text: "Track 1"
-                                halign: "center"
-                                
+                    adaptive_height: True
+                    radius: [dp(20)]
+                    padding: ["0dp", "8dp", "0dp", "8dp"]
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDList:
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Midnight City Lights"
+                            MDListItemSupportingText:
+                                text: "34.2M plays • 3:42"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Neon Horizon"
+                            MDListItemSupportingText:
+                                text: "28.9M plays • 4:15"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Digital Sunset"
+                            MDListItemSupportingText:
+                                text: "19.5M plays • 3:18"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "Quantum Pulse"
+                            MDListItemSupportingText:
+                                text: "12.1M plays • 5:01"
+                            MDListItemTrailingIcon:
+                                icon: "dots-vertical"
+
+                # Section Header: Albums
                 MDLabel:
-                    text: "Albums"
+                    text: "Discography & Albums"
+                    font_style: "Title"
+                    role: "medium"
                     bold: True
                     adaptive_height: True
-                    
-                MDScrollView:
+
+                # Horizontal Scrollable Albums list
+                DirectionalHorizontalScrollView:
                     size_hint_y: None
-                    height: "150dp"
+                    height: "170dp"
                     do_scroll_y: False
+                    do_scroll_x: True
+                    bar_width: "2dp"
                     MDBoxLayout:
-                        adaptive_width: True
-                        spacing: "8dp"
+                        adaptive_size: True
+                        height: "170dp"
+                        spacing: "16dp"
+                        padding: ["0dp", "4dp", "0dp", "4dp"]
+
+                        # Album 1
                         MDCard:
+                            style: "elevated"
                             size_hint: None, None
-                            size: "150dp", "150dp"
+                            size: "140dp", "160dp"
+                            radius: [dp(16)]
+                            padding: "10dp"
+                            spacing: "6dp"
+                            orientation: "vertical"
+                            ripple_behavior: True
+                            on_release: app.switch_screen("album")
+                            md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                            FitImage:
+                                source: "album_art.png"
+                                size_hint: None, None
+                                size: "120dp", "95dp"
+                                radius: [dp(12)]
+                                pos_hint: {"center_x": .5}
                             MDLabel:
-                                text: "Album 1"
-                                halign: "center"
+                                text: "Future Echoes"
+                                font_style: "Label"
+                                role: "large"
+                                bold: True
+                                adaptive_height: True
+                            MDLabel:
+                                text: "2024 • Album"
+                                font_style: "Body"
+                                role: "small"
+                                text_color: app.theme_cls.onSurfaceVariantColor
+                                adaptive_height: True
+
+                        # Album 2
+                        MDCard:
+                            style: "elevated"
+                            size_hint: None, None
+                            size: "140dp", "160dp"
+                            radius: [dp(16)]
+                            padding: "10dp"
+                            spacing: "6dp"
+                            orientation: "vertical"
+                            ripple_behavior: True
+                            on_release: app.switch_screen("album")
+                            md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                            FitImage:
+                                source: "album_art2.png"
+                                size_hint: None, None
+                                size: "120dp", "95dp"
+                                radius: [dp(12)]
+                                pos_hint: {"center_x": .5}
+                            MDLabel:
+                                text: "Midnight Drive"
+                                font_style: "Label"
+                                role: "large"
+                                bold: True
+                                adaptive_height: True
+                            MDLabel:
+                                text: "2023 • Album"
+                                font_style: "Body"
+                                role: "small"
+                                text_color: app.theme_cls.onSurfaceVariantColor
+                                adaptive_height: True
+
+                        # Album 3
+                        MDCard:
+                            style: "elevated"
+                            size_hint: None, None
+                            size: "140dp", "160dp"
+                            radius: [dp(16)]
+                            padding: "10dp"
+                            spacing: "6dp"
+                            orientation: "vertical"
+                            ripple_behavior: True
+                            on_release: app.switch_screen("album")
+                            md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                            FitImage:
+                                source: "album_art.png"
+                                size_hint: None, None
+                                size: "120dp", "95dp"
+                                radius: [dp(12)]
+                                pos_hint: {"center_x": .5}
+                            MDLabel:
+                                text: "Electric Dreams"
+                                font_style: "Label"
+                                role: "large"
+                                bold: True
+                                adaptive_height: True
+                            MDLabel:
+                                text: "2022 • Album"
+                                font_style: "Body"
+                                role: "small"
+                                text_color: app.theme_cls.onSurfaceVariantColor
+                                adaptive_height: True

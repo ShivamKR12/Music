@@ -1,67 +1,211 @@
 <EqualizerScreen>:
+    name: "equalizer"
+    md_bg_color: app.theme_cls.backgroundColor
+
     MDBoxLayout:
         orientation: "vertical"
-        padding: "16dp"
-        spacing: "16dp"
+        
+        MDTopAppBar:
+            type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.go_back()
+            MDTopAppBarTitle:
+                text: "10-Band Equalizer"
 
-        MDLabel:
-            text: "10-Band Equalizer"
-            font_style: "Headline"
-            role: "small"
-            adaptive_height: True
-
-        MDBoxLayout:
-            orientation: "horizontal"
-            spacing: "8dp"
-
-            # 10 Bands
-            MDSlider:
+        MDScrollView:
+            MDBoxLayout:
                 orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-            MDSlider:
-                orientation: "vertical"
-
-        MDBoxLayout:
-            orientation: "horizontal"
-            adaptive_height: True
-            spacing: "16dp"
-            pos_hint: {"center_y": 0.5}
-
-            MDLabel:
-                text: "Reverb Config"
                 adaptive_height: True
-                pos_hint: {"center_y": 0.5}
+                padding: ["16dp", "16dp", "16dp", "32dp"]
+                spacing: "20dp"
 
-            MDSwitch:
-                active: False
-                pos_hint: {"center_y": 0.5}
+                # 10-Band Sliders Card
+                MDCard:
+                    style: "elevated"
+                    radius: [dp(20)]
+                    padding: ["16dp", "16dp", "16dp", "16dp"]
+                    spacing: "12dp"
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
 
-        MDBoxLayout:
-            orientation: "horizontal"
-            adaptive_height: True
-            spacing: "16dp"
+                    MDBoxLayout:
+                        adaptive_height: True
+                        MDLabel:
+                            text: "Frequency Response"
+                            font_style: "Title"
+                            role: "medium"
+                            bold: True
+                            adaptive_height: True
+                        Widget:
+                        MDLabel:
+                            text: "±12 dB"
+                            font_style: "Label"
+                            role: "small"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_width: True
 
-            MDLabel:
-                text: "AutoEq Profile"
-                adaptive_height: True
-                pos_hint: {"center_y": 0.5}
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "180dp"
+                        spacing: "4dp"
 
-            MDButton:
-                pos_hint: {"center_y": 0.5}
-                MDButtonText:
-                    text: "Pick Profile..."
+                        # 10 Frequency Sliders
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+                        MDSlider:
+                            orientation: "vertical"
+                            value: 50
+
+                    # Band Frequency Labels
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "20dp"
+                        spacing: "4dp"
+                        MDLabel:
+                            text: "32"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "64"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "125"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "250"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "500"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "1k"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "2k"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "4k"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "8k"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: "16k"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+
+                # Audio Effects Card
+                MDCard:
+                    style: "elevated"
+                    radius: [dp(20)]
+                    padding: "20dp"
+                    spacing: "16dp"
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDLabel:
+                        text: "Audio Effects & Calibration"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+
+                    # Reverb Toggle
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "16dp"
+
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            adaptive_height: True
+                            pos_hint: {"center_y": 0.5}
+                            MDLabel:
+                                text: "Reverb Simulation"
+                                font_style: "Body"
+                                role: "large"
+                            MDLabel:
+                                text: "Spatial acoustic room reflections"
+                                font_style: "Body"
+                                role: "small"
+                                text_color: app.theme_cls.onSurfaceVariantColor
+
+                        MDSwitch:
+                            active: False
+                            pos_hint: {"center_y": 0.5}
+
+                    # AutoEq Profile Row
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "16dp"
+
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            adaptive_height: True
+                            pos_hint: {"center_y": 0.5}
+                            MDLabel:
+                                text: "Headphone Profile"
+                                font_style: "Body"
+                                role: "large"
+                            MDLabel:
+                                text: f"Active: {app.selected_eq_profile}"
+                                font_style: "Body"
+                                role: "small"
+                                text_color: app.theme_cls.primaryColor
+
+                        MDButton:
+                            style: "tonal"
+                            pos_hint: {"center_y": 0.5}
+                            on_release: app.show_autoeq_profile_dialog()
+                            MDButtonText:
+                                text: "Pick Profile..."

@@ -18,8 +18,20 @@
 #:include views/screens/equalizer.kv
 #:include views/screens/listen_together.kv
 #:include views/screens/auth.kv
+#:include views/screens/favorites.kv
 
 
+
+<MDScreen>:
+    pos_hint: {"x": 0, "y": 0}
+
+<NavBarItem@MDNavigationItem>:
+    icon: ""
+    text: ""
+    MDNavigationItemIcon:
+        icon: root.icon
+    MDNavigationItemLabel:
+        text: root.text
 
 <LibraryGridCard@MDCard>:
     style: "elevated"
@@ -30,8 +42,8 @@
     orientation: "vertical"
     icon: "music"
     text: "Title"
-    text_color: "black"
-    icon_color: "black"
+    text_color: app.theme_cls.onSurfaceColor
+    icon_color: app.theme_cls.primaryColor
     MDIcon:
         icon: root.icon
         
@@ -71,21 +83,22 @@ MDBoxLayout:
         EqualizerScreen:
         ListenTogetherScreen:
         AuthScreen:
+        FavoritesScreen:
 
     # Global Mini Player
     MDBoxLayout:
         id: mini_player
-        adaptive_height: True
+        size_hint_y: None
         padding: ["8dp", "0dp", "8dp", "8dp"]
-        opacity: 1 if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played"] else 0
-        size_hint_y: None if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played"] else 0
-        height: self.minimum_height if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played"] else 0
+        opacity: 1 if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
+        height: dp(72) if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
+        disabled: False if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else True
         MDCard:
             style: "elevated"
             size_hint_y: None
             height: "64dp"
             md_bg_color: app.theme_cls.surfaceContainerHighestColor
-            on_release: screen_manager.current = "player"
+            on_release: app.switch_screen("player")
             radius: [dp(16)]
             ripple_behavior: True
             MDBoxLayout:
@@ -109,27 +122,33 @@ MDBoxLayout:
                         role: "small"
                         text_color: app.theme_cls.onSurfaceVariantColor
                 MDIconButton:
-                    icon: "favorite-border"
+                    icon: "heart" if app.player_controller.is_favorite else "heart-outline"
+                    theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
+                    icon_color: [1, 0.2, 0.3, 1] if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
                     pos_hint: {"center_y": .5}
+                    on_release: app.player_controller.toggle_favorite()
                 MDIconButton:
                     icon: "pause" if app.player_controller.is_playing else "play"
                     pos_hint: {"center_y": .5}
                     on_release: app.player_controller.toggle_play()
 
-    MDBottomAppBar:
+    MDNavigationBar:
         id: bottom_nav
-        opacity: 1 if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played", "settings"] else 0
-        size_hint_y: None if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played", "settings"] else 0
-        height: dp(80) if screen_manager.current not in ["player", "wrapped", "analytics", "notifications", "recently_played", "settings"] else 0
-        MDActionBottomAppBarButton:
+        on_switch_tabs: app.on_switch_tabs(*args)
+        size_hint_y: None
+        opacity: 1 if screen_manager.current in ["home", "search", "library"] else 0
+        height: dp(80) if screen_manager.current in ["home", "search", "library"] else 0
+        disabled: False if screen_manager.current in ["home", "search", "library"] else True
+
+        NavBarItem:
             icon: "home"
-            active: screen_manager.current == "home"
-            on_release: screen_manager.current = "home"
-        MDActionBottomAppBarButton:
+            text: "Home"
+            active: True
+
+        NavBarItem:
             icon: "magnify"
-            active: screen_manager.current == "search"
-            on_release: screen_manager.current = "search"
-        MDActionBottomAppBarButton:
+            text: "Search"
+
+        NavBarItem:
             icon: "music-box-multiple"
-            active: screen_manager.current == "library"
-            on_release: screen_manager.current = "library"
+            text: "Library"

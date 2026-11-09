@@ -9,7 +9,7 @@
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "chevron-down"
-                    on_release: app.root.ids.screen_manager.current = "home"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "NOW PLAYING"
                 font_style: "Body"
@@ -17,18 +17,17 @@
             MDTopAppBarTrailingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "dots-vertical"
+                    on_release: app.show_track_options()
 
         MDBoxLayout:
             orientation: "vertical"
             padding: "24dp"
             spacing: "16dp"
 
-            MDCarousel:
+            Carousel:
                 id: album_carousel
                 size_hint: 1, 1
                 pos_hint: {"center_x": .5}
-                layouts: "uncontained"
-                uncontained_item_width: "280dp"
                 on_index: app.on_carousel_index(self.index)
 
             MDBoxLayout:
@@ -73,13 +72,16 @@
                     adaptive_width: True
 
             MDBoxLayout:
-                adaptive_height: True
+                adaptive_size: True
                 spacing: "16dp"
                 pos_hint: {"center_x": .5}
 
                 MDIconButton:
                     icon: "shuffle"
                     pos_hint: {"center_y": .5}
+                    theme_icon_color: "Custom" if app.player_controller.is_shuffle else "Primary"
+                    icon_color: app.theme_cls.primaryColor if app.player_controller.is_shuffle else app.theme_cls.onSurfaceVariantColor
+                    on_release: app.player_controller.toggle_shuffle()
                 MDIconButton:
                     icon: "skip-previous"
                     pos_hint: {"center_y": .5}
@@ -99,16 +101,47 @@
                 MDIconButton:
                     icon: "repeat"
                     pos_hint: {"center_y": .5}
+                    theme_icon_color: "Custom" if app.player_controller.is_repeat else "Primary"
+                    icon_color: app.theme_cls.primaryColor if app.player_controller.is_repeat else app.theme_cls.onSurfaceVariantColor
+                    on_release: app.player_controller.toggle_repeat()
                     
-            MDBoxLayout:
-                adaptive_height: True
-                spacing: "16dp"
+            # YouTube Music Style Up-Next Bottom Pill
+            MDCard:
+                style: "filled"
+                size_hint_y: None
+                height: "48dp"
+                radius: [dp(24)]
+                md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                padding: ["16dp", "0dp"]
+                ripple_behavior: True
                 pos_hint: {"center_x": .5}
-                MDIconButton:
-                    icon: "information-outline"
-                MDIconButton:
-                    icon: "playlist-plus"
-                MDIconButton:
-                    icon: "text-box-outline"
-                    on_release: app.show_lyrics()
+                on_release: app.show_queue_sheet()
+
+                MDBoxLayout:
+                    spacing: "8dp"
+                    pos_hint: {"center_y": .5}
+                    MDIcon:
+                        icon: "playlist-play"
+                        pos_hint: {"center_y": .5}
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.primaryColor
+                    MDLabel:
+                        text: "UP NEXT"
+                        font_style: "Label"
+                        role: "large"
+                        bold: True
+                        pos_hint: {"center_y": .5}
+                    Widget:
+                    MDLabel:
+                        text: f"{len(app.playlist_model.tracks)} tracks" if app.playlist_model else ""
+                        font_style: "Label"
+                        role: "medium"
+                        halign: "right"
+                        adaptive_width: True
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        pos_hint: {"center_y": .5}
+                    MDIcon:
+                        icon: "chevron-up"
+                        adaptive_width: True
+                        pos_hint: {"center_y": .5}
 

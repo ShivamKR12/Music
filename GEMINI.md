@@ -4,9 +4,9 @@ These rules must be strictly followed when working on this workspace:
 
 ## 1. API Documentation First
 **Always read the API markdown files** before making any changes related to the core libraries. Do not guess API methods or configuration options. Use the specific tool to read these files when needed:
-- `music_app/kivy_api.md` (for Kivy UI and Core API)
-- `music_app/kivymd_api.md` (for KivyMD Material Design components)
-- `music_app/ytdlp_api.md` (for yt-dlp downloading and extraction options)
+- `docs/api/kivy_api.md` (for Kivy UI and Core API)
+- `docs/api/kivymd_api.md` (for KivyMD Material Design components)
+- `docs/api/yt-dlp_api.md` (for yt-dlp downloading and extraction options)
 
 ## 2. Assess Overall Impact
 **Check and read all relevant code** before modifying any existing file. 
@@ -26,3 +26,37 @@ These rules must be strictly followed when working on this workspace:
 - Use scratch scripts to safely test logic (e.g., scraping, parsing, or library behavior) before modifying the actual application files.
 - Keep file modifications atomic and heavily focused on the user's explicit request.
 
+## 6. Mandatory Visual, Layout & Geometry Verification
+Whenever any UI modification is made (in `.kv` or Python UI components), you MUST verify that no visual glitches, clipping, or overlaps exist before concluding the task:
+- **Zero-Overlap Stacked Heights:** Never rely on `minimum_height` for top-level bars (`MDNavigationBar`, `mini_player`, `MDTopAppBar`). In KivyMD 2.0, `minimum_height` evaluates to 0 when child navigation items have `size_hint_y: 1.0`, collapsing the container and causing overlapping widgets at $y=0$. Set explicit heights (e.g. `dp(80)`, `dp(72)`) and verify that sibling bounding boxes do not overlap: $(y_1 + h_1 \le y_2)$.
+- **Bottom Navigation Padding:** All scrollable content (`MDScrollView`, `RecycleView`) must have bottom padding (minimum `32dp`, or `88dp` if an `MDFabButton` or persistent bar is present) so the last element can be fully scrolled into view without clipping.
+- **Scroll Container Spacing:** Ensure horizontal chip bars or card strips (`MDScrollView`, `RecycleView`) have explicit heights (e.g. `48dp` for chips) and internal box padding (`padding: ["8dp", "8dp", "8dp", "8dp"]`) so elements never touch scroll indicators or screen borders.
+- **Carousel & Pager Containment:** Carousels (`Carousel`, `MDCarousel`) must have slide dimensions cleanly constrained (`size_hint: (1, 1)` with centered, fixed-dimension cards) to prevent adjacent slides from peeking or clipping into the viewport.
+
+## 7. Touch-Stealing Prevention & Visibility Invariants
+- **Disabled State on Hidden Containers:** In Kivy, setting `opacity: 0` or `height: 0` on a parent does NOT prevent children with explicit sizes from intercepting touch events! Whenever a floating, pinned, or bottom overlay (such as `mini_player` or `bottom_nav`) is conditionally hidden, you MUST set `disabled: True` (e.g., `disabled: False if screen_manager.current in [...] else True`). Kivy completely halts touch dispatch for disabled widgets and all their descendants.
+- **Interactive Control Completeness:** Every interactive widget (buttons, list items, sliders, chips) must have a concrete, bound event handler (`on_release`, `on_touch_down`, `on_value`) wired to controller methods, modal dialogs, or bottom sheets. Never leave interactive widgets inert.
+
+## 8. Alignment, Sizing & Centering Standards
+- **Box Layout Centering (`adaptive_size`):** For centered horizontal button rows or action bars, always use `adaptive_size: True` (which sets both `adaptive_width` and `adaptive_height` to `True`) with `pos_hint: {"center_x": .5}`. Never use `adaptive_height: True` alone, as `size_hint_x: 1.0` defaults to expanding the full width and anchors child buttons to the left edge ($x=0$), causing severe spacing asymmetry.
+- **Touch Target Sizing:** All touchable elements must satisfy the minimum $48 \times 48\text{dp}$ touch target requirement.
+
+## 9. Directional Gesture Arbitration Invariant
+- **Nested Scrolling Rule:** Standard Kivy `ScrollView` and `RecycleView` absorb `on_scroll_move` and return `True` even for un-scrolled axes (`do_scroll_y: False`), locking parent vertical scrollviews.
+- **Mandatory Custom Containers:** Whenever placing a horizontal scroll container inside a vertical scrollview, you MUST use `DirectionalHorizontalScrollView` or `DirectionalHorizontalRecycleView` (powered by `DirectionalHorizontalScrollMixin`):
+  - In `on_scroll_start`: forward mouse wheel scrolling (`scrollup`, `scrolldown`) to the parent vertical scrollview.
+  - In `on_scroll_move`: if $\lvert dy \rvert > 1.1 \times \lvert dx \rvert$ and movement exceeds touch slop ($8\text{dp}$), return `False` so the parent vertical scrollview can scroll vertically.
+
+## 10. Performance & Main-Thread Preservation
+- **Debounced & Cached Dynamic Theming:** Material You wallpaper/album art quantization (`theme_cls.path_to_wallpaper`) is synchronous and heavy. Always debounce theme updates via `Clock.schedule_once`, cache the active image path, and avoid triggering theme updates multiple times on screen switches.
+- **Startup Async Sequencing:** Schedule background data population (`load_data_async`) promptly on startup ($0.05\text{s}$) rather than on a delayed timer (e.g. $1.0\text{s}$) to avoid freezing the UI while the user is actively navigating.
+
+## 11. Automated Headless Verification Battery
+- After any UI change, execute an automated verification script in headless mode (`KIVY_HEADLESS=1`).
+- The test suite must assert:
+  1. Zero exceptions during startup and screen navigation across all screens.
+  2. Bounding-box non-overlap across all stacked bars and screens.
+  3. Correct touch routing (sheets open on click, hidden overlays do not steal touches).
+  4. Symmetrical alignment (difference $< 1.0\text{dp}$ on centered rows).
+  5. Directional scrolling delegation (vertical swipe over horizontal container scrolls parent).
+  6. Screenshot captures saved for visual regression review.

@@ -1,25 +1,270 @@
-<MoodScreen>
+<MoodScreen>:
+    name: "mood"
+    md_bg_color: app.theme_cls.backgroundColor
+
     MDBoxLayout:
         orientation: "vertical"
         
         MDTopAppBar:
             type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
-                text: "Mood & Genres"
-                
+                text: "Moods & Genres"
+
         MDScrollView:
             MDGridLayout:
-                cols: 3
+                cols: 2
                 adaptive_height: True
-                padding: "16dp"
+                padding: ["16dp", "16dp", "16dp", "32dp"]
                 spacing: "16dp"
-                
+
+                # Chill & Relax
                 MDCard:
+                    style: "elevated"
                     size_hint_y: None
-                    height: "100dp"
-                    md_bg_color: 0.2, 0.5, 0.8, 1
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "coffee-outline"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.3, 0.75, 0.85, 1]
                     MDLabel:
-                        text: "Chill"
-                        halign: "center"
-                        
-                        text_color: 1, 1, 1, 1
+                        text: "Chill & Relax"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Unwind & calm vibes"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Workout & Energy
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "lightning-bolt-outline"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [1.0, 0.55, 0.2, 1]
+                    MDLabel:
+                        text: "Workout & Pump"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "High-BPM fuel"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Deep Focus
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "brain"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.55, 0.45, 0.95, 1]
+                    MDLabel:
+                        text: "Deep Focus"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Study & concentration"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Sleep & Ambient
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "weather-night"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.35, 0.5, 0.85, 1]
+                    MDLabel:
+                        text: "Sleep & Ambient"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Gentle soundscapes"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Party & Dance
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "party-popper"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.95, 0.35, 0.65, 1]
+                    MDLabel:
+                        text: "Party & Club"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Bass & floor fillers"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Romance & Love
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "heart-outline"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.95, 0.4, 0.45, 1]
+                    MDLabel:
+                        text: "Romance"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Intimate acoustic vibes"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Gaming & Synth
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "gamepad-variant-outline"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.25, 0.85, 0.65, 1]
+                    MDLabel:
+                        text: "Gaming & Synth"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Immersive OSTs"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                # Daily Commute
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    height: "125dp"
+                    radius: [dp(20)]
+                    padding: "16dp"
+                    spacing: "6dp"
+                    orientation: "vertical"
+                    ripple_behavior: True
+                    on_release: app.switch_screen("playlist")
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDIcon:
+                        icon: "bus-clock"
+                        font_size: "28sp"
+                        theme_text_color: "Custom"
+                        text_color: [0.45, 0.65, 0.85, 1]
+                    MDLabel:
+                        text: "Daily Commute"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+                    MDLabel:
+                        text: "Soundtrack for the ride"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True

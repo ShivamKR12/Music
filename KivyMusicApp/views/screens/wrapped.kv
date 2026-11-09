@@ -3,9 +3,9 @@
     md_bg_color: "black" # A distinct, dark background for wrapped
     
     MDFloatLayout:
-        MDCarousel:
+        Carousel:
             id: wrapped_carousel
-            layouts: "full-screen-horizontal"
+            direction: "right"
             
             # Slide 1: Welcome
             MDBoxLayout:
@@ -87,15 +87,12 @@
                     text_color: "white"
                     halign: "center"
 
-        # Overlay Back button and Progress
-        MDTopAppBar:
-            type: "small"
-            pos_hint: {"top": 1}
-            md_bg_color: 0, 0, 0, 0 # Transparent
-            MDTopAppBarLeadingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "close"
-                    theme_icon_color: "Custom"
-                    icon_color: "white"
-                    on_release: app.root.ids.screen_manager.current = "library"
+        # Floating Close Button
+        MDIconButton:
+            icon: "close"
+            style: "standard"
+            theme_icon_color: "Custom"
+            icon_color: "white"
+            pos_hint: {"top": 0.98, "x": 0.04}
+            on_release: app.go_back()
 

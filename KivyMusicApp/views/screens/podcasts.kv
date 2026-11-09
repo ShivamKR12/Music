@@ -1,18 +1,148 @@
-<PodcastsScreen>
+<PodcastsScreen>:
+    name: "podcasts"
+    md_bg_color: app.theme_cls.backgroundColor
+
     MDBoxLayout:
         orientation: "vertical"
         
         MDTopAppBar:
             type: "small"
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    on_release: app.go_back()
             MDTopAppBarTitle:
-                text: "Podcasts"
-                
+                text: "Podcasts & Shows"
+
         MDScrollView:
-            MDList:
-                MDListItem:
-                    MDListItemLeadingIcon:
-                        icon: "podcast"
-                    MDListItemHeadlineText:
-                        text: "Tech Talk"
-                    MDListItemSupportingText:
-                        text: "Latest episodes"
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: ["16dp", "16dp", "16dp", "32dp"]
+                spacing: "16dp"
+
+                # Featured Spotlight Show Card
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    adaptive_height: True
+                    radius: [dp(20)]
+                    padding: "20dp"
+                    spacing: "12dp"
+                    orientation: "vertical"
+                    md_bg_color: app.theme_cls.surfaceContainerColor
+
+                    MDBoxLayout:
+                        adaptive_height: True
+                        spacing: "8dp"
+                        MDIcon:
+                            icon: "podcast"
+                            font_size: "20sp"
+                            theme_text_color: "Custom"
+                            text_color: app.theme_cls.primaryColor
+                        MDLabel:
+                            text: "FEATURED SHOW"
+                            font_style: "Label"
+                            role: "medium"
+                            bold: True
+                            theme_text_color: "Custom"
+                            text_color: app.theme_cls.primaryColor
+                            adaptive_height: True
+
+                    MDLabel:
+                        text: "The Sound Architecture"
+                        font_style: "Headline"
+                        role: "small"
+                        bold: True
+                        adaptive_height: True
+
+                    MDLabel:
+                        text: "Deep dive into synthesizers, audio engineering, acoustic physics, and spatial music production."
+                        font_style: "Body"
+                        role: "medium"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_height: True
+
+                    MDBoxLayout:
+                        adaptive_height: True
+                        padding: ["0dp", "8dp", "0dp", "0dp"]
+                        MDButton:
+                            style: "filled"
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDButtonIcon:
+                                icon: "play"
+                            MDButtonText:
+                                text: "Listen to Latest (48m)"
+
+                # Section Header
+                MDLabel:
+                    text: "Trending Episodes"
+                    font_style: "Title"
+                    role: "medium"
+                    bold: True
+                    adaptive_height: True
+
+                # Episodes Card List
+                MDCard:
+                    style: "elevated"
+                    size_hint_y: None
+                    adaptive_height: True
+                    radius: [dp(20)]
+                    padding: ["0dp", "8dp", "0dp", "8dp"]
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                    MDList:
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "microphone-variant"
+                            MDListItemHeadlineText:
+                                text: "EP 142 • Analog Warmth vs Digital"
+                            MDListItemSupportingText:
+                                text: "The Sound Architecture • 52m"
+                            MDListItemTrailingIcon:
+                                icon: "play-circle-outline"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "headphones"
+                            MDListItemHeadlineText:
+                                text: "EP 89 • Lo-Fi Beats Masterclass"
+                            MDListItemSupportingText:
+                                text: "Beatmakers Weekly • 34m"
+                            MDListItemTrailingIcon:
+                                icon: "play-circle-outline"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "waveform"
+                            MDListItemHeadlineText:
+                                text: "EP 210 • Psychoacoustics & Flow"
+                            MDListItemSupportingText:
+                                text: "Audio Engineering Talk • 1h 05m"
+                            MDListItemTrailingIcon:
+                                icon: "play-circle-outline"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "radio"
+                            MDListItemHeadlineText:
+                                text: "EP 45 • Spatial Audio in Dolby Atmos"
+                            MDListItemSupportingText:
+                                text: "Future of Sound • 41m"
+                            MDListItemTrailingIcon:
+                                icon: "play-circle-outline"
+
+                        MDListItem:
+                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            MDListItemLeadingIcon:
+                                icon: "music-note"
+                            MDListItemHeadlineText:
+                                text: "EP 12 • Ambient Music for Deep Focus"
+                            MDListItemSupportingText:
+                                text: "Developer Melodies • 1h 12m"
+                            MDListItemTrailingIcon:
+                                icon: "play-circle-outline"
