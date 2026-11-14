@@ -55,6 +55,7 @@ class AudioEngine:
         self.current_info = None
         self.current_path = None
         self.repeat_one = False
+        self._has_started_playing = False
 
         # Decoupled UI Callbacks
         self.on_time_update = None       # callback(elapsed, duration)
@@ -63,23 +64,56 @@ class AudioEngine:
         self.on_loading = None           # callback(is_loading)
         self.on_download_progress = None # callback(percent_str)
         self.on_error = None             # callback(error_msg)
+        self.on_track_loaded = None      # callback(local_path, info)
 
         self.lock = threading.Lock()
         self.cancel_event = threading.Event()
+
+    def _cache_path_from_id(self, video_id: str):
+        """Locate any existing cached audio file for a given video ID."""
+        base = os.path.join(get_cache_dir(), video_id)
+        for ext in [".mp3", ".wav", ".ogg", ".flac", ".opus", ".webm", ".m4a", ".mp4", ".mkv"]:
+            path = base + ext
+            if os.path.exists(path) and os.path.isfile(path):
+                return path
+        return base + ".mp3"
 
     def start_play(self, url_or_path: str, track_info=None):
         """Initiate playback for a local file or remote YouTube track."""
         if not url_or_path:
             return False
 
-        # If it's an existing local audio file, play immediately on main thread
+        # 1. If it's an existing local audio file, play immediately on main thread
         if os.path.exists(url_or_path) and os.path.isfile(url_or_path):
             info = track_info or {"title": os.path.basename(url_or_path), "duration": 0}
             self.cleanup_player()
+            self._set_main_thread_info(info, url_or_path)
             self._play_file(url_or_path, info)
             return True
 
-        # Otherwise treat as online stream/video ID and process in background thread
+        # 2. Check if this YouTube track/video ID is already installed/cached in local cache
+        video_id = extract_video_id(url_or_path)
+        cache_dir = get_cache_dir()
+        cached_audio = self._cache_path_from_id(video_id) if video_id else ""
+        if cached_audio and os.path.exists(cached_audio) and os.path.isfile(cached_audio):
+            meta_path = os.path.join(cache_dir, f"{video_id}.json")
+            cached_meta = self._load_cached_metadata(meta_path) or {}
+            if track_info:
+                cached_meta.update(track_info)
+            self.cleanup_player()
+            self._set_main_thread_info(cached_meta, cached_audio)
+            thumb_path = os.path.join(cache_dir, f"{video_id}.jpg")
+            art = cached_meta.get("artwork")
+            if not art or not os.path.exists(art):
+                if os.path.exists(thumb_path):
+                    art = thumb_path
+                    cached_meta["artwork"] = art
+            if art and os.path.exists(art) and self.on_artwork_loaded:
+                Clock.schedule_once(lambda dt: self.on_artwork_loaded(art), 0)
+            self._play_file(cached_audio, cached_meta)
+            return True
+
+        # 3. Otherwise treat as online stream/video ID and process in background thread
         with self.lock:
             self.cancel_event.set()
             self.cleanup_player()
@@ -99,7 +133,6 @@ class AudioEngine:
         if self.player:
             try:
                 self.player.stop()
-                self.player.unload()
             except Exception:
                 pass
         self.player = None
@@ -107,6 +140,7 @@ class AudioEngine:
         self.duration = 0.0
         self.last_tick = None
         self.paused = False
+        self._has_started_playing = False
 
     def _set_loading(self, state: bool):
         self.loading = state
@@ -212,6 +246,11 @@ class AudioEngine:
 
             if os.path.exists(mp3_path):
                 self._save_cached_metadata(meta_path, clean_info)
+                try:
+                    from models.database import update_local_track_path
+                    update_local_track_path(video_id, mp3_path, clean_info.get("duration", 0))
+                except Exception:
+                    pass
                 Clock.schedule_once(lambda dt: self._play_file(mp3_path, clean_info), 0)
 
             Clock.schedule_once(lambda dt: self._set_loading(False), 0)
@@ -236,24 +275,34 @@ class AudioEngine:
 
     def _play_file(self, path: str, info: dict):
         self.cleanup_player()
-        if not os.path.exists(path):
+        abs_path = os.path.abspath(path)
+        if not os.path.exists(abs_path):
+            print(f"[AudioEngine] File not found: {abs_path}")
             return
 
-        self.player = SoundLoader.load(path)
+        self.player = SoundLoader.load(abs_path)
         if self.player:
             self.player.play()
             file_len = getattr(self.player, 'length', 0)
             meta_len = info.get("duration", 0) if info else 0
             self.duration = meta_len if meta_len > 0 else (file_len if file_len > 0 else 180)
             self.elapsed = 0.0
-            self.last_tick = time.time()
+            self.last_tick = None
             self.paused = False
+            self._has_started_playing = False
 
             artwork = info.get("artwork") if info else None
             if artwork and os.path.exists(artwork) and self.on_artwork_loaded:
                 Clock.schedule_once(lambda dt: self.on_artwork_loaded(artwork), 0)
 
+            if self.on_track_loaded:
+                Clock.schedule_once(lambda dt: self.on_track_loaded(abs_path, info), 0)
+
             Clock.schedule_interval(self._update, 0.1)
+        else:
+            print(f"[AudioEngine] SoundLoader failed to load: {abs_path}")
+            if self.on_error:
+                Clock.schedule_once(lambda dt: self.on_error(f"Failed to load audio: {os.path.basename(abs_path)}"), 0)
 
     def _update(self, dt):
         if not self.player:
@@ -269,17 +318,27 @@ class AudioEngine:
 
         if not self.paused:
             pos = getattr(self.player, 'get_pos', lambda: None)()
-            if pos is not None and pos > 0:
-                self.elapsed = pos
-            else:
+
+            if not getattr(self, '_has_started_playing', False):
+                if pos is not None and pos > 0:
+                    self._has_started_playing = True
+                elif pos is None or pos == 0:
+                    self._has_started_playing = True
+
+            if getattr(self, '_has_started_playing', False):
                 self.elapsed += dt_real
+                # Periodically sync with pos if valid positive value
+                if pos is not None and pos > 0:
+                    if abs(self.elapsed - pos) > 0.5:
+                        self.elapsed = pos
 
         if self.on_time_update:
             self.on_time_update(self.elapsed, self.duration)
 
         # Track end detection
-        if self.player.state == 'stop' and not self.paused and self.elapsed > 1.0:
+        if getattr(self.player, 'state', None) == 'stop' and not self.paused and self.elapsed > 1.0:
             return self._end_track()
+
         if self.duration > 0 and self.elapsed >= self.duration:
             return self._end_track()
 
@@ -290,9 +349,16 @@ class AudioEngine:
             return
         self.paused = True
         try:
-            self.player.stop()
+            if hasattr(self.player, '_ffplayer') and self.player._ffplayer:
+                self.player._ffplayer.set_pause(True)
+                self.player.state = 'stop'
+                self.player._state = 'paused'
+            elif hasattr(self.player, 'set_pause'):
+                self.player.set_pause(True)
+            else:
+                self.player.stop()
         except Exception:
-            pass
+            self.player.stop()
 
     def unpause(self):
         if not self.player:
@@ -300,15 +366,24 @@ class AudioEngine:
         self.paused = False
         self.last_tick = time.time()
         try:
-            self.player.play()
-            Clock.schedule_once(lambda dt: self._safe_seek(self.elapsed), 0.05)
+            if hasattr(self.player, '_ffplayer') and self.player._ffplayer:
+                self.player._ffplayer.set_pause(False)
+                self.player.state = 'play'
+                self.player._state = 'playing'
+            elif hasattr(self.player, 'set_pause'):
+                self.player.set_pause(False)
+            else:
+                self.player.play()
+                Clock.schedule_once(lambda dt: self._safe_seek(self.elapsed), 0.1)
         except Exception:
-            pass
+            self.player.play()
+            Clock.schedule_once(lambda dt: self._safe_seek(self.elapsed), 0.1)
 
     def seek(self, target_pos: float):
         if not self.player:
             return
         self.elapsed = max(0.0, min(target_pos, self.duration if self.duration > 0 else target_pos))
+        self.last_tick = time.time()
         self._safe_seek(self.elapsed)
 
     def _safe_seek(self, pos: float):
@@ -320,6 +395,8 @@ class AudioEngine:
                     self.player.seek(pos, relative=False)
                 except Exception:
                     pass
+            except Exception:
+                pass
 
     def _end_track(self):
         if self.repeat_one and self.player:

@@ -81,6 +81,20 @@ def init_db(db_path=None):
             default_playlists = [("Favorites",), ("Late Night",), ("Workout",), ("Chillwave",)]
             cursor.executemany("INSERT INTO playlists (name) VALUES (?)", default_playlists)
 
+        # Seed initial tracks to default playlists if playlist_tracks is empty
+        cursor.execute("SELECT COUNT(*) FROM playlist_tracks")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("SELECT video_id FROM tracks LIMIT 4")
+            sample_vids = [r[0] for r in cursor.fetchall()]
+            if sample_vids:
+                for pl_name in ["Favorites", "Chillwave", "Late Night", "Workout"]:
+                    cursor.execute("SELECT id FROM playlists WHERE name = ?", (pl_name,))
+                    prow = cursor.fetchone()
+                    if prow:
+                        pid = prow[0]
+                        for vid in sample_vids:
+                            cursor.execute("INSERT OR IGNORE INTO playlist_tracks (playlist_id, video_id) VALUES (?, ?)", (pid, vid))
+
         conn.commit()
 
 def add_track(video_id, title, artist, url, duration=0, artwork="", local_path=""):
@@ -142,6 +156,18 @@ def update_local_track_path(video_id, local_path, duration=None):
             ''', (local_path, video_id))
         conn.commit()
 
+def update_track_artwork(video_id, artwork_path):
+    """Updates the artwork path for a track in the database."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE tracks 
+            SET artwork = ? 
+            WHERE video_id = ?
+        ''', (artwork_path, video_id))
+        conn.commit()
+
 def mark_track_played(video_id):
     """Records the timestamp when a track is played."""
     with DB_LOCK:
@@ -164,12 +190,35 @@ def get_recently_played(limit=10):
         ''', (limit,))
         return [dict(row) for row in cursor.fetchall()]
 
-def get_all_playlists():
-    """Fetches all playlist names from the database."""
+def get_continue_listening(limit=5):
+    """Fetches recently played tracks for the Continue Listening section."""
+    return get_recently_played(limit=limit)
+
+def get_recently_added(limit=10):
+    """Fetches newest tracks sorted by creation timestamp."""
     with DB_LOCK:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name FROM playlists ORDER BY name ASC")
+        cursor.execute('''
+            SELECT video_id, title, artist, url, local_path, duration, artwork 
+            FROM tracks 
+            ORDER BY added_at DESC 
+            LIMIT ?
+        ''', (limit,))
+        return [dict(row) for row in cursor.fetchall()]
+
+def get_all_playlists():
+    """Fetches all playlist names from the database with track counts."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.id, p.name, COUNT(pt.video_id) as track_count
+            FROM playlists p
+            LEFT JOIN playlist_tracks pt ON p.id = pt.playlist_id
+            GROUP BY p.id, p.name
+            ORDER BY p.name ASC
+        ''')
         return [dict(row) for row in cursor.fetchall()]
 
 def add_playlist(name):
@@ -187,6 +236,21 @@ def add_playlist(name):
         except sqlite3.IntegrityError:
             return None
 
+def delete_playlist(name):
+    """Deletes a playlist and its track associations from the database."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM playlists WHERE name = ?", (name,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        pid = row['id']
+        cursor.execute("DELETE FROM playlist_tracks WHERE playlist_id = ?", (pid,))
+        cursor.execute("DELETE FROM playlists WHERE id = ?", (pid,))
+        conn.commit()
+        return True
+
 def get_playlist_tracks(playlist_name):
     """Retrieves all tracks for a given playlist."""
     with DB_LOCK:
@@ -202,11 +266,35 @@ def get_playlist_tracks(playlist_name):
         ''', (playlist_name,))
         return [dict(row) for row in cursor.fetchall()]
 
-def add_track_to_playlist(playlist_name, video_id):
-    """Adds a track to a playlist by name."""
+def add_track_to_playlist(playlist_name, video_id, track_meta=None):
+    """Adds a track to a playlist by name, ensuring track exists in database."""
     with DB_LOCK:
         conn = get_connection()
         cursor = conn.cursor()
+        if track_meta and video_id:
+            try:
+                cursor.execute('''
+                    INSERT INTO tracks (video_id, title, artist, url, artwork, duration, local_path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(video_id) DO UPDATE SET
+                        title = excluded.title,
+                        artist = excluded.artist,
+                        url = CASE WHEN excluded.url != '' THEN excluded.url ELSE tracks.url END,
+                        artwork = CASE WHEN excluded.artwork != '' AND excluded.artwork != 'album_art.png' THEN excluded.artwork ELSE tracks.artwork END,
+                        duration = CASE WHEN excluded.duration > 0 THEN excluded.duration ELSE tracks.duration END,
+                        local_path = CASE WHEN excluded.local_path != '' THEN excluded.local_path ELSE tracks.local_path END
+                ''', (
+                    video_id,
+                    sanitize_text(track_meta.get("title", "Unknown Title")),
+                    sanitize_text(track_meta.get("artist", "Unknown Artist")),
+                    track_meta.get("url", ""),
+                    track_meta.get("artwork", ""),
+                    track_meta.get("duration", 0),
+                    track_meta.get("local_path", "")
+                ))
+            except Exception as e:
+                print(f"[add_track_to_playlist error inserting/updating track]: {e}")
+
         cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
         row = cursor.fetchone()
         if not row:
@@ -220,6 +308,7 @@ def add_track_to_playlist(playlist_name, video_id):
             conn.commit()
             return True
         except Exception:
+            return False
             return False
 
 def remove_track_from_playlist(playlist_name, video_id):

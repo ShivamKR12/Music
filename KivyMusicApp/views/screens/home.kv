@@ -83,16 +83,16 @@
                     id: quick_picks_list
                     viewclass: "HomeCardItem"
                     size_hint_y: None
-                    height: "172dp"
-                    data: [{"text": f"Quick Pick {i}"} for i in range(1, 9)]
+                    height: "238dp"
+                    data: []
                     RecycleBoxLayout:
-                        default_size: dp(140), dp(140)
+                        default_size: dp(140), dp(210)
                         default_size_hint: None, None
                         size_hint_x: None
                         width: self.minimum_width
                         orientation: 'horizontal'
                         spacing: dp(16)
-                        padding: [dp(16), dp(16)]
+                        padding: [dp(16), dp(12)]
 
                 MDLabel:
                     text: "Trending community playlists"
@@ -104,16 +104,16 @@
                     id: trending_list
                     viewclass: "HomeCardItem"
                     size_hint_y: None
-                    height: "172dp"
-                    data: [{"text": f"Playlist {i}"} for i in range(10)]
+                    height: "238dp"
+                    data: []
                     RecycleBoxLayout:
-                        default_size: dp(140), dp(140)
+                        default_size: dp(140), dp(210)
                         default_size_hint: None, None
                         size_hint_x: None
                         width: self.minimum_width
                         orientation: 'horizontal'
                         spacing: dp(16)
-                        padding: [dp(16), dp(16)]
+                        padding: [dp(16), dp(12)]
 
                 MDLabel:
                     text: "Featured playlists for you"
@@ -125,13 +125,13 @@
                     id: featured_list
                     viewclass: "HomeCardItem"
                     size_hint_y: None
-                    height: "172dp"
-                    data: [{"text": f"Featured {i}"} for i in range(10)]
+                    height: "238dp"
+                    data: []
                     RecycleBoxLayout:
-                        default_size: dp(140), dp(140)
+                        default_size: dp(140), dp(210)
                         default_size_hint: None, None
                         size_hint_x: None
                         width: self.minimum_width
                         orientation: 'horizontal'
                         spacing: dp(16)
-                        padding: [dp(16), dp(16)]
+                        padding: [dp(16), dp(12)]

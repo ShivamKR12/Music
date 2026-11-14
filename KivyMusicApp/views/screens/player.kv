@@ -33,20 +33,21 @@
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                spacing: "8dp"
-                MDLabel:
+                spacing: "4dp"
+                MarqueeLabel:
                     text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
-                    font_style: "Headline"
-                    role: "small"
+                    font_style: "Title"
+                    role: "large"
+                    bold: True
                     halign: "center"
-                    adaptive_height: True
-                MDLabel:
+                    height: "32dp"
+                MarqueeLabel:
                     text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
                     font_style: "Body"
                     role: "medium"
                     halign: "center"
                     text_color: app.theme_cls.onSurfaceVariantColor
-                    adaptive_height: True
+                    height: "22dp"
 
             MDBoxLayout:
                 adaptive_height: True

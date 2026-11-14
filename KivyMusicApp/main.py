@@ -10,7 +10,8 @@ import os
 import threading
 from kivy.lang import Builder
 from kivy.clock import Clock
-from kivy.properties import StringProperty
+from kivy.metrics import dp
+from kivy.properties import StringProperty, ListProperty, BooleanProperty, NumericProperty
 from kivymd.app import MDApp
 from kivy.core.window import Window
 from kivymd.uix.filemanager import MDFileManager
@@ -22,12 +23,24 @@ from kivymd.uix.dialog import (
     MDDialogButtonContainer
 )
 from kivymd.uix.button import MDButton, MDButtonText
-from kivymd.uix.bottomsheet import MDBottomSheet, MDBottomSheetDragHandle, MDBottomSheetDragHandleTitle, MDBottomSheetDragHandleButton
-from kivymd.uix.navigationbar import MDNavigationBar, MDNavigationItem, MDNavigationItemIcon, MDNavigationItemLabel
+from kivymd.uix.bottomsheet import (
+    MDBottomSheet, 
+    MDBottomSheetDragHandle, 
+    MDBottomSheetDragHandleTitle, 
+    MDBottomSheetDragHandleButton
+)
+from kivymd.uix.navigationbar import (
+    MDNavigationBar, 
+    MDNavigationItem, 
+    MDNavigationItemIcon, 
+    MDNavigationItemLabel
+)
+from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.list import (
     MDList, 
     MDListItem, 
-    MDListItemLeadingIcon, 
+    MDListItemLeadingIcon,
+    MDListItemLeadingAvatar,
     MDListItemHeadlineText,
     MDListItemSupportingText,
     MDListItemTrailingIcon
@@ -40,28 +53,63 @@ from models.database import (
     get_playlist_tracks,
     add_playlist,
     get_all_playlists,
+    delete_playlist,
+    add_track_to_playlist,
+    remove_track_from_playlist,
     is_favorite,
     toggle_favorite,
     add_search_history,
     get_search_history,
     clear_search_history,
+    get_continue_listening,
+    get_recently_added,
+    update_track_artwork,
+    update_local_track_path,
 )
+from services.lyrics_service import fetch_lyrics_async, get_cached_lyrics
 from models.track_model import TrackModel, PlaylistModel
 from controllers.player_controller import PlayerController
-from views.screens import HomeScreen, SearchScreen, LibraryScreen, SettingsScreen, PlayerScreen, FavoritesScreen
+from views.screens import (
+    HomeScreen, 
+    SearchScreen, 
+    LibraryScreen, 
+    SettingsScreen, 
+    PlayerScreen, 
+    FavoritesScreen
+)
 from views.components import (
     TrackListItem,
     DirectionalHorizontalScrollView,
     DirectionalHorizontalRecycleView,
 )
 from utils.theme_utils import update_theme_from_image
+from services.logger import app_logger, init_logging
+from utils.media_utils import (
+    enforce_max_cache_size,
+    extract_video_id,
+    fetch_youtube_metadata,
+    get_thumbnail_path,
+    download_artwork,
+    ensure_artworks_downloaded,
+)
 
 class MusicApp(MDApp):
     selected_audio_quality = StringProperty("High (320kbps)")
     selected_eq_profile = StringProperty("Flat")
+    active_playlist_name = StringProperty("Favorites")
+    active_playlist_artwork = StringProperty("album_art2.png")
+    active_playlist_info = StringProperty("0 tracks")
+    active_playlist_tracks = ListProperty([])
+
+    @property
+    def cache_dir(self):
+        from utils.media_utils import get_cache_dir
+        return get_cache_dir()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        init_logging()
+        app_logger.info("Initializing MusicApp components...")
         self.file_manager = None
         self.dialog = None
         self.quality_dialog = None
@@ -112,6 +160,8 @@ class MusicApp(MDApp):
         self.theme_cls.dynamic_color = True
         root = Builder.load_file(os.path.join("views", "main.kv"))
         Window.bind(on_keyboard=self.on_keyboard)
+        # Enforce disk cache footprint limits in a background daemon thread
+        threading.Thread(target=enforce_max_cache_size, kwargs={"max_size_mb": 5000}, daemon=True).start()
         return root
 
     def switch_screen(self, screen_name: str):
@@ -237,17 +287,170 @@ class MusicApp(MDApp):
             rv_data.append({
                 "title": track.title,
                 "artist": track.artist,
+                "artwork": track.album_art,
                 "track_obj": track
             })
         library_list.data = rv_data
+
+        # Populate Home Screen horizontal carousels with real library tracks
+        self.populate_home_screen_data()
+
+        # Automatically download album artwork for all tracks in library/catalog in background
+        ensure_artworks_downloaded(self.playlist_model.tracks, on_track_updated=self.on_artwork_downloaded)
 
         # Populate carousel slightly deferred so frame 0 renders instantly without freezing
         from kivy.clock import Clock
         Clock.schedule_once(lambda d: self.ensure_player_carousel(), 0.1)
 
-    def ensure_player_carousel(self):
-        """Populate the Now Playing album carousel if not already initialized."""
-        if getattr(self, "_player_carousel_initialized", False):
+        # Scan device offline songs silently in background so 'Offline Songs' playlist is populated
+        threading.Thread(target=lambda: self.scan_and_load_offline_songs(auto_play=False, show_screen=False), daemon=True).start()
+
+        # If catalog is minimal/fresh, dynamically discover trending tracks
+        if len(self.playlist_model.tracks) <= 3:
+            app_logger.info("[THREAD START] MusicApp._fetch_trending_tracks")
+            threading.Thread(target=self._fetch_trending_tracks, daemon=True).start()
+
+    def on_artwork_downloaded(self, track, art_path):
+        """Dispatched on main thread whenever a track's album art finishes downloading."""
+        track.album_art = art_path
+        # Re-populate Home cards with downloaded artwork
+        self.populate_home_screen_data()
+        # Re-populate Library list with downloaded artwork
+        if hasattr(self, "root") and self.root:
+            try:
+                lib_screen = self.root.ids.screen_manager.get_screen("library")
+                if "library_list" in lib_screen.ids:
+                    lib_screen.ids.library_list.data = [{
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t
+                    } for t in self.playlist_model.tracks]
+            except Exception:
+                pass
+        # Refresh Carousel if Now Playing initialized
+        self.ensure_player_carousel(force_refresh=True)
+
+    def on_search_artwork_downloaded(self, track, art_path):
+        """Dispatched when a search result track's album art finishes downloading."""
+        track.album_art = art_path
+        if hasattr(self, "root") and self.root:
+            try:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_results_list" in search_screen.ids:
+                    rv = search_screen.ids.search_results_list
+                    for item in rv.data:
+                        if item.get("track_obj") == track:
+                            item["artwork"] = art_path
+                    rv.refresh_from_data()
+            except Exception:
+                pass
+
+    def populate_home_screen_data(self):
+        """Populate Quick Picks, Trending, and Featured horizontally scrollable lists on the Home screen."""
+        if not hasattr(self, "root") or not self.root or not hasattr(self.root, "ids") or "screen_manager" not in self.root.ids:
+            return
+        try:
+            home = self.root.ids.screen_manager.get_screen("home")
+            tracks = self.playlist_model.tracks
+            if not tracks:
+                return
+
+            recent = get_continue_listening(limit=8)
+            quick_picks_tracks = []
+            if recent:
+                for row in recent:
+                    vid = row.get("video_id") if isinstance(row, dict) else row[3]
+                    t = self.playlist_model.find_track(vid)
+                    if t and t not in quick_picks_tracks:
+                        quick_picks_tracks.append(t)
+            for t in tracks:
+                if t not in quick_picks_tracks:
+                    quick_picks_tracks.append(t)
+
+            if "quick_picks_list" in home.ids:
+                home.ids.quick_picks_list.data = [
+                    {
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t,
+                        "text": t.title,
+                    } for t in quick_picks_tracks
+                ]
+            if "trending_list" in home.ids:
+                home.ids.trending_list.data = [
+                    {
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t,
+                        "text": t.title,
+                    } for t in reversed(tracks)
+                ]
+            if "featured_list" in home.ids:
+                featured_tracks = tracks[::2] + tracks[1::2]
+                home.ids.featured_list.data = [
+                    {
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t,
+                        "text": t.title,
+                    } for t in featured_tracks
+                ]
+        except Exception as e:
+            app_logger.warning(f"populate_home_screen_data encountered non-fatal error: {e}")
+
+    def _fetch_trending_tracks(self):
+        """Dynamically pulls top trending music on a fresh install in the background."""
+        try:
+            info = fetch_youtube_metadata("ytsearch8:trending global top music hits", extract_flat=True)
+            entries = info.get('entries', []) if info else []
+            for entry in entries:
+                video_id = entry.get('id')
+                if video_id:
+                    title = entry.get('title', 'Unknown Title')
+                    artist = entry.get('uploader') or entry.get('channel') or 'Unknown Artist'
+                    url = entry.get('url', f"https://www.youtube.com/watch?v={video_id}")
+                    duration = int(entry.get('duration') or 0)
+                    thumb = get_thumbnail_path(video_id)
+                    add_track(
+                        video_id=video_id,
+                        title=title,
+                        artist=artist,
+                        url=url,
+                        duration=duration,
+                        artwork=thumb
+                    )
+            app_logger.info("[THREAD SUCCESS] MusicApp._fetch_trending_tracks completed")
+            Clock.schedule_once(lambda dt: self._on_trending_fetched(), 0)
+        except Exception as e:
+            app_logger.error(f"[THREAD FAILED] MusicApp._fetch_trending_tracks error: {e}")
+
+    def _on_trending_fetched(self):
+        """Main-thread callback to push newly fetched trending data to all views."""
+        self.playlist_model.load_from_db()
+        self.player_controller.rebuild_queue()
+        try:
+            library_screen = self.root.ids.screen_manager.get_screen("library")
+            library_list = library_screen.ids.library_list
+            library_list.data = [{
+                "title": t.title,
+                "artist": t.artist,
+                "artwork": t.album_art,
+                "track_obj": t
+            } for t in self.playlist_model.tracks]
+        except Exception:
+            pass
+        self.populate_home_screen_data()
+        self.ensure_player_carousel(force_refresh=True)
+        # Ensure all newly fetched tracks have their artwork automatically downloaded
+        ensure_artworks_downloaded(self.playlist_model.tracks, on_track_updated=self.on_artwork_downloaded)
+
+    def ensure_player_carousel(self, force_refresh=False):
+        """Populate the Now Playing album carousel if not already initialized or on update."""
+        if getattr(self, "_player_carousel_initialized", False) and not force_refresh:
             return
         if not hasattr(self, "root") or not self.root or not hasattr(self.root, "ids") or "screen_manager" not in self.root.ids:
             return
@@ -293,6 +496,9 @@ class MusicApp(MDApp):
         self.ensure_player_carousel()
         if track not in self.playlist_model.tracks:
             self.playlist_model.add_track(track)
+        # If playing from active playlist, synchronize playback queue for continuous playback
+        if hasattr(self, "active_playlist_tracks") and self.active_playlist_tracks and track in self.active_playlist_tracks:
+            self.player_controller.set_custom_queue(self.active_playlist_tracks, start_track=track)
         self.player_controller.set_track(track)
         self.switch_screen("player")
         self.player_controller.play()
@@ -323,7 +529,20 @@ class MusicApp(MDApp):
 
     def select_path(self, path):
         self.exit_manager()
-        print(f"Selected file: {path}")
+        if path and os.path.isfile(path):
+            from utils.local_audio_utils import extract_local_audio_metadata
+            meta = extract_local_audio_metadata(path, self.cache_dir)
+            track = TrackModel.from_dict(meta)
+            
+            # Persist track in database under 'Offline Songs' playlist
+            try:
+                from models.database import add_playlist, add_track_to_playlist
+                add_playlist("Offline Songs")
+                add_track_to_playlist("Offline Songs", meta["video_id"], meta)
+            except Exception as e:
+                print(f"[select_path error saving to SQLite]: {e}")
+                
+            self.play_selected_track(track)
 
     def exit_manager(self, *args):
         if self.file_manager:
@@ -371,60 +590,463 @@ class MusicApp(MDApp):
         )
         self.quality_dialog.open()
 
-    def create_playlist_action(self):
-        playlist_name = f"My Mix #{len(get_all_playlists()) + 1}"
-        add_playlist(playlist_name)
-        if self.dialog:
-            self.dialog.dismiss()
+    def show_toast(self, msg: str):
+        """Displays a Material 3 snackbar notification safely."""
+        try:
+            from kivymd.uix.snackbar import MDSnackbar, MDSnackbarText
+            MDSnackbar(
+                MDSnackbarText(text=msg),
+                y="24dp",
+                pos_hint={"center_x": .5},
+                size_hint_x=0.85,
+                duration=2.5
+            ).open()
+        except Exception as e:
+            print(f"[Toast] {msg}")
 
-    def show_add_playlist_dialog(self):
-        if not self.dialog:
-            self.dialog = MDDialog(
-                MDDialogHeadlineText(text="New Playlist"),
-                MDDialogSupportingText(text="Do you want to create a new playlist?"),
-                MDDialogButtonContainer(
-                    MDButton(MDButtonText(text="CANCEL"), style="text", on_release=lambda x: self.dialog.dismiss()),
-                    MDButton(MDButtonText(text="CREATE"), style="text", on_release=lambda x: self.create_playlist_action()),
-                ),
-            )
-        self.dialog.open()
+    def show_add_playlist_dialog(self, track_to_add=None):
+        """Displays dialog with text field to create a real custom playlist."""
+        from kivymd.uix.dialog import (
+            MDDialog, MDDialogHeadlineText, MDDialogSupportingText,
+            MDDialogContentContainer, MDDialogButtonContainer
+        )
+        from kivymd.uix.textfield import MDTextField, MDTextFieldHintText
+        from kivymd.uix.button import MDButton, MDButtonText
+
+        text_field = MDTextField(
+            MDTextFieldHintText(text="Playlist name..."),
+            mode="filled"
+        )
+
+        def on_create(*args):
+            name = text_field.text.strip()
+            if not name:
+                name = f"My Playlist #{len(get_all_playlists()) + 1}"
+            add_playlist(name)
+            if track_to_add:
+                vid = getattr(track_to_add, "video_id", "")
+                if vid:
+                    add_track_to_playlist(name, vid, {
+                        "title": track_to_add.title,
+                        "artist": track_to_add.artist,
+                        "url": track_to_add.url,
+                        "artwork": track_to_add.album_art,
+                        "duration": track_to_add.duration,
+                        "local_path": track_to_add.local_path
+                    })
+            if hasattr(self, "playlist_dialog") and self.playlist_dialog:
+                self.playlist_dialog.dismiss()
+            self.show_toast(f"Playlist '{name}' created!")
+            self.open_playlist(name)
+
+        self.playlist_dialog = MDDialog(
+            MDDialogHeadlineText(text="New Playlist"),
+            MDDialogSupportingText(text="Enter a name for your new playlist:"),
+            MDDialogContentContainer(
+                text_field,
+                orientation="vertical",
+            ),
+            MDDialogButtonContainer(
+                MDButton(MDButtonText(text="CANCEL"), style="text", on_release=lambda x: self.playlist_dialog.dismiss()),
+                MDButton(MDButtonText(text="CREATE"), style="text", on_release=on_create),
+            ),
+        )
+        self.playlist_dialog.open()
+
+    def open_playlist(self, playlist_name: str):
+        """Switches to PlaylistScreen and populates it with real tracks for the selected playlist."""
+        self.active_playlist_name = playlist_name
+        self.switch_screen("playlist")
+        self.sync_active_playlist_screen()
+
+    def sync_active_playlist_screen(self):
+        """Synchronizes PlaylistScreen with SQLite data for active_playlist_name."""
+        if not hasattr(self, "root") or not self.root:
+            return
+        try:
+            pl_screen = self.root.ids.screen_manager.get_screen("playlist")
+            raw_tracks = get_playlist_tracks(self.active_playlist_name)
+            
+            track_objs = []
+            for r in raw_tracks:
+                existing = self.playlist_model.get_track_by_video_id(r["video_id"])
+                if existing:
+                    track_objs.append(existing)
+                else:
+                    new_t = TrackModel.from_dict(r)
+                    self.playlist_model.add_track(new_t)
+                    track_objs.append(new_t)
+
+            self.active_playlist_tracks = track_objs
+            self.active_playlist_info = f"{len(track_objs)} tracks"
+            if track_objs and track_objs[0].album_art:
+                self.active_playlist_artwork = track_objs[0].album_art
+            else:
+                self.active_playlist_artwork = "album_art2.png"
+
+            if "playlist_tracks_list" in pl_screen.ids:
+                pl_screen.ids.playlist_tracks_list.data = [{
+                    "title": t.title,
+                    "artist": t.artist,
+                    "artwork": t.album_art,
+                    "track_obj": t
+                } for t in track_objs]
+
+            if track_objs:
+                ensure_artworks_downloaded(track_objs, on_track_updated=self.on_artwork_downloaded, cache_dir=self.cache_dir)
+        except Exception as e:
+            print(f"[open_playlist error]: {e}")
+
+    def play_active_playlist(self, shuffle=False):
+        """Plays all tracks in the currently viewed playlist continuously."""
+        if not hasattr(self, "active_playlist_tracks") or not self.active_playlist_tracks:
+            self.show_toast("Playlist has no tracks to play.")
+            return
+        tracks = list(self.active_playlist_tracks)
+        if shuffle:
+            import random
+            random.shuffle(tracks)
+        first = tracks[0]
+        self.player_controller.set_custom_queue(tracks, start_track=first)
+        self.play_selected_track(first)
+
+    def download_active_playlist(self, playlist_name=None):
+        """Downloads all tracks in the currently active playlist."""
+        pl_name = playlist_name or self.active_playlist_name
+        tracks = get_playlist_tracks(pl_name) if pl_name else []
+        if not tracks:
+            self.show_toast("No tracks to download.")
+            return
+        to_download = []
+        for r in tracks:
+            t = self.playlist_model.get_track_by_video_id(r["video_id"]) or TrackModel.from_dict(r)
+            if not t.is_downloaded and not (t.local_path and os.path.exists(t.local_path)):
+                to_download.append(t)
+        if not to_download:
+            self.show_toast(f"All tracks in '{pl_name}' are already downloaded!")
+            return
+        self.show_toast(f"Queued {len(to_download)} tracks for offline download...")
+        for t in to_download:
+            self.download_track_offline(t)
+
+    def show_playlists_overview(self):
+        """Displays a bottom sheet listing all user playlists."""
+        playlists = get_all_playlists()
+        sheet = MDBottomSheet(
+            MDBottomSheetDragHandle(
+                MDBottomSheetDragHandleTitle(text="Your Playlists"),
+                MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
+            ),
+            size_hint_y=None,
+            height="420dp"
+        )
+        scroll = MDScrollView(size_hint_y=None, height="350dp")
+        dlist = MDList()
         
-    def show_track_options(self):
-        if not self.bottom_sheet:
-            self.bottom_sheet = MDBottomSheet(
-                MDBottomSheetDragHandle(
-                    MDBottomSheetDragHandleTitle(text="Track Options"),
-                    MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: self.bottom_sheet.set_state("close"))
-                ),
-                MDList(
-                    MDListItem(
-                        MDListItemLeadingIcon(icon="playlist-plus"), 
-                        MDListItemHeadlineText(text="Add to Playlist"), 
-                        on_release=lambda x: (self.bottom_sheet.set_state("close"), self.show_add_playlist_dialog())
-                    ),
-                    MDListItem(
-                        MDListItemLeadingIcon(icon="text-box-outline"), 
-                        MDListItemHeadlineText(text="View Lyrics"), 
-                        on_release=lambda x: (self.bottom_sheet.set_state("close"), self.show_lyrics())
-                    ),
-                    MDListItem(
-                        MDListItemLeadingIcon(icon="share-variant"), 
-                        MDListItemHeadlineText(text="Share"), 
-                        on_release=lambda x: self.bottom_sheet.set_state("close")
-                    ),
-                    MDListItem(
-                        MDListItemLeadingIcon(icon="delete"), 
-                        MDListItemHeadlineText(text="Remove"), 
-                        on_release=lambda x: self.bottom_sheet.set_state("close")
-                    ),
-                ),
-                size_hint_y=None,
-                height="340dp",
+        new_item = MDListItem(
+            MDListItemLeadingIcon(icon="playlist-plus"),
+            MDListItemHeadlineText(text="Create New Playlist"),
+            MDListItemSupportingText(text="Tap to create custom playlist"),
+            on_release=lambda x: (sheet.set_state("close"), self.show_add_playlist_dialog())
+        )
+        dlist.add_widget(new_item)
+
+        for p in playlists:
+            def on_sel(inst, pl_name=p["name"]):
+                sheet.set_state("close")
+                self.open_playlist(pl_name)
+            item = MDListItem(
+                MDListItemLeadingIcon(icon="playlist-music"),
+                MDListItemHeadlineText(text=p["name"]),
+                MDListItemSupportingText(text=f"{p.get('track_count', 0)} tracks"),
+                MDListItemTrailingIcon(icon="chevron-right"),
+                on_release=on_sel
             )
-            Window.add_widget(self.bottom_sheet)
-        self.bottom_sheet.width = Window.width
-        self.bottom_sheet.x = 0
-        self.bottom_sheet.set_state("open")
+            dlist.add_widget(item)
+
+        scroll.add_widget(dlist)
+        sheet.add_widget(scroll)
+        Window.add_widget(sheet)
+        sheet.width = Window.width
+        sheet.x = 0
+        sheet.set_state("open")
+
+    def show_add_to_active_playlist_sheet(self):
+        """Bottom sheet allowing user to select tracks from library to add to active playlist."""
+        if not self.active_playlist_name:
+            return
+        current_vids = {t.video_id for t in getattr(self, "active_playlist_tracks", [])}
+        available_tracks = [t for t in self.playlist_model.tracks if t.video_id not in current_vids]
+
+        if not available_tracks and self.active_playlist_name != "Offline Songs":
+            self.show_toast("All library songs are already in this playlist!")
+            return
+
+        sheet = MDBottomSheet(
+            MDBottomSheetDragHandle(
+                MDBottomSheetDragHandleTitle(text=f"Add Songs to '{self.active_playlist_name}'"),
+                MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
+            ),
+            size_hint_y=None,
+            height="400dp"
+        )
+        scroll = MDScrollView(size_hint_y=None, height="330dp")
+        dlist = MDList()
+
+        if self.active_playlist_name == "Offline Songs":
+            scan_item = MDListItem(
+                MDListItemLeadingIcon(icon="folder-sync"),
+                MDListItemHeadlineText(text="Scan Device for Offline Songs"),
+                MDListItemSupportingText(text="Search Music & Downloads for newly added audio"),
+                on_release=lambda x: (sheet.set_state("close"), self.scan_and_load_offline_songs(show_screen=True))
+            )
+            dlist.add_widget(scan_item)
+            pick_item = MDListItem(
+                MDListItemLeadingIcon(icon="file-music-outline"),
+                MDListItemHeadlineText(text="Select Local Audio File..."),
+                MDListItemSupportingText(text="Pick an MP3, FLAC, or WAV file"),
+                on_release=lambda x: (sheet.set_state("close"), self.file_manager_open())
+            )
+            dlist.add_widget(pick_item)
+
+        for track in available_tracks:
+            def on_add(inst, t=track):
+                add_track_to_playlist(self.active_playlist_name, t.video_id, {
+                    "title": t.title,
+                    "artist": t.artist,
+                    "url": t.url,
+                    "artwork": t.album_art,
+                    "duration": t.duration,
+                    "local_path": t.local_path
+                })
+                self.show_toast(f"Added '{t.title}' to {self.active_playlist_name}")
+                self.sync_active_playlist_screen()
+                sheet.set_state("close")
+
+            item = MDListItem(
+                MDListItemLeadingAvatar(
+                    source=track.album_art if track.album_art else "album_art.png",
+                    radius=[dp(8), dp(8), dp(8), dp(8)],
+                ),
+                MDListItemHeadlineText(text=track.title),
+                MDListItemSupportingText(text=track.artist),
+                MDListItemTrailingIcon(icon="plus"),
+                on_release=on_add
+            )
+            dlist.add_widget(item)
+
+        scroll.add_widget(dlist)
+        sheet.add_widget(scroll)
+        Window.add_widget(sheet)
+        sheet.width = Window.width
+        sheet.x = 0
+        sheet.set_state("open")
+
+    def show_playlist_options(self):
+        """Options menu for the active playlist (download, delete, etc.)."""
+        sheet = MDBottomSheet(
+            MDBottomSheetDragHandle(
+                MDBottomSheetDragHandleTitle(text=f"Options: {self.active_playlist_name}"),
+                MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
+            ),
+            size_hint_y=None,
+            height="260dp"
+        )
+        dlist = MDList()
+        
+        dlist.add_widget(MDListItem(
+            MDListItemLeadingIcon(icon="download"),
+            MDListItemHeadlineText(text="Download All for Offline"),
+            on_release=lambda x: (sheet.set_state("close"), self.download_active_playlist())
+        ))
+        
+        dlist.add_widget(MDListItem(
+            MDListItemLeadingIcon(icon="plus"),
+            MDListItemHeadlineText(text="Add Songs to Playlist"),
+            on_release=lambda x: (sheet.set_state("close"), self.show_add_to_active_playlist_sheet())
+        ))
+
+        if self.active_playlist_name != "Favorites":
+            def on_del(x):
+                sheet.set_state("close")
+                delete_playlist(self.active_playlist_name)
+                self.show_toast(f"Deleted playlist '{self.active_playlist_name}'")
+                self.go_back()
+            dlist.add_widget(MDListItem(
+                MDListItemLeadingIcon(icon="delete"),
+                MDListItemHeadlineText(text="Delete Playlist"),
+                on_release=on_del
+            ))
+
+        sheet.add_widget(dlist)
+        Window.add_widget(sheet)
+        sheet.width = Window.width
+        sheet.x = 0
+        sheet.set_state("open")
+
+    def show_add_to_playlist_sheet(self, track=None):
+        """Displays bottom sheet to add a track to any existing playlist or create a new one."""
+        target_track = track or self.player_controller.active_track
+        if not target_track:
+            return
+
+        playlists = get_all_playlists()
+        sheet = MDBottomSheet(
+            MDBottomSheetDragHandle(
+                MDBottomSheetDragHandleTitle(text="Add to Playlist"),
+                MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
+            ),
+            size_hint_y=None,
+            height="380dp"
+        )
+        scroll = MDScrollView(size_hint_y=None, height="310dp")
+        dlist = MDList()
+
+        new_item = MDListItem(
+            MDListItemLeadingIcon(icon="playlist-plus"),
+            MDListItemHeadlineText(text="Create New Playlist"),
+            on_release=lambda x: (sheet.set_state("close"), self.show_add_playlist_dialog(track_to_add=target_track))
+        )
+        dlist.add_widget(new_item)
+
+        for p in playlists:
+            def on_sel(inst, pl_name=p["name"]):
+                sheet.set_state("close")
+                add_track_to_playlist(pl_name, target_track.video_id, {
+                    "title": target_track.title,
+                    "artist": target_track.artist,
+                    "url": target_track.url,
+                    "artwork": target_track.album_art,
+                    "duration": target_track.duration,
+                    "local_path": target_track.local_path
+                })
+                self.show_toast(f"Added '{target_track.title}' to '{pl_name}'")
+
+            item = MDListItem(
+                MDListItemLeadingIcon(icon="playlist-music"),
+                MDListItemHeadlineText(text=p["name"]),
+                MDListItemSupportingText(text=f"{p.get('track_count', 0)} tracks"),
+                on_release=on_sel
+            )
+            dlist.add_widget(item)
+
+        scroll.add_widget(dlist)
+        sheet.add_widget(scroll)
+        Window.add_widget(sheet)
+        sheet.width = Window.width
+        sheet.x = 0
+        sheet.set_state("open")
+
+    def download_track_offline(self, track):
+        """Asynchronously downloads a track to local cache for 100% offline playback."""
+        if not track:
+            return
+        if track.is_downloaded or (track.local_path and os.path.exists(track.local_path)):
+            self.show_toast(f"'{track.title}' is already downloaded for offline listening.")
+            return
+
+        track.is_loading = True
+        track.download_progress = "0%"
+        self.show_toast(f"Downloading '{track.title}' for offline...")
+
+        def _worker():
+            try:
+                from yt_dlp import YoutubeDL
+                import re
+
+                cache_dir = self.cache_dir
+                download_artwork(track.video_id, custom_url=track.album_art, cache_dir=cache_dir)
+                target = track.url or f"https://www.youtube.com/watch?v={track.video_id}"
+                out_tmpl = os.path.join(cache_dir, f"{track.video_id}.%(ext)s")
+                mp3_path = os.path.join(cache_dir, f"{track.video_id}.mp3")
+
+                def hook(d):
+                    if d.get('status') == 'downloading':
+                        raw_p = d.get('_percent_str', '')
+                        clean_p = re.sub(r'\x1b\[[0-9;]*m', '', raw_p).strip()
+                        if clean_p:
+                            Clock.schedule_once(lambda dt: setattr(track, 'download_progress', clean_p), 0)
+
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': out_tmpl,
+                    'quiet': True,
+                    'noplaylist': True,
+                    'nocheckcertificate': True,
+                    'continuedl': True,
+                    'progress_hooks': [hook],
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192',
+                    }],
+                }
+                with YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([target])
+
+                if os.path.exists(mp3_path):
+                    track.local_path = mp3_path
+                    track.is_downloaded = True
+                    try:
+                        update_local_track_path(track.video_id, mp3_path, track.duration)
+                    except Exception:
+                        pass
+                    Clock.schedule_once(lambda dt: self._on_download_finished(track, True), 0)
+                else:
+                    Clock.schedule_once(lambda dt: self._on_download_finished(track, False), 0)
+            except Exception as e:
+                print(f"[Offline Download Error]: {e}")
+                Clock.schedule_once(lambda dt: self._on_download_finished(track, False), 0)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_download_finished(self, track, success):
+        track.is_loading = False
+        track.download_progress = ""
+        if success:
+            self.show_toast(f"Downloaded '{track.title}' for offline listening!")
+        else:
+            self.show_toast(f"Download completed for '{track.title}'")
+
+    def show_track_options(self):
+        active_t = self.player_controller.active_track
+        if not active_t:
+            return
+        sheet = MDBottomSheet(
+            MDBottomSheetDragHandle(
+                MDBottomSheetDragHandleTitle(text=active_t.title[:25]),
+                MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
+            ),
+            size_hint_y=None,
+            height="360dp",
+        )
+        dlist = MDList(
+            MDListItem(
+                MDListItemLeadingIcon(icon="playlist-plus"),
+                MDListItemHeadlineText(text="Add to Playlist"),
+                on_release=lambda x: (sheet.set_state("close"), self.show_add_to_playlist_sheet(active_t))
+            ),
+            MDListItem(
+                MDListItemLeadingIcon(icon="download" if not active_t.is_downloaded else "check-circle"),
+                MDListItemHeadlineText(text="Download for Offline" if not active_t.is_downloaded else "Downloaded Offline"),
+                on_release=lambda x: (sheet.set_state("close"), self.download_track_offline(active_t))
+            ),
+            MDListItem(
+                MDListItemLeadingIcon(icon="text-box-outline"),
+                MDListItemHeadlineText(text="View Lyrics"),
+                on_release=lambda x: (sheet.set_state("close"), self.show_lyrics())
+            ),
+            MDListItem(
+                MDListItemLeadingIcon(icon="share-variant"),
+                MDListItemHeadlineText(text="Share"),
+                on_release=lambda x: (sheet.set_state("close"), self.show_toast(f"Share link: {active_t.url or 'https://youtube.com/watch?v=' + active_t.video_id}"))
+            ),
+        )
+        sheet.add_widget(dlist)
+        Window.add_widget(sheet)
+        sheet.width = Window.width
+        sheet.x = 0
+        sheet.set_state("open")
 
     def show_clear_cache_dialog(self):
         """Display confirmation dialog to clear cached media and temporary data."""
@@ -497,13 +1119,48 @@ class MusicApp(MDApp):
             if "library_chips_box" in lib.ids:
                 for c in lib.ids.library_chips_box.children:
                     c.active = (c == chip_instance)
-        mapping = {
-            "Playlists": "playlist",
-            "Albums": "album",
-            "Artists": "artist",
-        }
-        if filter_name in mapping:
-            self.switch_screen(mapping[filter_name])
+        if filter_name == "Playlists":
+            self.show_playlists_overview()
+        elif filter_name == "Albums":
+            self.open_album()
+        elif filter_name == "Artists":
+            self.open_artist()
+        elif filter_name == "Downloaded":
+            self.show_downloaded()
+        elif filter_name == "Songs":
+            self.switch_screen("library")
+
+    def open_album(self, album_name="Future Echoes"):
+        """Populates AlbumScreen with real tracks from library."""
+        self.switch_screen("album")
+        if hasattr(self, "root") and self.root:
+            try:
+                screen = self.root.ids.screen_manager.get_screen("album")
+                if "album_tracks_list" in screen.ids:
+                    screen.ids.album_tracks_list.data = [{
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t
+                    } for t in self.playlist_model.tracks]
+            except Exception as e:
+                print(f"[open_album error]: {e}")
+
+    def open_artist(self, artist_name="Synthwave Collective"):
+        """Populates ArtistScreen with real tracks from library."""
+        self.switch_screen("artist")
+        if hasattr(self, "root") and self.root:
+            try:
+                screen = self.root.ids.screen_manager.get_screen("artist")
+                if "artist_tracks_list" in screen.ids:
+                    screen.ids.artist_tracks_list.data = [{
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t
+                    } for t in self.playlist_model.tracks]
+            except Exception as e:
+                print(f"[open_artist error]: {e}")
 
     def show_favorites(self):
         """Navigate to the dedicated Favorite Songs screen and sync with SQLite."""
@@ -522,28 +1179,129 @@ class MusicApp(MDApp):
             fav_tracks = get_playlist_tracks("Favorites")
             if fav_tracks:
                 container.clear_widgets()
+                track_objs = []
                 for t_dict in fav_tracks:
                     track_obj = TrackModel.from_dict(t_dict)
+                    track_objs.append(track_obj)
                     def on_sel(instance, t=track_obj):
                         self.play_selected_track(t)
                     item = MDListItem(
-                        MDListItemLeadingIcon(
+                        MDListItemLeadingAvatar(
+                            source=track_obj.album_art if track_obj.album_art else "album_art.png",
+                            radius=[dp(8), dp(8), dp(8), dp(8)],
+                        ),
+                        MDListItemHeadlineText(text=track_obj.title),
+                        MDListItemSupportingText(text=f"{track_obj.artist} • {track_obj.formatted_duration}"),
+                        MDListItemTrailingIcon(
                             icon="heart",
                             theme_icon_color="Custom",
                             icon_color=self.theme_cls.primaryColor,
                         ),
-                        MDListItemHeadlineText(text=track_obj.title),
-                        MDListItemSupportingText(text=f"{track_obj.artist} • {track_obj.formatted_duration}"),
-                        MDListItemTrailingIcon(icon="dots-vertical"),
                         on_release=on_sel,
                     )
                     container.add_widget(item)
+                # Automatically ensure artwork is downloaded for all favorite tracks
+                ensure_artworks_downloaded(track_objs)
         except Exception as e:
             print("Error syncing favorites screen:", e)
 
     def show_downloaded(self):
-        """Open file manager or filter downloaded items."""
-        self.file_manager_open()
+        """Show and manage downloaded and device offline songs in a dedicated playlist."""
+        from models.database import get_playlist_tracks
+        tracks = get_playlist_tracks("Offline Songs")
+        if not tracks:
+            self.scan_and_load_offline_songs(auto_play=False, show_screen=True)
+        else:
+            self.open_playlist("Offline Songs")
+
+    def show_local_audio_options(self):
+        """Displays bottom sheet with offline music actions (Play All, Scan Device, File Picker)."""
+        sheet = MDBottomSheet(
+            MDBottomSheetDragHandle(
+                MDBottomSheetDragHandleTitle(text="Local & Offline Audio"),
+                MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
+            ),
+            size_hint_y=None,
+            height="320dp"
+        )
+        scroll = MDScrollView(size_hint_y=None, height="240dp")
+        dlist = MDList()
+
+        item_pl = MDListItem(
+            MDListItemLeadingIcon(icon="playlist-music"),
+            MDListItemHeadlineText(text="Open Offline Songs Playlist"),
+            MDListItemSupportingText(text="View and play all device music files"),
+            on_release=lambda x: (sheet.set_state("close"), self.show_downloaded())
+        )
+        dlist.add_widget(item_pl)
+
+        item_scan = MDListItem(
+            MDListItemLeadingIcon(icon="folder-sync"),
+            MDListItemHeadlineText(text="Scan Device for Music"),
+            MDListItemSupportingText(text="Scan Music, Downloads, and storage folders"),
+            on_release=lambda x: (sheet.set_state("close"), self.scan_and_load_offline_songs(show_screen=True))
+        )
+        dlist.add_widget(item_scan)
+
+        item_picker = MDListItem(
+            MDListItemLeadingIcon(icon="file-music-outline"),
+            MDListItemHeadlineText(text="Select Specific File..."),
+            MDListItemSupportingText(text="Pick an MP3, FLAC, or WAV file"),
+            on_release=lambda x: (sheet.set_state("close"), self.file_manager_open())
+        )
+        dlist.add_widget(item_picker)
+
+        scroll.add_widget(dlist)
+        sheet.add_widget(scroll)
+        Window.add_widget(sheet)
+        sheet.width = Window.width
+        sheet.x = 0
+        sheet.set_state("open")
+
+    def scan_and_load_offline_songs(self, auto_play=False, show_screen=True):
+        """Scans device for all local audio files and loads them into 'Offline Songs' playlist."""
+        if show_screen:
+            self.show_toast("Scanning device for offline songs...")
+
+        def _worker():
+            try:
+                from utils.local_audio_utils import scan_device_offline_songs
+                from models.database import add_playlist, add_track_to_playlist
+                add_playlist("Offline Songs")
+
+                scanned = scan_device_offline_songs(cache_dir=self.cache_dir)
+                loaded_tracks = []
+                for meta in scanned:
+                    add_track_to_playlist("Offline Songs", meta["video_id"], meta)
+                    t = self.playlist_model.get_track_by_video_id(meta["video_id"])
+                    if not t:
+                        t = TrackModel.from_dict(meta)
+                        self.playlist_model.add_track(t)
+                    else:
+                        t.title = meta.get("title", t.title)
+                        t.artist = meta.get("artist", t.artist)
+                        t.album_art = meta.get("artwork", t.album_art)
+                        t.local_path = meta.get("local_path", t.local_path)
+                        t.is_downloaded = True
+                    loaded_tracks.append(t)
+
+                def _finish(dt):
+                    count = len(scanned)
+                    if show_screen:
+                        self.show_toast(f"Loaded {count} offline songs into 'Offline Songs' playlist!")
+                        self.open_playlist("Offline Songs")
+                    elif getattr(self, "active_playlist_name", "") == "Offline Songs":
+                        self.sync_active_playlist_screen()
+
+                    if auto_play and loaded_tracks:
+                        self.player_controller.set_custom_queue(loaded_tracks, start_track=loaded_tracks[0])
+                        self.play_selected_track(loaded_tracks[0])
+
+                Clock.schedule_once(_finish, 0)
+            except Exception as e:
+                print(f"[scan_and_load_offline_songs error]: {e}")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def load_search_history_from_db(self):
         """Populate the search screen history list from SQLite."""
@@ -579,7 +1337,7 @@ class MusicApp(MDApp):
             pass
 
     def perform_search(self, query: str):
-        """Execute real search query via yt-dlp, update search history in SQLite and display results."""
+        """Execute real search query via yt-dlp or direct URL, update search history in SQLite and display results."""
         if not query or not str(query).strip():
             return
         q = str(query).strip()
@@ -593,28 +1351,108 @@ class MusicApp(MDApp):
                 existing = [item["text"].lower() for item in rv.data]
                 if q.lower() not in existing:
                     rv.data.insert(0, {"text": q})
-            if "search_status_label" in search_screen.ids:
-                search_screen.ids.search_status_label.text = f"Searching for '{q}'..."
         except Exception:
             pass
 
-        import threading
+        # 1. Direct YouTube URL extraction check
+        if "youtube.com/" in q or "youtu.be/" in q or (len(q) == 11 and not " " in q and q.isalnum()):
+            try:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_status_label" in search_screen.ids:
+                    search_screen.ids.search_status_label.text = "Extracting video metadata..."
+            except Exception:
+                pass
+            app_logger.info(f"[THREAD START] MusicApp._async_url_extractor for URL: {q}")
+            threading.Thread(target=self._async_url_extractor, args=(q,), daemon=True).start()
+            return
+
+        # 2. Local Library search (instant 0ms response)
+        local_matches = [
+            t for t in self.playlist_model.tracks
+            if q.lower() in t.title.lower() or q.lower() in t.artist.lower()
+        ]
+        if local_matches:
+            try:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_status_label" in search_screen.ids:
+                    search_screen.ids.search_status_label.text = f"Local matches ({len(local_matches)})... Searching online..."
+                if "search_results_list" in search_screen.ids:
+                    search_screen.ids.search_results_list.data = [{
+                        "title": t.title,
+                        "artist": f"{t.artist} • {t.formatted_duration}",
+                        "artwork": t.album_art,
+                        "track_obj": t
+                    } for t in local_matches]
+            except Exception:
+                pass
+        else:
+            try:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_status_label" in search_screen.ids:
+                    search_screen.ids.search_status_label.text = f"Searching online for '{q}'..."
+            except Exception:
+                pass
+
+        # 3. Online yt-dlp search in background
+        app_logger.info(f"[THREAD START] MusicApp._async_yt_search for: {q}")
         threading.Thread(target=self._async_yt_search, args=(q,), daemon=True).start()
 
-    def _async_yt_search(self, query: str):
-        from yt_dlp import YoutubeDL
-        from services.audio_engine import SilentLogger
-        ydl_opts = {
-            'quiet': True,
-            'noplaylist': True,
-            'extract_flat': True,
-            'socket_timeout': 10,
-            'logger': SilentLogger(),
-        }
+    def _async_url_extractor(self, url: str):
         try:
-            with YoutubeDL(ydl_opts) as ydl:
-                res = ydl.extract_info(f"ytsearch8:{query}", download=False)
-                entries = res.get('entries', []) if res else []
+            video_id = extract_video_id(url)
+            full_url = url if ("youtube.com" in url or "youtu.be" in url) else f"https://www.youtube.com/watch?v={video_id}"
+            info = fetch_youtube_metadata(full_url)
+            title = info.get('title', 'Unknown Title')
+            artist = info.get('uploader') or info.get('channel') or 'Unknown Artist'
+            duration = int(info.get('duration', 0) or 0)
+            thumb = get_thumbnail_path(video_id)
+
+            add_track(video_id=video_id, title=title, artist=artist, url=full_url, duration=duration, artwork=thumb)
+            app_logger.info(f"[THREAD SUCCESS] _async_url_extractor completed for {video_id}: {title}")
+            Clock.schedule_once(lambda dt: self._on_url_extracted(video_id, title, artist, full_url, duration, thumb), 0)
+        except Exception as e:
+            app_logger.error(f"[THREAD FAILED] _async_url_extractor error: {e}")
+            Clock.schedule_once(lambda dt: self._on_search_error(f"Link extraction failed: {e}"), 0)
+
+    def _on_url_extracted(self, video_id, title, artist, url, duration, thumb):
+        self.playlist_model.load_from_db()
+        self.player_controller.rebuild_queue()
+        track_obj = self.playlist_model.find_track(video_id)
+        if not track_obj:
+            track_obj = TrackModel(
+                video_id=video_id,
+                title=title,
+                artist=artist,
+                url=url,
+                duration=duration,
+                album_art=thumb
+            )
+            self.playlist_model.add_track(track_obj)
+
+        try:
+            search_screen = self.root.ids.screen_manager.get_screen("search")
+            if "search_status_label" in search_screen.ids:
+                search_screen.ids.search_status_label.text = f"Ready: {title}"
+            if "search_results_list" in search_screen.ids:
+                search_screen.ids.search_results_list.data = [{
+                    "title": title,
+                    "artist": f"{artist} • {track_obj.formatted_duration}",
+                    "artwork": track_obj.album_art,
+                    "track_obj": track_obj
+                }]
+        except Exception:
+            pass
+
+        # Trigger automatic download of artwork for the extracted track
+        download_artwork(video_id, custom_url=thumb, on_success=lambda p: self.on_artwork_downloaded(track_obj, p))
+
+        self.populate_home_screen_data()
+        self.play_selected_track(track_obj)
+
+    def _async_yt_search(self, query: str):
+        try:
+            info = fetch_youtube_metadata(f"ytsearch8:{query}", extract_flat=True)
+            entries = info.get('entries', []) if info else []
             Clock.schedule_once(lambda dt: self._on_search_results(entries, query), 0)
         except Exception as e:
             Clock.schedule_once(lambda dt: self._on_search_error(str(e)), 0)
@@ -631,21 +1469,26 @@ class MusicApp(MDApp):
                 title = entry.get("title", "Unknown Title")
                 artist = entry.get("uploader") or entry.get("channel") or "YouTube"
                 dur = int(entry.get("duration", 0) or 180)
+                thumb = get_thumbnail_path(vid) if vid else "album_art.png"
                 track_obj = TrackModel(
                     video_id=vid,
                     title=title,
                     artist=artist,
                     url=f"https://www.youtube.com/watch?v={vid}" if vid else "",
                     duration=dur,
-                    album_art="album_art.png"
+                    album_art=thumb
                 )
                 rv_data.append({
                     "title": title,
                     "artist": f"{artist} • {track_obj.formatted_duration}",
+                    "artwork": track_obj.album_art,
                     "track_obj": track_obj
                 })
             if "search_results_list" in search_screen.ids:
                 search_screen.ids.search_results_list.data = rv_data
+
+            # Automatically download artwork for all search results in background
+            ensure_artworks_downloaded([item["track_obj"] for item in rv_data], on_track_updated=self.on_search_artwork_downloaded)
         except Exception as e:
             print("Error rendering search results:", e)
 
@@ -658,37 +1501,62 @@ class MusicApp(MDApp):
             pass
 
     def show_lyrics(self):
-        if not self.player_controller.active_track:
+        """Displays real fetched lyrics with asynchronous background loading."""
+        track = self.player_controller.active_track
+        if not track:
             return
-            
+
         from kivymd.uix.label import MDLabel
         from kivymd.uix.scrollview import MDScrollView
         from kivymd.uix.boxlayout import MDBoxLayout
-        
+
         lyrics_sheet = MDBottomSheet(
             MDBottomSheetDragHandle(
-                MDBottomSheetDragHandleTitle(text="Lyrics"),
+                MDBottomSheetDragHandleTitle(text=f"Lyrics - {track.title[:20]}"),
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: lyrics_sheet.set_state("close"))
             ),
+            size_hint_y=None,
+            height="440dp"
         )
+        scroll = MDScrollView(size_hint_y=None, height="370dp")
+        box = MDBoxLayout(orientation="vertical", adaptive_height=True, padding=["20dp", "16dp", "20dp", "32dp"], spacing="12dp")
         
-        scroll = MDScrollView(size_hint_y=None, height="300dp")
-        box = MDBoxLayout(orientation="vertical", adaptive_height=True, padding="24dp")
-        label = MDLabel(
-            text=self.player_controller.active_track.lyrics,
-            font_style="Headline",
-            role="small",
+        title_lbl = MDLabel(
+            text=f"{track.title}\n{track.artist}",
+            font_style="Title",
+            role="large",
+            bold=True,
             adaptive_height=True,
             halign="center"
         )
-        box.add_widget(label)
+        box.add_widget(title_lbl)
+
+        current_lyrics = track.lyrics.strip() if track.lyrics else ""
+        if not current_lyrics or "dummy lyrics" in current_lyrics.lower():
+            body_text = "Fetching lyrics from LRCLIB..."
+        else:
+            body_text = current_lyrics
+
+        lyrics_lbl = MDLabel(
+            text=body_text,
+            font_style="Body",
+            role="large",
+            adaptive_height=True,
+            halign="center"
+        )
+        box.add_widget(lyrics_lbl)
         scroll.add_widget(box)
         lyrics_sheet.add_widget(scroll)
-        
         Window.add_widget(lyrics_sheet)
         lyrics_sheet.width = Window.width
         lyrics_sheet.x = 0
         lyrics_sheet.set_state("open")
+
+        if not current_lyrics or "dummy lyrics" in current_lyrics.lower():
+            def on_fetched(lyrics_text):
+                track.lyrics = lyrics_text
+                lyrics_lbl.text = lyrics_text
+            fetch_lyrics_async(track.title, track.artist, track.video_id, cache_dir=self.cache_dir, on_success=on_fetched)
 
     def show_queue_sheet(self):
         """Display YouTube Music style Up Next bottom sheet with playlist queue."""
@@ -727,10 +1595,9 @@ class MusicApp(MDApp):
                     self.queue_sheet.set_state("close")
 
                 item = MDListItem(
-                    MDListItemLeadingIcon(
-                        icon=icon_name,
-                        theme_icon_color="Custom" if is_active else "Primary",
-                        icon_color=self.theme_cls.primaryColor if is_active else self.theme_cls.onSurfaceVariantColor,
+                    MDListItemLeadingAvatar(
+                        source=track.album_art if track.album_art else "album_art.png",
+                        radius=[dp(8), dp(8), dp(8), dp(8)],
                     ),
                     MDListItemHeadlineText(
                         text=track.title,

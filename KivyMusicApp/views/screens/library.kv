@@ -111,15 +111,15 @@
                     LibraryGridCard:
                         icon: "account-music"
                         text: "Artists"
-                        on_release: app.switch_screen("artist")
+                        on_release: app.open_artist()
                     LibraryGridCard:
                         icon: "album"
                         text: "Albums"
-                        on_release: app.switch_screen("album")
+                        on_release: app.open_album()
                     LibraryGridCard:
                         icon: "playlist-music"
                         text: "Playlists"
-                        on_release: app.switch_screen("playlist")
+                        on_release: app.show_playlists_overview()
                     LibraryGridCard:
                         icon: "podcast"
                         text: "Podcasts"
@@ -170,4 +170,4 @@
         style: "standard"
         color_map: "tertiary"
         pos_hint: {"right": 0.94, "y": 0.04}
-        on_release: app.file_manager_open()
+        on_release: app.show_local_audio_options()

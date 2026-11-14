@@ -110,59 +110,19 @@
                     bold: True
                     adaptive_height: True
 
-                # Top Tracks List Card
-                MDCard:
-                    style: "elevated"
+                # Real Dynamic Top Tracks
+                RecycleView:
+                    id: artist_tracks_list
+                    viewclass: "TrackListItem"
                     size_hint_y: None
-                    adaptive_height: True
-                    radius: [dp(20)]
-                    padding: ["0dp", "8dp", "0dp", "8dp"]
-                    md_bg_color: app.theme_cls.surfaceContainerLowColor
-
-                    MDList:
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "music-note"
-                            MDListItemHeadlineText:
-                                text: "Midnight City Lights"
-                            MDListItemSupportingText:
-                                text: "34.2M plays • 3:42"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "music-note"
-                            MDListItemHeadlineText:
-                                text: "Neon Horizon"
-                            MDListItemSupportingText:
-                                text: "28.9M plays • 4:15"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "music-note"
-                            MDListItemHeadlineText:
-                                text: "Digital Sunset"
-                            MDListItemSupportingText:
-                                text: "19.5M plays • 3:18"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "music-note"
-                            MDListItemHeadlineText:
-                                text: "Quantum Pulse"
-                            MDListItemSupportingText:
-                                text: "12.1M plays • 5:01"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
+                    height: max(dp(72), (dp(72) + dp(16)) * len(self.data)) if self.data else 0
+                    RecycleBoxLayout:
+                        default_size: None, dp(72)
+                        default_size_hint: 1, None
+                        size_hint_y: None
+                        height: self.minimum_height
+                        orientation: 'vertical'
+                        spacing: dp(16)
 
                 # Section Header: Albums
                 MDLabel:

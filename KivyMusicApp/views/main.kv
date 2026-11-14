@@ -105,22 +105,27 @@ MDBoxLayout:
                 padding: "8dp"
                 spacing: "12dp"
                 FitImage:
-                    source: "album_art.png"
+                    source: app.player_controller.active_track.album_art if app.player_controller.active_track and app.player_controller.active_track.album_art else "album_art.png"
                     size_hint: None, None
                     size: "48dp", "48dp"
                     radius: [dp(8)]
                 MDBoxLayout:
                     orientation: "vertical"
+                    size_hint_x: 1
                     pos_hint: {"center_y": .5}
-                    MDLabel:
+                    spacing: "2dp"
+                    MarqueeLabel:
                         text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
                         font_style: "Body"
-                        role: "large"
-                    MDLabel:
+                        role: "medium"
+                        bold: True
+                        height: "20dp"
+                    MarqueeLabel:
                         text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
                         font_style: "Body"
                         role: "small"
                         text_color: app.theme_cls.onSurfaceVariantColor
+                        height: "16dp"
                 MDIconButton:
                     icon: "heart" if app.player_controller.is_favorite else "heart-outline"
                     theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"

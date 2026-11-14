@@ -93,6 +93,7 @@
                             style: "outlined"
                             icon: "download-outline"
                             pos_hint: {"center_y": .5}
+                            on_release: app.download_active_playlist()
 
                 # Section Header
                 MDLabel:
@@ -102,78 +103,16 @@
                     bold: True
                     adaptive_height: True
 
-                # Tracks List Card
-                MDCard:
-                    style: "elevated"
+                # Real Dynamic Tracklist
+                RecycleView:
+                    id: album_tracks_list
+                    viewclass: "TrackListItem"
                     size_hint_y: None
-                    adaptive_height: True
-                    radius: [dp(20)]
-                    padding: ["0dp", "8dp", "0dp", "8dp"]
-                    md_bg_color: app.theme_cls.surfaceContainerLowColor
-
-                    MDList:
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "numeric-1-circle-outline"
-                            MDListItemHeadlineText:
-                                text: "Midnight City Lights"
-                            MDListItemSupportingText:
-                                text: "Synthwave Collective • 3:42"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "numeric-2-circle-outline"
-                            MDListItemHeadlineText:
-                                text: "Neon Horizon"
-                            MDListItemSupportingText:
-                                text: "Synthwave Collective • 4:15"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "numeric-3-circle-outline"
-                            MDListItemHeadlineText:
-                                text: "Digital Sunset"
-                            MDListItemSupportingText:
-                                text: "Synthwave Collective • 3:18"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "numeric-4-circle-outline"
-                            MDListItemHeadlineText:
-                                text: "Quantum Pulse"
-                            MDListItemSupportingText:
-                                text: "Synthwave Collective • 5:01"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "numeric-5-circle-outline"
-                            MDListItemHeadlineText:
-                                text: "Retrograde"
-                            MDListItemSupportingText:
-                                text: "Synthwave Collective • 3:55"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
-
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "numeric-6-circle-outline"
-                            MDListItemHeadlineText:
-                                text: "Cybernetic Drift"
-                            MDListItemSupportingText:
-                                text: "Synthwave Collective • 4:30"
-                            MDListItemTrailingIcon:
-                                icon: "dots-vertical"
+                    height: max(dp(72), (dp(72) + dp(16)) * len(self.data)) if self.data else 0
+                    RecycleBoxLayout:
+                        default_size: None, dp(72)
+                        default_size_hint: 1, None
+                        size_hint_y: None
+                        height: self.minimum_height
+                        orientation: 'vertical'
+                        spacing: dp(16)
