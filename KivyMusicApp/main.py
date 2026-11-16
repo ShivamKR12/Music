@@ -372,6 +372,8 @@ class MusicApp(MDApp):
         self.listen_together_dialog = None
         self.listen_together_last_broadcast = 0.0
         self.screen_history = []
+        self.active_search_provider = "all"
+        self._active_spotify_dialog = None
         
         # Listen Together Synchronization Service
         self.listen_together_service = ListenTogetherService()
@@ -1734,6 +1736,87 @@ class MusicApp(MDApp):
         )
         self.playlist_dialog.open()
 
+    def show_import_spotify_dialog(self):
+        """Displays dialog prompting for a public Spotify playlist or album link."""
+        from kivymd.uix.dialog import (
+            MDDialog, MDDialogHeadlineText, MDDialogSupportingText,
+            MDDialogContentContainer, MDDialogButtonContainer
+        )
+        from kivymd.uix.textfield import MDTextField, MDTextFieldHintText
+        from kivymd.uix.button import MDButton, MDButtonText
+
+        text_field = MDTextField(
+            MDTextFieldHintText(text="Paste Spotify Playlist URL..."),
+            mode="filled"
+        )
+
+        def on_import(*args):
+            url = text_field.text.strip()
+            if self._active_spotify_dialog:
+                self._active_spotify_dialog.dismiss()
+            if url:
+                self.import_spotify_playlist(url)
+
+        self._active_spotify_dialog = MDDialog(
+            MDDialogHeadlineText(text="Import Spotify Playlist"),
+            MDDialogSupportingText(text="Paste any public Spotify playlist or album URL. All tracks will be extracted and saved to your library:"),
+            MDDialogContentContainer(
+                text_field,
+                orientation="vertical",
+                spacing="8dp"
+            ),
+            MDDialogButtonContainer(
+                MDButton(
+                    MDButtonText(text="CANCEL"),
+                    style="text",
+                    on_release=lambda *a: self._active_spotify_dialog.dismiss() if self._active_spotify_dialog else None
+                ),
+                MDButton(
+                    MDButtonText(text="IMPORT"),
+                    style="text",
+                    on_release=on_import
+                ),
+                spacing="8dp"
+            )
+        )
+        self._active_spotify_dialog.open()
+
+    def import_spotify_playlist(self, url: str):
+        """Imports a public Spotify playlist or album in a background thread."""
+        self.show_toast("Connecting to Spotify & extracting tracks...")
+        def _bg():
+            try:
+                from services.music_provider_router import MusicProviderRouter
+                res = MusicProviderRouter().import_spotify_playlist(url)
+                if res.get("success"):
+                    title = res.get("title")
+                    count = res.get("count")
+                    Clock.schedule_once(lambda dt: self.show_toast(f"Imported '{title}' ({count} tracks)!"), 0)
+                    Clock.schedule_once(lambda dt: self.playlist_model.load_from_db(), 0)
+                    Clock.schedule_once(lambda dt: self.populate_home_screen_data(), 0)
+                    Clock.schedule_once(lambda dt: self.open_playlist(title), 0)
+                else:
+                    err = res.get("error", "Failed to import playlist")
+                    Clock.schedule_once(lambda dt: self.show_toast(f"Spotify error: {err}"), 0)
+            except Exception as e:
+                Clock.schedule_once(lambda dt: self.show_toast(f"Import error: {e}"), 0)
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def set_search_provider(self, provider: str):
+        """Sets active search provider filter ('all' | 'jiosaavn' | 'youtube' | 'spotify')."""
+        self.active_search_provider = provider
+        msg = f"Search Source: {provider.upper()}" if provider != "all" else "Search Source: All Providers"
+        self.show_toast(msg)
+        try:
+            search_screen = self.root.ids.screen_manager.get_screen("search")
+            if "search_input" in search_screen.ids:
+                q = search_screen.ids.search_input.text.strip()
+                if q:
+                    self.perform_search(q)
+        except Exception:
+            pass
+
     def open_playlist(self, playlist_name: str):
         """Switches to PlaylistScreen and populates it with real tracks for the selected playlist."""
         self.active_playlist_name = playlist_name
@@ -3051,7 +3134,19 @@ class MusicApp(MDApp):
         except Exception:
             pass
 
-        # 1. Direct YouTube URL extraction check
+        # 1. Direct Spotify URL / URI check
+        if "open.spotify.com/" in q or q.startswith("spotify:"):
+            try:
+                search_screen = self.root.ids.screen_manager.get_screen("search")
+                if "search_status_label" in search_screen.ids:
+                    search_screen.ids.search_status_label.text = "Extracting Spotify metadata & tracks..."
+            except Exception:
+                pass
+            app_logger.info(f"[THREAD START] MusicApp._async_spotify_extractor for URL: {q}")
+            threading.Thread(target=self._async_spotify_extractor, args=(q,), daemon=True).start()
+            return
+
+        # 2. Direct YouTube URL extraction check
         if "youtube.com/" in q or "youtu.be/" in q or (len(q) == 11 and not " " in q and q.isalnum()):
             try:
                 search_screen = self.root.ids.screen_manager.get_screen("search")
@@ -3063,7 +3158,7 @@ class MusicApp(MDApp):
             threading.Thread(target=self._async_url_extractor, args=(q,), daemon=True).start()
             return
 
-        # 2. Local Library search (instant 0ms response)
+        # 3. Local Library search (instant 0ms response)
         local_matches = [
             t for t in self.playlist_model.tracks
             if q.lower() in t.title.lower() or q.lower() in t.artist.lower()
@@ -3146,10 +3241,36 @@ class MusicApp(MDApp):
         self.populate_home_screen_data()
         self.play_selected_track(track_obj)
 
+    def _async_spotify_extractor(self, url: str):
+        try:
+            from services.music_provider_router import MusicProviderRouter
+            router = MusicProviderRouter()
+            if "/track/" in url or "spotify:track:" in url:
+                td = router.spotify.get_track_details(url)
+                if td:
+                    Clock.schedule_once(lambda dt: self._on_search_results([td], "Spotify Track"), 0)
+                    Clock.schedule_once(lambda dt: self.show_toast(f"Found: {td['title']}"), 0)
+                else:
+                    Clock.schedule_once(lambda dt: self.show_toast("Could not resolve Spotify track"), 0)
+            else:
+                res = router.import_spotify_playlist(url)
+                if res.get("success"):
+                    title = res.get("title")
+                    count = res.get("count")
+                    Clock.schedule_once(lambda dt: self.show_toast(f"Imported '{title}' ({count} tracks)!"), 0)
+                    Clock.schedule_once(lambda dt: self.playlist_model.load_from_db(), 0)
+                    Clock.schedule_once(lambda dt: self.populate_home_screen_data(), 0)
+                    Clock.schedule_once(lambda dt: self._on_search_results(res.get("tracks", []), title), 0)
+                else:
+                    Clock.schedule_once(lambda dt: self.show_toast(f"Spotify: {res.get('error')}"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self._on_search_error(f"Spotify extraction error: {e}"), 0)
+
     def _async_yt_search(self, query: str):
         try:
-            info = fetch_youtube_metadata(f"ytsearch8:{query}", extract_flat=True)
-            entries = info.get('entries', []) if info else []
+            from services.music_provider_router import MusicProviderRouter
+            provider_filter = getattr(self, "active_search_provider", "all")
+            entries = MusicProviderRouter().search(query, provider=provider_filter, limit=16)
             Clock.schedule_once(lambda dt: self._on_search_results(entries, query), 0)
         except Exception as e:
             Clock.schedule_once(lambda dt: self._on_search_error(str(e)), 0)
@@ -3162,22 +3283,38 @@ class MusicApp(MDApp):
 
             rv_data = []
             for entry in entries:
-                vid = entry.get("id", "")
+                vid = entry.get("video_id") or entry.get("id", "")
                 title = entry.get("title", "Unknown Title")
-                artist = entry.get("uploader") or entry.get("channel") or "YouTube"
+                artist = entry.get("artist") or entry.get("uploader") or entry.get("channel") or "Unknown Artist"
                 dur = int(entry.get("duration", 0) or 180)
-                thumb = get_thumbnail_path(vid) if vid else "album_art.png"
+                thumb = entry.get("artwork") or (get_thumbnail_path(vid) if vid else "album_art.png")
+                source = entry.get("source", "youtube")
+                bitrate = int(entry.get("bitrate", 128) or 128)
+                stream_url = entry.get("stream_url", "")
+
                 track_obj = TrackModel(
                     video_id=vid,
                     title=title,
                     artist=artist,
-                    url=f"https://www.youtube.com/watch?v={vid}" if vid else "",
+                    url=entry.get("url", f"https://www.youtube.com/watch?v={vid}" if vid else ""),
                     duration=dur,
-                    album_art=thumb
+                    album_art=thumb,
+                    source=source,
+                    source_id=entry.get("source_id", vid),
+                    bitrate=bitrate,
                 )
+
+                # Source-specific Material 3 badges
+                if source == "jiosaavn":
+                    badge_str = f"⚡ 320kbps HD • {artist} • {track_obj.formatted_duration}"
+                elif source == "spotify":
+                    badge_str = f"🟢 Spotify • {artist} • {track_obj.formatted_duration}"
+                else:
+                    badge_str = f"🔴 YouTube • {artist} • {track_obj.formatted_duration}"
+
                 rv_data.append({
                     "title": title,
-                    "artist": f"{artist} • {track_obj.formatted_duration}",
+                    "artist": badge_str,
                     "artwork": track_obj.album_art,
                     "track_obj": track_obj
                 })

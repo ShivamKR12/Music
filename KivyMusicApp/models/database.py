@@ -57,6 +57,17 @@ def init_db(db_path=None):
         except Exception:
             pass
 
+        for col_stmt in [
+            "ALTER TABLE tracks ADD COLUMN source TEXT DEFAULT 'youtube'",
+            "ALTER TABLE tracks ADD COLUMN source_id TEXT",
+            "ALTER TABLE tracks ADD COLUMN bitrate INTEGER DEFAULT 128",
+            "ALTER TABLE tracks ADD COLUMN isrc TEXT",
+        ]:
+            try:
+                cursor.execute(col_stmt)
+            except Exception:
+                pass
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS playlists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,7 +149,7 @@ def init_db(db_path=None):
 
         conn.commit()
 
-def add_track(video_id, title, artist, url, duration=0, artwork="", local_path=""):
+def add_track(video_id, title, artist, url, duration=0, artwork="", local_path="", source="youtube", source_id="", bitrate=128, isrc=""):
     """Inserts a new track record into the database, or updates an existing record."""
     with DB_LOCK:
         conn = get_connection()
@@ -147,16 +158,20 @@ def add_track(video_id, title, artist, url, duration=0, artwork="", local_path="
             clean_title = sanitize_text(title)
             clean_artist = sanitize_text(artist)
             cursor.execute('''
-                INSERT INTO tracks (video_id, title, artist, url, local_path, duration, artwork)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tracks (video_id, title, artist, url, local_path, duration, artwork, source, source_id, bitrate, isrc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(video_id) DO UPDATE SET
                     title=excluded.title,
                     artist=excluded.artist,
                     url=excluded.url,
                     local_path=CASE WHEN excluded.local_path != '' THEN excluded.local_path ELSE tracks.local_path END,
                     duration=CASE WHEN excluded.duration > 0 THEN excluded.duration ELSE tracks.duration END,
-                    artwork=CASE WHEN excluded.artwork != '' THEN excluded.artwork ELSE tracks.artwork END
-            ''', (video_id, clean_title, clean_artist, url, local_path, duration, artwork))
+                    artwork=CASE WHEN excluded.artwork != '' THEN excluded.artwork ELSE tracks.artwork END,
+                    source=CASE WHEN excluded.source != '' THEN excluded.source ELSE tracks.source END,
+                    source_id=CASE WHEN excluded.source_id != '' THEN excluded.source_id ELSE tracks.source_id END,
+                    bitrate=CASE WHEN excluded.bitrate > 0 THEN excluded.bitrate ELSE tracks.bitrate END,
+                    isrc=CASE WHEN excluded.isrc != '' THEN excluded.isrc ELSE tracks.isrc END
+            ''', (video_id, clean_title, clean_artist, url, local_path, duration, artwork, source, source_id, bitrate, isrc))
             conn.commit()
         except Exception as e:
             print("Database error in add_track:", e)
@@ -166,7 +181,7 @@ def get_all_tracks():
     with DB_LOCK:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT video_id, title, artist, url, local_path, duration, artwork FROM tracks ORDER BY added_at DESC")
+        cursor.execute("SELECT video_id, title, artist, url, local_path, duration, artwork, source, source_id, bitrate, isrc FROM tracks ORDER BY added_at DESC")
         return [dict(row) for row in cursor.fetchall()]
 
 def get_track(video_id):
@@ -174,7 +189,7 @@ def get_track(video_id):
     with DB_LOCK:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT video_id, title, artist, url, local_path, duration, artwork FROM tracks WHERE video_id = ?", (video_id,))
+        cursor.execute("SELECT video_id, title, artist, url, local_path, duration, artwork, source, source_id, bitrate, isrc FROM tracks WHERE video_id = ?", (video_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
 

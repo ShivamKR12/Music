@@ -207,13 +207,23 @@ class PlayerController(EventDispatcher):
                     True
                 )
         else:
-            target_src = getattr(self.active_track, "local_path", "") or getattr(self.active_track, "url", "")
+            target_src = getattr(self.active_track, "local_path", "")
+            if not target_src or not os.path.exists(target_src):
+                try:
+                    from services.music_provider_router import MusicProviderRouter
+                    resolved = MusicProviderRouter().resolve_stream(self.active_track)
+                    target_src = resolved.get("url") or getattr(self.active_track, "url", "")
+                except Exception as e:
+                    print(f"[PlayerController] Stream resolution fallback: {e}")
+                    target_src = getattr(self.active_track, "url", "")
+
             track_meta = {
                 "id": getattr(self.active_track, "video_id", ""),
                 "title": self.active_track.title,
                 "artist": self.active_track.artist,
                 "duration": self.active_track.duration,
-                "artwork": self.active_track.album_art
+                "artwork": self.active_track.album_art,
+                "source": getattr(self.active_track, "source", "youtube")
             }
             # If target_src is empty or doesn't exist, check local bundled art/demo
             if not target_src and hasattr(self.active_track, "video_id") and self.active_track.video_id:

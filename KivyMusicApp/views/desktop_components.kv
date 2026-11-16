@@ -62,6 +62,10 @@
         on_release: app.show_playlists_overview()
 
     DesktopNavButton:
+        icon: "spotify"
+        on_release: app.show_import_spotify_dialog()
+
+    DesktopNavButton:
         icon: "equalizer"
         theme_icon_color: "Custom" if app.active_tab_name == "equalizer" else "Primary"
         icon_color: app.theme_cls.primaryColor if app.active_tab_name == "equalizer" else app.theme_cls.onSurfaceVariantColor
@@ -114,7 +118,7 @@
                 touch_pass_through: True
 
             MarqueeLabel:
-                text: app.player_controller.active_track.artist if app.player_controller.active_track else "Select a song to start"
+                text: (("⚡ 320k " if getattr(app.player_controller.active_track, "source", "") == "jiosaavn" else ("🟢 " if getattr(app.player_controller.active_track, "source", "") == "spotify" else "")) + app.player_controller.active_track.artist) if app.player_controller.active_track else "Select a song to start"
                 font_style: "Body"
                 role: "small"
                 text_color: app.theme_cls.onSurfaceVariantColor

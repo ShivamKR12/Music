@@ -12,6 +12,10 @@
                     on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Search"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "spotify"
+                    on_release: app.show_import_spotify_dialog()
                 
         MDBoxLayout:
             orientation: "vertical"
@@ -38,6 +42,45 @@
                     opacity: 1 if search_input.text else 0
                     disabled: False if search_input.text else True
                     on_release: app.clear_search_input()
+
+            # Multi-Source Provider Filter Chips
+            DirectionalHorizontalScrollView:
+                size_hint_y: None
+                height: "48dp"
+                do_scroll_y: False
+                do_scroll_x: True
+                bar_width: "2dp"
+                MDBoxLayout:
+                    adaptive_size: True
+                    height: "48dp"
+                    padding: ["8dp", "8dp", "8dp", "8dp"]
+                    spacing: "8dp"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: app.set_search_provider("all")
+                        MDChipText:
+                            text: "All Sources"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: app.set_search_provider("jiosaavn")
+                        MDChipLeadingIcon:
+                            icon: "flash"
+                        MDChipText:
+                            text: "JioSaavn (320k HD)"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: app.set_search_provider("youtube")
+                        MDChipLeadingIcon:
+                            icon: "youtube"
+                        MDChipText:
+                            text: "YouTube"
+                    MDChip:
+                        type: "suggestion"
+                        on_release: app.set_search_provider("spotify")
+                        MDChipLeadingIcon:
+                            icon: "spotify"
+                        MDChipText:
+                            text: "Spotify"
 
             # Browse Category Chips
             DirectionalHorizontalScrollView:

@@ -5,6 +5,7 @@ import json
 import socket
 import threading
 import urllib.request
+import requests
 from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
 from yt_dlp import YoutubeDL
@@ -201,7 +202,16 @@ class AudioEngine:
     def _download_and_play(self, target: str, cancel_event: threading.Event, user_info=None):
         try:
             Clock.schedule_once(lambda dt: self._set_loading(True), 0)
-            video_id = extract_video_id(target)
+            track_id = (user_info.get("id") or user_info.get("video_id")) if user_info else ""
+            if not track_id:
+                track_id = extract_video_id(target)
+            video_id = track_id
+
+            # Direct CDN HTTP Audio Stream (JioSaavn or direct streaming CDN)
+            if target.startswith("http") and ("saavncdn.com" in target or any(target.endswith(ext) for ext in [".mp4", ".m4a", ".aac", ".mp3"])):
+                self._stream_direct_http(target, video_id, cancel_event, user_info)
+                return
+
             cache_dir = get_cache_dir()
             mp3_path = os.path.join(cache_dir, f"{video_id}.mp3")
             meta_path = os.path.join(cache_dir, f"{video_id}.json")
@@ -323,6 +333,91 @@ class AudioEngine:
     def _set_main_thread_info(self, info, path):
         self.current_info = info
         self.current_path = path
+
+    def _stream_direct_http(self, stream_url: str, track_id: str, cancel_event: threading.Event, user_info=None):
+        try:
+            cache_dir = get_cache_dir()
+            ext = ".mp4" if ".mp4" in stream_url else (".m4a" if ".m4a" in stream_url else ".mp3")
+            target_path = os.path.join(cache_dir, f"{track_id}{ext}")
+            meta_path = os.path.join(cache_dir, f"{track_id}.json")
+
+            clean_info = {
+                "id": track_id,
+                "title": user_info.get("title", "Unknown Title") if user_info else "Unknown Title",
+                "artist": user_info.get("artist", "Direct Artist") if user_info else "Direct Artist",
+                "duration": int(user_info.get("duration", 0) if user_info else 0),
+                "artwork": user_info.get("artwork", "") if user_info else ""
+            }
+
+            # 1. Cache hit check
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 1024:
+                cached_meta = self._load_cached_metadata(meta_path) or clean_info
+                if cancel_event.is_set():
+                    return
+                Clock.schedule_once(lambda dt: self._set_main_thread_info(cached_meta, target_path), 0)
+                if cached_meta.get("artwork") and os.path.exists(cached_meta["artwork"]) and self.on_artwork_loaded:
+                    Clock.schedule_once(lambda dt: self.on_artwork_loaded(cached_meta["artwork"]), 0)
+                Clock.schedule_once(lambda dt: self._play_file(target_path, cached_meta), 0)
+                Clock.schedule_once(lambda dt: self._set_loading(False), 0)
+                return
+
+            # Download thumbnail
+            thumb_url = clean_info.get("artwork")
+            thumb_path = os.path.join(cache_dir, f"{track_id}.jpg")
+            if thumb_url and thumb_url.startswith("http") and not os.path.exists(thumb_path):
+                self._download_thumbnail(thumb_url, thumb_path)
+            if os.path.exists(thumb_path):
+                clean_info["artwork"] = thumb_path
+
+            if cancel_event.is_set():
+                return
+
+            Clock.schedule_once(lambda dt: self._set_main_thread_info(clean_info, target_path), 0)
+            if clean_info.get("artwork") and self.on_artwork_loaded:
+                Clock.schedule_once(lambda dt: self.on_artwork_loaded(clean_info["artwork"]), 0)
+
+            # Stream download chunked via requests
+            resp = requests.get(stream_url, stream=True, timeout=15)
+            if resp.status_code == 200:
+                total_len = int(resp.headers.get("content-length", 0) or 0)
+                dl = 0
+                temp_path = target_path + ".tmp"
+                with open(temp_path, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=65536):
+                        if cancel_event.is_set():
+                            f.close()
+                            if os.path.exists(temp_path):
+                                os.remove(temp_path)
+                            return
+                        if chunk:
+                            f.write(chunk)
+                            dl += len(chunk)
+                            if total_len > 0 and self.on_download_progress:
+                                prog = f"{int((dl / total_len) * 100)}%"
+                                Clock.schedule_once(lambda dt, p=prog: self.on_download_progress(p), 0)
+                if os.path.exists(temp_path):
+                    if os.path.exists(target_path):
+                        os.remove(target_path)
+                    os.rename(temp_path, target_path)
+
+                self._save_cached_metadata(meta_path, clean_info)
+                if cancel_event.is_set():
+                    return
+                try:
+                    from models.database import update_local_track_path
+                    update_local_track_path(track_id, target_path, clean_info.get("duration", 0))
+                except Exception:
+                    pass
+                Clock.schedule_once(lambda dt: self._play_file(target_path, clean_info), 0)
+            else:
+                if self.on_error:
+                    Clock.schedule_once(lambda dt: self.on_error(f"Stream error: HTTP {resp.status_code}"), 0)
+        except Exception as e:
+            print(f"[AudioEngine] Direct stream download error: {e}")
+            if self.on_error and not cancel_event.is_set():
+                Clock.schedule_once(lambda dt: self.on_error(f"Stream error: {e}"), 0)
+        finally:
+            Clock.schedule_once(lambda dt: self._set_loading(False), 0)
 
     def _play_file(self, path: str, info: dict):
         self.cleanup_player()

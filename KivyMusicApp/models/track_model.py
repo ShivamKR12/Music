@@ -20,6 +20,10 @@ class TrackModel(EventDispatcher):
     is_downloaded = BooleanProperty(False)
     is_loading = BooleanProperty(False)
     download_progress = StringProperty("")
+    source = StringProperty("youtube")
+    source_id = StringProperty("")
+    bitrate = NumericProperty(128)
+    isrc = StringProperty("")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -82,6 +86,10 @@ class TrackModel(EventDispatcher):
             synced_lyrics=data.get("synced_lyrics") or data.get("syncedLyrics") or "",
             is_favorite=is_fav_val,
             is_downloaded=bool(local_path and os.path.exists(local_path)),
+            source=data.get("source", "youtube") or "youtube",
+            source_id=data.get("source_id", "") or vid,
+            bitrate=int(data.get("bitrate", 128) or 128),
+            isrc=data.get("isrc", "") or "",
         )
 
     def to_dict(self):
@@ -99,6 +107,10 @@ class TrackModel(EventDispatcher):
             "synced_lyrics": self.synced_lyrics,
             "is_favorite": self.is_favorite,
             "is_downloaded": self.is_downloaded,
+            "source": self.source,
+            "source_id": self.source_id,
+            "bitrate": int(self.bitrate),
+            "isrc": self.isrc,
         }
 
 DEFAULT_TRACKS_SEED = [
