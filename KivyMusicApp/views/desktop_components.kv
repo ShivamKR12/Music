@@ -128,7 +128,7 @@
         MDIconButton:
             icon: "heart" if app.player_controller.is_favorite else "heart-outline"
             theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
-            icon_color: [1, 0.2, 0.3, 1] if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
+            icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
             pos_hint: {"center_y": .5}
             on_release: app.player_controller.toggle_favorite()
 

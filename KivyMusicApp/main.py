@@ -792,14 +792,29 @@ class MusicApp(MDApp):
                     app_logger.error(f"Failed to instantiate screen '{screen_name}': {e}")
                     return
             if sm.has_screen(screen_name) and sm.current != screen_name:
-                self.screen_history.append(sm.current)
-                if sm.width == 0 or sm.height == 0:
+                old_screen = sm.current
+                self.screen_history.append(old_screen)
+                if os.environ.get("KIVY_HEADLESS") == "1" or sm.width == 0 or sm.height == 0:
                     from kivy.uix.screenmanager import NoTransition
                     prev_trans = sm.transition
                     sm.transition = NoTransition()
                     sm.current = screen_name
                     sm.transition = prev_trans
                 else:
+                    from kivy.uix.screenmanager import SlideTransition
+                    if not isinstance(sm.transition, SlideTransition):
+                        sm.transition = SlideTransition(duration=0.22)
+
+                    tab_indices = {"home": 0, "search": 1, "library": 2, "browse": 3}
+                    if screen_name == "player":
+                        sm.transition.direction = "up"
+                    elif old_screen == "player":
+                        sm.transition.direction = "down"
+                    elif old_screen in tab_indices and screen_name in tab_indices:
+                        sm.transition.direction = "left" if tab_indices[screen_name] > tab_indices[old_screen] else "right"
+                    else:
+                        sm.transition.direction = "left"
+
                     sm.current = screen_name
                 self.sync_nav_bar(screen_name)
                 if screen_name == "player":
@@ -848,6 +863,7 @@ class MusicApp(MDApp):
             return
         if hasattr(self, "root") and self.root and hasattr(self.root, "ids") and "screen_manager" in self.root.ids:
             sm = self.root.ids.screen_manager
+            old_screen = sm.current
             dest = target
             if not dest:
                 if self.screen_history:
@@ -858,7 +874,21 @@ class MusicApp(MDApp):
                         dest = "home"
                 else:
                     dest = "home"
-            sm.current = dest
+            if os.environ.get("KIVY_HEADLESS") == "1" or sm.width == 0 or sm.height == 0:
+                from kivy.uix.screenmanager import NoTransition
+                prev_trans = sm.transition
+                sm.transition = NoTransition()
+                sm.current = dest
+                sm.transition = prev_trans
+            else:
+                from kivy.uix.screenmanager import SlideTransition
+                if not isinstance(sm.transition, SlideTransition):
+                    sm.transition = SlideTransition(duration=0.22)
+                if old_screen == "player":
+                    sm.transition.direction = "down"
+                else:
+                    sm.transition.direction = "right"
+                sm.current = dest
             self.sync_nav_bar(dest)
 
     def on_keyboard(self, window, key, scancode, codepoint, modifier):
@@ -1054,7 +1084,11 @@ class MusicApp(MDApp):
                     pass
                 self._splash_completed = True
                 if sm.current == "splash":
+                    from kivy.uix.screenmanager import NoTransition
+                    prev_trans = sm.transition
+                    sm.transition = NoTransition()
                     sm.current = "home"
+                    sm.transition = prev_trans
                     self.sync_nav_bar("home")
             fade_anim.bind(on_complete=lambda *args: Clock.schedule_once(_on_fade_complete, 0))
             fade_anim.start(splash)
@@ -1516,7 +1550,7 @@ class MusicApp(MDApp):
                     md_bg_color=self.theme_cls.surfaceContainerColor,
                     on_release=lambda *args: self.show_lyrics()
                 )
-                img = FitImage(source="album_art.png", radius=[dp(24)])
+                img = FitImage(source="album_art.png", radius=[dp(24)], mipmap=True)
                 c.add_widget(img)
                 c._fit_img = img
                 return c

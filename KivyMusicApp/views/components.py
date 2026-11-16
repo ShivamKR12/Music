@@ -681,6 +681,11 @@ class AnimatedBackground(Widget):
         else:
             self._tick(0.016)
 
+    def _apply_extracted_colors(self, p, s, t):
+        self.color_primary = p
+        self.color_secondary = s
+        self.color_tertiary = t
+
     def update_colors_from_theme(self, app=None):
         """Harmonizes backdrop colors with album art extraction or active theme palette."""
         if not app:
@@ -696,22 +701,24 @@ class AnimatedBackground(Widget):
         if getattr(app, "extract_artwork_colors", True) and hasattr(app, "player_controller") and app.player_controller.active_track:
             art = app.player_controller.active_track.album_art
             if art and os.path.exists(art) and not art.endswith("album_art.png"):
-                try:
-                    from PIL import Image
-                    with Image.open(art) as img:
-                        img = img.resize((32, 32)).convert("RGB")
-                        colors = img.getcolors(1024)
-                        if colors:
-                            colors.sort(key=lambda c: c[0], reverse=True)
-                            p = [c / 255.0 for c in colors[0][1]] + [0.45 * self.intensity]
-                            s = [c / 255.0 for c in colors[min(1, len(colors)-1)][1]] + [0.40 * self.intensity]
-                            t = [c / 255.0 for c in colors[min(2, len(colors)-1)][1]] + [0.35 * self.intensity]
-                            self.color_primary = p
-                            self.color_secondary = s
-                            self.color_tertiary = t
-                            return
-                except Exception:
-                    pass
+                import threading
+                intensity = self.intensity
+                def _worker():
+                    try:
+                        from PIL import Image
+                        with Image.open(art) as img:
+                            img = img.resize((32, 32)).convert("RGB")
+                            colors = img.getcolors(1024)
+                            if colors:
+                                colors.sort(key=lambda c: c[0], reverse=True)
+                                p = [c / 255.0 for c in colors[0][1]] + [0.45 * intensity]
+                                s = [c / 255.0 for c in colors[min(1, len(colors)-1)][1]] + [0.40 * intensity]
+                                t = [c / 255.0 for c in colors[min(2, len(colors)-1)][1]] + [0.35 * intensity]
+                                Clock.schedule_once(lambda dt: self._apply_extracted_colors(p, s, t), 0)
+                    except Exception:
+                        pass
+                threading.Thread(target=_worker, daemon=True).start()
+                return
 
         # Fallback / Non-extraction mode: harmonize with active theme
         p = list(getattr(app.theme_cls, "primaryColor", [0.48, 0.30, 1.0, 1.0]))
@@ -729,6 +736,13 @@ class AnimatedBackground(Widget):
             if self.mesh.vertices:
                 self.mesh.vertices = []
             return
+
+        # Performance Preservation: Only calculate mesh vertices when player screen is current
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "root") and app.root and hasattr(app.root, "ids") and "screen_manager" in app.root.ids:
+            if app.root.ids.screen_manager.current != "player":
+                return
         self._t += dt * self.speed
         w, h = max(10, self.width), max(10, self.height)
         ox, oy = self.x, self.y

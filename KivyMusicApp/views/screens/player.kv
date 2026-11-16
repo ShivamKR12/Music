@@ -33,6 +33,11 @@
                     pos_hint: {"center_x": .5}
                 MDTopAppBarTrailingButtonContainer:
                     MDActionTopAppBarButton:
+                        icon: "heart" if app.player_controller.is_favorite else "heart-outline"
+                        theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
+                        icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
+                        on_release: app.player_controller.toggle_favorite()
+                    MDActionTopAppBarButton:
                         icon: "text-box-outline"
                         on_release: app.show_lyrics()
                     MDActionTopAppBarButton:

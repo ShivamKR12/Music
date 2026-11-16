@@ -24,6 +24,15 @@
 
 
 
+<FitImage>:
+    mipmap: True
+
+<Image>:
+    mipmap: True
+
+<AsyncImage>:
+    mipmap: True
+
 <MDScreen>:
     pos_hint: {"x": 0, "y": 0}
 
@@ -78,7 +87,7 @@ MDBoxLayout:
         LazyScreenManager:
             id: screen_manager
             current: "splash"
-            transition: __import__('kivy.uix.screenmanager').uix.screenmanager.FadeTransition()
+            transition: __import__('kivy.uix.screenmanager').uix.screenmanager.SlideTransition(duration=0.22)
 
             SplashScreen:
             HomeScreen:
@@ -92,11 +101,11 @@ MDBoxLayout:
             opacity: 1 if (app.is_desktop_layout and app.desktop_panel_open) else 0
             disabled: not (app.is_desktop_layout and app.desktop_panel_open)
 
-    # Global Mini Player (Mobile Only)
+    # Global Mini Player (Mobile Only - SimpMusic Floating Capsule Pill)
     MDBoxLayout:
         id: mini_player
         size_hint_y: None
-        padding: ["8dp", "0dp", "8dp", "8dp"] if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else ["0dp", "0dp", "0dp", "0dp"]
+        padding: ["12dp", "0dp", "12dp", "8dp"] if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else ["0dp", "0dp", "0dp", "0dp"]
         opacity: 1 if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
         height: dp(72) if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
         disabled: False if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else True
@@ -106,45 +115,72 @@ MDBoxLayout:
             height: "64dp"
             md_bg_color: app.theme_cls.surfaceContainerHighestColor
             on_release: app.switch_screen("player")
-            radius: [dp(16)]
+            radius: [dp(24)]
             ripple_behavior: True
             MDBoxLayout:
-                padding: "8dp"
-                spacing: "12dp"
-                FitImage:
-                    source: app.player_controller.active_track.album_art if app.player_controller.active_track and app.player_controller.active_track.album_art else "album_art.png"
-                    size_hint: None, None
-                    size: "48dp", "48dp"
-                    radius: [dp(8)]
+                orientation: "vertical"
+                size_hint: 1, 1
+
                 MDBoxLayout:
-                    orientation: "vertical"
-                    size_hint_x: 1
-                    pos_hint: {"center_y": .5}
-                    spacing: "2dp"
-                    MarqueeLabel:
-                        text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
-                        font_style: "Body"
-                        role: "medium"
-                        bold: True
-                        height: "20dp"
-                        touch_pass_through: True
-                    MarqueeLabel:
-                        text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
-                        font_style: "Body"
-                        role: "small"
-                        text_color: app.theme_cls.onSurfaceVariantColor
-                        height: "16dp"
-                        touch_pass_through: True
-                MDIconButton:
-                    icon: "heart" if app.player_controller.is_favorite else "heart-outline"
-                    theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
-                    icon_color: [1, 0.2, 0.3, 1] if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
-                    pos_hint: {"center_y": .5}
-                    on_release: app.player_controller.toggle_favorite()
-                MDIconButton:
-                    icon: "pause" if app.player_controller.is_playing else "play"
-                    pos_hint: {"center_y": .5}
-                    on_release: app.player_controller.toggle_play()
+                    padding: ["10dp", "4dp", "10dp", "4dp"]
+                    spacing: "12dp"
+                    size_hint_y: 1
+
+                    FitImage:
+                        source: app.player_controller.active_track.album_art if app.player_controller.active_track and app.player_controller.active_track.album_art else "album_art.png"
+                        size_hint: None, None
+                        size: "46dp", "46dp"
+                        radius: [dp(23)]
+                        mipmap: True
+                        pos_hint: {"center_y": .5}
+
+                    MDBoxLayout:
+                        orientation: "vertical"
+                        size_hint_x: 1
+                        pos_hint: {"center_y": .5}
+                        spacing: "2dp"
+
+                        MarqueeLabel:
+                            text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
+                            font_style: "Body"
+                            role: "medium"
+                            bold: True
+                            height: "20dp"
+                            touch_pass_through: True
+
+                        MarqueeLabel:
+                            text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
+                            font_style: "Body"
+                            role: "small"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            height: "16dp"
+                            touch_pass_through: True
+
+                    MDIconButton:
+                        icon: "heart" if app.player_controller.is_favorite else "heart-outline"
+                        theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
+                        icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
+                        pos_hint: {"center_y": .5}
+                        on_release: app.player_controller.toggle_favorite()
+
+                    MDIconButton:
+                        icon: "pause" if app.player_controller.is_playing else "play"
+                        style: "filled"
+                        theme_bg_color: "Custom"
+                        md_bg_color: app.theme_cls.primaryColor
+                        theme_icon_color: "Custom"
+                        icon_color: app.theme_cls.onPrimaryColor
+                        size_hint: None, None
+                        size: "42dp", "42dp"
+                        pos_hint: {"center_y": .5}
+                        on_release: app.player_controller.toggle_play()
+
+                MDLinearProgressIndicator:
+                    size_hint_y: None
+                    height: "2dp"
+                    value: (app.player_controller.current_time / app.player_controller.duration * 100) if (app.player_controller and app.player_controller.duration > 0) else 0
+                    color: app.theme_cls.primaryColor
+                    track_color: [0, 0, 0, 0]
 
     MDNavigationBar:
         id: bottom_nav
