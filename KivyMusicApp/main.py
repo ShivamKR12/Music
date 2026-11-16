@@ -914,6 +914,19 @@ class MusicApp(MDApp):
             Clock.schedule_once(lambda dt: self.start_warmup_pipeline(), 0.05)
             return
         sm = self.root.ids.screen_manager
+        if os.environ.get("KIVY_HEADLESS") == "1":
+            # In headless test execution, complete warmup instantly with zero timer delays
+            self._stage_1_populate_home(0)
+            self._stage_2_populate_library_and_history(0)
+            self._stage_3_apply_initial_theme(0)
+            if sm.has_screen("splash"):
+                splash = sm.get_screen("splash")
+                splash.opacity = 0.0
+            self._splash_completed = True
+            sm.current = "home"
+            self.sync_nav_bar("home")
+            return
+
         if not sm.has_screen("splash"):
             self._stage_1_populate_home(0)
             self._stage_2_populate_library_and_history(0)
@@ -1261,6 +1274,9 @@ class MusicApp(MDApp):
 
     def _stage_4_background_tasks(self, dt):
         """Stage 4: Launch background maintenance tasks politely during idle."""
+        if os.environ.get("KIVY_HEADLESS") == "1":
+            return
+
         # 1. Download missing artworks in background
         ensure_artworks_downloaded(self.playlist_model.tracks, on_track_updated=self.on_artwork_downloaded)
 
