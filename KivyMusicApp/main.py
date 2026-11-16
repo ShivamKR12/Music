@@ -916,12 +916,13 @@ class MusicApp(MDApp):
         """Cooperative pre-warm pipeline: animates splash screen while pre-rendering all screens."""
         from kivy.clock import Clock
         from kivy.core.window import Window
-        Window.bind(on_resize=lambda win, w, h: self.check_responsive_layout(w))
-        if platform not in ('android', 'ios'):
-            from utils.desktop_utils import DesktopKeyboardManager, setup_desktop_window
-            self.keyboard_manager = DesktopKeyboardManager(self)
-            setup_desktop_window(self)
-        self.check_responsive_layout(Window.width)
+        if os.environ.get("KIVY_HEADLESS") != "1":
+            Window.bind(on_resize=lambda win, w, h: self.check_responsive_layout(w))
+            if platform not in ('android', 'ios'):
+                from utils.desktop_utils import DesktopKeyboardManager, setup_desktop_window
+                self.keyboard_manager = DesktopKeyboardManager(self)
+                setup_desktop_window(self)
+            self.check_responsive_layout(Window.width)
         Clock.schedule_once(lambda dt: self.start_warmup_pipeline(), 0.02)
 
     def start_warmup_pipeline(self):
@@ -3631,7 +3632,7 @@ class MusicApp(MDApp):
         if width is not None:
             should_be_desktop = (width >= dp(840))
         elif os.environ.get("KIVY_HEADLESS") == "1":
-            should_be_desktop = False
+            should_be_desktop = self.is_desktop_layout
         else:
             w = Window.width
             should_be_desktop = (w >= dp(840))
