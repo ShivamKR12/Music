@@ -16,14 +16,16 @@
             MDTopAppBarTrailingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "heart-outline"
+                    on_release: app.show_toast(f"Saved album '{app.active_album_name}' to Library")
                 MDActionTopAppBarButton:
                     icon: "share-variant-outline"
+                    on_release: app.show_toast(f"Share link for '{app.active_album_name}' copied")
 
         MDScrollView:
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["16dp", "16dp", "16dp", "32dp"]
+                padding: ["16dp", "16dp", "16dp", "88dp"]
                 spacing: "20dp"
 
                 # Album Header Card
@@ -38,7 +40,7 @@
                     md_bg_color: app.theme_cls.surfaceContainerColor
 
                     FitImage:
-                        source: "album_art.png"
+                        source: app.active_album_art if app.active_album_art else "album_art.png"
                         size_hint: None, None
                         size: "180dp", "180dp"
                         radius: [dp(16)]
@@ -49,14 +51,14 @@
                         adaptive_height: True
                         spacing: "4dp"
                         MDLabel:
-                            text: "Future Echoes"
+                            text: app.active_album_name or "Album"
                             font_style: "Headline"
                             role: "small"
                             bold: True
                             halign: "center"
                             adaptive_height: True
                         MDLabel:
-                            text: "Synthwave Collective"
+                            text: app.active_album_artist or "Artist"
                             font_style: "Title"
                             role: "medium"
                             halign: "center"
@@ -64,7 +66,7 @@
                             text_color: app.theme_cls.primaryColor
                             adaptive_height: True
                         MDLabel:
-                            text: "Album • 2024 • 6 tracks • 24 min"
+                            text: app.active_album_info or "Album Collection"
                             font_style: "Body"
                             role: "small"
                             halign: "center"
@@ -77,14 +79,14 @@
                         pos_hint: {"center_x": .5}
                         MDButton:
                             style: "filled"
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            on_release: app.play_active_album(shuffle=False)
                             MDButtonIcon:
                                 icon: "play"
                             MDButtonText:
                                 text: "Play"
                         MDButton:
                             style: "tonal"
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            on_release: app.play_active_album(shuffle=True)
                             MDButtonIcon:
                                 icon: "shuffle"
                             MDButtonText:
@@ -104,7 +106,7 @@
                     adaptive_height: True
 
                 # Real Dynamic Tracklist
-                RecycleView:
+                EmbeddedRecycleView:
                     id: album_tracks_list
                     viewclass: "TrackListItem"
                     size_hint_y: None

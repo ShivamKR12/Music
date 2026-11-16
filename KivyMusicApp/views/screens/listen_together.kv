@@ -18,133 +18,334 @@
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["20dp", "16dp", "20dp", "32dp"]
-                spacing: "20dp"
+                padding: ["16dp", "16dp", "16dp", "88dp"]
+                spacing: "16dp"
 
-                # Room Header & Status Card
-                MDCard:
-                    style: "elevated"
-                    radius: [dp(20)]
-                    padding: "20dp"
-                    spacing: "12dp"
+                # -------------------------------------------------------------
+                # INACTIVE STATE: Host or Join Session
+                # -------------------------------------------------------------
+                MDBoxLayout:
+                    id: inactive_container
                     orientation: "vertical"
                     adaptive_height: True
-                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+                    spacing: "16dp"
+                    size_hint_y: None
+                    height: self.minimum_height if not app.listen_together_active else 0
+                    opacity: 1 if not app.listen_together_active else 0
+                    disabled: app.listen_together_active
 
-                    MDBoxLayout:
+                    # Hero Introduction Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "20dp"
+                        spacing: "12dp"
+                        orientation: "vertical"
                         adaptive_height: True
-                        spacing: "8dp"
-                        MDIcon:
-                            icon: "access-point"
-                            theme_text_color: "Custom"
-                            text_color: app.theme_cls.primaryColor
-                            pos_hint: {"center_y": .5}
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: "10dp"
+                            MDIcon:
+                                icon: "account-group"
+                                theme_text_color: "Custom"
+                                text_color: app.theme_cls.primaryColor
+                                pos_hint: {"center_y": .5}
+                            MDLabel:
+                                text: "Listen Together"
+                                font_style: "Title"
+                                role: "large"
+                                bold: True
+                                adaptive_height: True
+                                pos_hint: {"center_y": .5}
+
                         MDLabel:
-                            text: "Room #8492"
+                            text: "Synchronize music playback in real-time with your friends. Connect multiple devices over local Wi-Fi or hotspot and enjoy songs together in unison."
+                            font_style: "Body"
+                            role: "medium"
+                            adaptive_height: True
+                            text_color: app.theme_cls.onSurfaceVariantColor
+
+                    # Host Room Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "20dp"
+                        spacing: "12dp"
+                        orientation: "vertical"
+                        adaptive_height: True
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                        MDLabel:
+                            text: "Host a Listening Party"
                             font_style: "Title"
-                            role: "large"
+                            role: "medium"
                             bold: True
                             adaptive_height: True
-                            pos_hint: {"center_y": .5}
-                        Widget:
+
                         MDLabel:
-                            text: "CONNECTED"
-                            font_style: "Label"
+                            text: "Become the session DJ. Starts a local synchronization server, generates a 4-digit room code, and broadcasts your queue."
+                            font_style: "Body"
                             role: "small"
+                            adaptive_height: True
+                            text_color: app.theme_cls.onSurfaceVariantColor
+
+                        MDButton:
+                            style: "filled"
+                            size_hint_x: 1
+                            height: "48dp"
+                            on_release: app.create_listen_together_room()
+                            MDButtonIcon:
+                                icon: "radio-tower"
+                            MDButtonText:
+                                text: "Create Room & Host"
+
+                    # Join Room Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "20dp"
+                        spacing: "12dp"
+                        orientation: "vertical"
+                        adaptive_height: True
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                        MDLabel:
+                            text: "Join a Session"
+                            font_style: "Title"
+                            role: "medium"
                             bold: True
-                            theme_text_color: "Custom"
-                            text_color: [0.2, 0.8, 0.2, 1]
-                            adaptive_width: True
-                            pos_hint: {"center_y": .5}
+                            adaptive_height: True
 
-                    MDLabel:
-                        text: "Sync playback in real-time with your friends. Anyone in this room hears the same music synchronously."
-                        font_style: "Body"
-                        role: "small"
-                        adaptive_height: True
-                        text_color: app.theme_cls.onSurfaceVariantColor
+                        MDLabel:
+                            text: "Join an existing party using a 4-digit room code or host IP. Your playback will automatically mirror the host's queue."
+                            font_style: "Body"
+                            role: "small"
+                            adaptive_height: True
+                            text_color: app.theme_cls.onSurfaceVariantColor
 
-                # Members Card
-                MDCard:
-                    style: "elevated"
-                    radius: [dp(20)]
-                    padding: "16dp"
-                    spacing: "12dp"
+                        MDButton:
+                            style: "tonal"
+                            size_hint_x: 1
+                            height: "48dp"
+                            on_release: app.show_join_listen_together_dialog()
+                            MDButtonIcon:
+                                icon: "account-plus"
+                            MDButtonText:
+                                text: "Enter Room Code..."
+
+                # -------------------------------------------------------------
+                # ACTIVE STATE: Connected to Room
+                # -------------------------------------------------------------
+                MDBoxLayout:
+                    id: active_container
                     orientation: "vertical"
                     adaptive_height: True
-                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+                    spacing: "16dp"
+                    size_hint_y: None
+                    height: self.minimum_height if app.listen_together_active else 0
+                    opacity: 1 if app.listen_together_active else 0
+                    disabled: not app.listen_together_active
 
-                    MDLabel:
-                        text: "Connected Listeners"
-                        font_style: "Title"
-                        role: "medium"
+                    # Room Header & Status Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "20dp"
+                        spacing: "12dp"
+                        orientation: "vertical"
                         adaptive_height: True
-                        bold: True
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
 
-                    MDList:
-                        id: member_list
-                        MDListItem:
-                            MDListItemLeadingIcon:
-                                icon: "crown"
-                                theme_icon_color: "Custom"
-                                icon_color: [1, 0.8, 0.2, 1]
-                            MDListItemHeadlineText:
-                                text: "You (Host)"
-                            MDListItemSupportingText:
-                                text: "Synced • Playback controller"
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: "8dp"
+                            MDIcon:
+                                icon: "access-point"
+                                theme_text_color: "Custom"
+                                text_color: app.theme_cls.primaryColor
+                                pos_hint: {"center_y": .5}
+                            MDLabel:
+                                text: f"Room {app.listen_together_room_id}"
+                                font_style: "Title"
+                                role: "large"
+                                bold: True
+                                adaptive_height: True
+                                pos_hint: {"center_y": .5}
+                            Widget:
+                            MDLabel:
+                                text: app.listen_together_status
+                                font_style: "Label"
+                                role: "small"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: [0.2, 0.8, 0.2, 1] if app.listen_together_active else [0.7, 0.7, 0.7, 1]
+                                adaptive_width: True
+                                pos_hint: {"center_y": .5}
 
-                        MDListItem:
-                            MDListItemLeadingIcon:
-                                icon: "account"
-                            MDListItemHeadlineText:
-                                text: "Alex R."
-                            MDListItemSupportingText:
-                                text: "Synced • Mobile client"
+                        MDLabel:
+                            text: "Playback is actively synchronized in real-time across all connected peers."
+                            font_style: "Body"
+                            role: "small"
+                            adaptive_height: True
+                            text_color: app.theme_cls.onSurfaceVariantColor
 
-                # Shared Queue Card
-                MDCard:
-                    style: "elevated"
-                    radius: [dp(20)]
-                    padding: "16dp"
-                    spacing: "12dp"
-                    orientation: "vertical"
-                    adaptive_height: True
-                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+                        MDBoxLayout:
+                            orientation: "horizontal"
+                            adaptive_size: True
+                            pos_hint: {"center_x": .5}
+                            spacing: "12dp"
 
-                    MDLabel:
-                        text: "Shared Session Queue"
-                        font_style: "Title"
-                        role: "medium"
+                            MDButton:
+                                style: "tonal"
+                                height: "48dp"
+                                on_release: app.copy_listen_together_code()
+                                MDButtonIcon:
+                                    icon: "content-copy"
+                                MDButtonText:
+                                    text: "Copy Code"
+
+                            MDButton:
+                                style: "tonal"
+                                height: "48dp"
+                                on_release: app.add_demo_listen_together_peer()
+                                MDButtonIcon:
+                                    icon: "account-multiple-plus"
+                                MDButtonText:
+                                    text: "Simulate Peer"
+
+                    # Now Synchronized Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "16dp"
+                        spacing: "8dp"
+                        orientation: "vertical"
                         adaptive_height: True
-                        bold: True
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
 
-                    MDList:
-                        id: queue_list
-                        MDListItem:
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
-                            MDListItemLeadingIcon:
-                                icon: "music"
-                            MDListItemHeadlineText:
-                                text: app.playlist_model.tracks[0].title if app.playlist_model.tracks else "Track 1"
-                            MDListItemSupportingText:
-                                text: app.playlist_model.tracks[0].artist if app.playlist_model.tracks else "Artist A"
+                        MDLabel:
+                            text: "Now Synchronized"
+                            font_style: "Title"
+                            role: "medium"
+                            bold: True
+                            adaptive_height: True
 
                         MDListItem:
-                            on_release: if len(app.playlist_model.tracks) > 1: app.play_selected_track(app.playlist_model.tracks[1])
                             MDListItemLeadingIcon:
-                                icon: "music"
+                                icon: "music-note"
                             MDListItemHeadlineText:
-                                text: app.playlist_model.tracks[1].title if len(app.playlist_model.tracks) > 1 else "Track 2"
+                                text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track Loaded"
                             MDListItemSupportingText:
-                                text: app.playlist_model.tracks[1].artist if len(app.playlist_model.tracks) > 1 else "Artist B"
+                                text: f"{app.player_controller.active_track.artist} • {'Playing' if app.player_controller.is_playing else 'Paused'}" if app.player_controller.active_track else "Idle"
 
-                # Leave Room Button
-                MDButton:
-                    style: "tonal"
-                    size_hint_x: 1
-                    height: "48dp"
-                    on_release: app.go_back()
-                    MDButtonIcon:
-                        icon: "door-open"
-                    MDButtonText:
-                        text: "Leave Room"
+                    # Members Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "16dp"
+                        spacing: "12dp"
+                        orientation: "vertical"
+                        adaptive_height: True
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                        MDBoxLayout:
+                            adaptive_height: True
+                            MDLabel:
+                                text: "Connected Listeners"
+                                font_style: "Title"
+                                role: "medium"
+                                adaptive_height: True
+                                bold: True
+                            Widget:
+                            MDLabel:
+                                text: f"{len(app.listen_together_members)} connected"
+                                font_style: "Label"
+                                role: "small"
+                                text_color: app.theme_cls.onSurfaceVariantColor
+                                adaptive_width: True
+
+                        MDList:
+                            id: member_list
+                            MDListItem:
+                                MDListItemLeadingIcon:
+                                    icon: "crown"
+                                    theme_icon_color: "Custom"
+                                    icon_color: [1, 0.8, 0.2, 1]
+                                MDListItemHeadlineText:
+                                    text: "You (Host)" if app.listen_together_role == "host" else "You (Listener)"
+                                MDListItemSupportingText:
+                                    text: "Session Host • Playback controller" if app.listen_together_role == "host" else "Synced • Real-time receiver"
+
+                            MDListItem:
+                                size_hint_y: None
+                                height: "72dp" if len(app.listen_together_members) > 1 else 0
+                                opacity: 1 if len(app.listen_together_members) > 1 else 0
+                                disabled: len(app.listen_together_members) <= 1
+                                MDListItemLeadingIcon:
+                                    icon: "account-circle"
+                                MDListItemHeadlineText:
+                                    text: app.listen_together_members[1]["name"] if len(app.listen_together_members) > 1 else ""
+                                MDListItemSupportingText:
+                                    text: app.listen_together_members[1]["role"] if len(app.listen_together_members) > 1 else ""
+
+                            MDListItem:
+                                size_hint_y: None
+                                height: "72dp" if len(app.listen_together_members) > 2 else 0
+                                opacity: 1 if len(app.listen_together_members) > 2 else 0
+                                disabled: len(app.listen_together_members) <= 2
+                                MDListItemLeadingIcon:
+                                    icon: "account-circle"
+                                MDListItemHeadlineText:
+                                    text: app.listen_together_members[2]["name"] if len(app.listen_together_members) > 2 else ""
+                                MDListItemSupportingText:
+                                    text: app.listen_together_members[2]["role"] if len(app.listen_together_members) > 2 else ""
+
+                    # Shared Session Queue Card
+                    MDCard:
+                        style: "elevated"
+                        radius: [dp(20)]
+                        padding: "16dp"
+                        spacing: "12dp"
+                        orientation: "vertical"
+                        adaptive_height: True
+                        md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+                        MDLabel:
+                            text: "Shared Session Queue"
+                            font_style: "Title"
+                            role: "medium"
+                            adaptive_height: True
+                            bold: True
+
+                        MDList:
+                            id: queue_list
+                            MDListItem:
+                                on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                                MDListItemLeadingIcon:
+                                    icon: "music"
+                                MDListItemHeadlineText:
+                                    text: app.playlist_model.tracks[0].title if app.playlist_model.tracks else "Track 1"
+                                MDListItemSupportingText:
+                                    text: app.playlist_model.tracks[0].artist if app.playlist_model.tracks else "Artist A"
+
+                            MDListItem:
+                                on_release: if len(app.playlist_model.tracks) > 1: app.play_selected_track(app.playlist_model.tracks[1])
+                                MDListItemLeadingIcon:
+                                    icon: "music"
+                                MDListItemHeadlineText:
+                                    text: app.playlist_model.tracks[1].title if len(app.playlist_model.tracks) > 1 else "Track 2"
+                                MDListItemSupportingText:
+                                    text: app.playlist_model.tracks[1].artist if len(app.playlist_model.tracks) > 1 else "Artist B"
+
+                    # Leave Session Button
+                    MDButton:
+                        style: "tonal"
+                        size_hint_x: 1
+                        height: "48dp"
+                        on_release: app.leave_listen_together()
+                        MDButtonIcon:
+                            icon: "door-open"
+                        MDButtonText:
+                            text: "Leave Session"

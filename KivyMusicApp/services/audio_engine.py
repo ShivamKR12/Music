@@ -56,6 +56,8 @@ class AudioEngine:
         self.current_path = None
         self.repeat_one = False
         self._has_started_playing = False
+        self.eq_bands = [0.0] * 10
+        self.eq_reverb = False
 
         # Decoupled UI Callbacks
         self.on_time_update = None       # callback(elapsed, duration)
@@ -285,7 +287,14 @@ class AudioEngine:
             self.player.play()
             file_len = getattr(self.player, 'length', 0)
             meta_len = info.get("duration", 0) if info else 0
-            self.duration = meta_len if meta_len > 0 else (file_len if file_len > 0 else 180)
+            if file_len > 0:
+                self.duration = file_len
+            elif meta_len > 0:
+                self.duration = meta_len
+            else:
+                self.duration = 180
+            if info:
+                info["duration"] = int(self.duration)
             self.elapsed = 0.0
             self.last_tick = None
             self.paused = False
@@ -320,16 +329,17 @@ class AudioEngine:
             pos = getattr(self.player, 'get_pos', lambda: None)()
 
             if not getattr(self, '_has_started_playing', False):
-                if pos is not None and pos > 0:
-                    self._has_started_playing = True
-                elif pos is None or pos == 0:
-                    self._has_started_playing = True
+                self._has_started_playing = True
 
             if getattr(self, '_has_started_playing', False):
                 self.elapsed += dt_real
-                # Periodically sync with pos if valid positive value
+                # Dynamically sync exact duration from decoder if length resolved after first frames
+                flen = getattr(self.player, 'length', 0)
+                if flen > 0 and abs(self.duration - flen) > 1.0:
+                    self.duration = flen
+                # Monotonic progression: sync forward with decoder PTS but prevent backward jitter
                 if pos is not None and pos > 0:
-                    if abs(self.elapsed - pos) > 0.5:
+                    if pos > self.elapsed and (pos - self.elapsed) < 2.0:
                         self.elapsed = pos
 
         if self.on_time_update:
@@ -423,6 +433,25 @@ class AudioEngine:
         except Exception:
             pass
 
+    def set_equalizer(self, bands: list, reverb: bool = False):
+        """Sets 10-band equalizer dB gains (-12 to +12 dB) and reverb simulation."""
+        self.eq_bands = list(bands)
+        self.eq_reverb = reverb
+        if self.player and hasattr(self.player, '_ffplayer') and self.player._ffplayer:
+            try:
+                freqs = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+                filters = []
+                for freq, gain in zip(freqs, bands):
+                    if abs(gain) >= 0.1:
+                        filters.append(f"equalizer=f={freq}:t=q:w=1:g={gain:.1f}")
+                if reverb:
+                    filters.append("aecho=0.8:0.88:60:0.4")
+                filter_str = ",".join(filters) if filters else "anull"
+                if hasattr(self.player._ffplayer, 'set_filter'):
+                    self.player._ffplayer.set_filter(filter_str)
+            except Exception as e:
+                print(f"[AudioEngine EQ]: {e}")
+
     def _load_cached_metadata(self, meta_path: str):
         if not os.path.exists(meta_path):
             return None
@@ -443,3 +472,42 @@ class AudioEngine:
                 out_f.write(resp.read())
         except Exception:
             pass
+
+    def fade_out(self, duration: float = 0.25, on_complete=None):
+        """
+        Gradually decreases audio volume towards 0.0 over the given duration,
+        then pauses/stops playback and triggers on_complete callback.
+        """
+        from kivy.clock import Clock
+        if not self.player:
+            if on_complete:
+                on_complete()
+            return
+
+        current_vol = getattr(self.player, "volume", 1.0)
+        steps = 10
+        interval = max(0.01, duration / steps)
+        step_val = current_vol / steps
+
+        def _step(dt):
+            nonlocal current_vol
+            if not self.player:
+                if on_complete:
+                    on_complete()
+                return False
+            current_vol = max(0.0, current_vol - step_val)
+            try:
+                self.player.volume = current_vol
+            except Exception:
+                pass
+            if current_vol <= 0.001:
+                try:
+                    self.player.stop()
+                except Exception:
+                    pass
+                if on_complete:
+                    on_complete()
+                return False
+            return True
+
+        Clock.schedule_interval(_step, interval)

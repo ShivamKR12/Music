@@ -17,7 +17,7 @@
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: "24dp"
+                padding: ["24dp", "24dp", "24dp", "48dp"]
                 spacing: "24dp"
 
                 MDList:
@@ -31,35 +31,74 @@
                             icon: "chevron-right"
                             
                     MDListItem:
-                        on_release: wifi_checkbox.active = not wifi_checkbox.active
+                        on_release: app.toggle_wifi_only()
                         MDListItemHeadlineText:
                             text: "Download over Wi-Fi only"
                         MDListItemSupportingText:
                             text: "Save mobile data"
-                        MDListItemTrailingCheckbox:
+                        PassiveTrailingCheckbox:
                             id: wifi_checkbox
-                            active: True
+                            active: app.wifi_only
 
                     MDListItem:
-                        on_release: dark_checkbox.active = not dark_checkbox.active
+                        on_release: app.toggle_dark_mode()
                         MDListItemHeadlineText:
                             text: "Dark Mode"
                         MDListItemSupportingText:
                             text: "Toggle app theme"
-                        MDListItemTrailingCheckbox:
+                        PassiveTrailingCheckbox:
                             id: dark_checkbox
                             active: app.theme_cls.theme_style == "Dark"
-                            on_active: app.toggle_theme_style(self.active)
+
+                    MDListItem:
+                        on_release: app.toggle_extract_artwork_colors()
+                        MDListItemHeadlineText:
+                            text: "Dynamic Artwork Theming"
+                        MDListItemSupportingText:
+                            text: "Extract Material You colors from track art"
+                        PassiveTrailingCheckbox:
+                            id: color_extract_checkbox
+                            active: app.extract_artwork_colors
+
+                    MDListItem:
+                        on_release: app.toggle_animated_bg()
+                        MDListItemHeadlineText:
+                            text: "Animated Background"
+                        MDListItemSupportingText:
+                            text: "Dynamic flowing visual backdrop in player"
+                        PassiveTrailingCheckbox:
+                            id: anim_bg_checkbox
+                            active: app.animated_bg_enabled
+
+                    MDListItem:
+                        on_release: app.show_animated_bg_style_dialog()
+                        disabled: not app.animated_bg_enabled
+                        MDListItemHeadlineText:
+                            text: "Animation Style"
+                        MDListItemSupportingText:
+                            text: app.animated_bg_variation_label
+                        MDListItemTrailingIcon:
+                            icon: "palette-outline"
+
+                    MDListItem:
+                        on_release: app.cycle_animated_bg_speed()
+                        disabled: not app.animated_bg_enabled
+                        MDListItemHeadlineText:
+                            text: "Animation Speed"
+                        MDListItemSupportingText:
+                            text: app.animated_bg_speed_label
+                        MDListItemTrailingIcon:
+                            icon: "speedometer"
                             
                     MDListItem:
-                        on_release: sponsor_checkbox.active = not sponsor_checkbox.active
+                        on_release: app.toggle_sponsorblock()
                         MDListItemHeadlineText:
                             text: "SponsorBlock"
                         MDListItemSupportingText:
                             text: "Skip non-music segments"
-                        MDListItemTrailingCheckbox:
+                        PassiveTrailingCheckbox:
                             id: sponsor_checkbox
-                            active: True
+                            active: app.sponsorblock_enabled
                             
                     MDListItem:
                         on_release: app.switch_screen("equalizer")
@@ -78,4 +117,13 @@
                             text: "Free up storage space"
                         MDListItemTrailingIcon:
                             icon: "delete-outline"
+
+                    MDListItem:
+                        on_release: app.smooth_exit()
+                        MDListItemHeadlineText:
+                            text: "Exit Application"
+                        MDListItemSupportingText:
+                            text: "Smoothly close Melodify"
+                        MDListItemTrailingIcon:
+                            icon: "power"
 

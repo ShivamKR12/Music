@@ -12,21 +12,35 @@ class TrackModel(EventDispatcher):
     local_path = StringProperty("")
     duration = NumericProperty(180) # seconds
     current_time = NumericProperty(0)
+    formatted_current_time = StringProperty("00:00")
+    formatted_duration = StringProperty("03:00")
     lyrics = StringProperty("")
+    synced_lyrics = StringProperty("")
     is_favorite = BooleanProperty(False)
     is_downloaded = BooleanProperty(False)
     is_loading = BooleanProperty(False)
     download_progress = StringProperty("")
 
-    @property
-    def formatted_current_time(self):
-        m, s = divmod(int(self.current_time), 60)
-        return f"{m:02d}:{s:02d}"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._update_formatted_duration(self.duration)
+        self._update_formatted_current_time(self.current_time)
 
-    @property
-    def formatted_duration(self):
-        m, s = divmod(int(self.duration), 60)
-        return f"{m:02d}:{s:02d}"
+    def on_current_time(self, instance, value):
+        self._update_formatted_current_time(value)
+
+    def on_duration(self, instance, value):
+        self._update_formatted_duration(value)
+
+    def _update_formatted_current_time(self, seconds):
+        sec = max(0, int(seconds or 0))
+        m, s = divmod(sec, 60)
+        self.formatted_current_time = f"{m:02d}:{s:02d}"
+
+    def _update_formatted_duration(self, seconds):
+        sec = max(0, int(seconds or 0))
+        m, s = divmod(sec, 60)
+        self.formatted_duration = f"{m:02d}:{s:02d}"
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -47,14 +61,14 @@ class TrackModel(EventDispatcher):
         if not art or not os.path.exists(art) or art == "album_art.png":
             if cached_art and os.path.exists(cached_art):
                 art = cached_art
-            elif vid:
-                try:
-                    from utils.media_utils import get_thumbnail_path
-                    art = get_thumbnail_path(vid, cache_dir)
-                except Exception:
-                    art = "album_art.png"
             elif not art or not os.path.exists(art):
                 art = "album_art.png"
+
+        raw_fav = data.get("is_favorite")
+        if raw_fav is not None:
+            is_fav_val = bool(raw_fav)
+        else:
+            is_fav_val = is_favorite(vid) if vid else False
 
         return cls(
             video_id=vid,
@@ -64,9 +78,28 @@ class TrackModel(EventDispatcher):
             album_art=art,
             local_path=local_path,
             duration=int(data.get("duration", 180)),
-            is_favorite=is_favorite(vid) if vid else False,
+            lyrics=data.get("lyrics") or data.get("plainLyrics") or "",
+            synced_lyrics=data.get("synced_lyrics") or data.get("syncedLyrics") or "",
+            is_favorite=is_fav_val,
             is_downloaded=bool(local_path and os.path.exists(local_path)),
         )
+
+    def to_dict(self):
+        """Serializes TrackModel into a dictionary for JSON caching and state storage."""
+        return {
+            "video_id": self.video_id,
+            "title": self.title,
+            "artist": self.artist,
+            "url": self.url,
+            "artwork": self.album_art,
+            "album_art": self.album_art,
+            "local_path": self.local_path,
+            "duration": int(self.duration),
+            "lyrics": self.lyrics,
+            "synced_lyrics": self.synced_lyrics,
+            "is_favorite": self.is_favorite,
+            "is_downloaded": self.is_downloaded,
+        }
 
 DEFAULT_TRACKS_SEED = [
     {

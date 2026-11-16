@@ -21,6 +21,8 @@ def update_theme_from_image(image_path: str):
         app = MDApp.get_running_app()
         if not app or not hasattr(app, "theme_cls"):
             return
+        if not getattr(app, "extract_artwork_colors", True):
+            return
             
         if image_path and os.path.exists(image_path):
             abs_path = os.path.abspath(image_path)

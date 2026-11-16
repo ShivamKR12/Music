@@ -13,20 +13,119 @@
                     on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "10-Band Equalizer"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "refresh"
+                    on_release: app.reset_eq()
 
         MDScrollView:
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["16dp", "16dp", "16dp", "32dp"]
-                spacing: "20dp"
+                padding: ["16dp", "16dp", "16dp", "48dp"]
+                spacing: "16dp"
+
+                # Genre & Style Quick Presets Strip
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    spacing: "6dp"
+
+                    MDLabel:
+                        text: "Quick Presets"
+                        font_style: "Title"
+                        role: "small"
+                        bold: True
+                        adaptive_height: True
+
+                    DirectionalHorizontalScrollView:
+                        size_hint_y: None
+                        height: "48dp"
+                        do_scroll_y: False
+                        bar_color: [0, 0, 0, 0]
+
+                        MDBoxLayout:
+                            orientation: "horizontal"
+                            adaptive_width: True
+                            spacing: "8dp"
+                            padding: ["4dp", "4dp", "4dp", "4dp"]
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Flat" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Flat")
+                                MDButtonText:
+                                    text: "Flat"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Bass Boost" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Bass Boost")
+                                MDButtonText:
+                                    text: "Bass Boost"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Vocal Booster" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Vocal Booster")
+                                MDButtonText:
+                                    text: "Vocal Booster"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Rock" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Rock")
+                                MDButtonText:
+                                    text: "Rock"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Electronic" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Electronic")
+                                MDButtonText:
+                                    text: "Electronic"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Classical" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Classical")
+                                MDButtonText:
+                                    text: "Classical"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Hip-Hop" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Hip-Hop")
+                                MDButtonText:
+                                    text: "Hip-Hop"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Acoustic" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Acoustic")
+                                MDButtonText:
+                                    text: "Acoustic"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Pop" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Pop")
+                                MDButtonText:
+                                    text: "Pop"
+
+                            MDButton:
+                                style: "filled" if app.selected_eq_profile == "Treble Booster" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_eq_profile("Treble Booster")
+                                MDButtonText:
+                                    text: "Treble"
 
                 # 10-Band Sliders Card
                 MDCard:
                     style: "elevated"
                     radius: [dp(20)]
                     padding: ["16dp", "16dp", "16dp", "16dp"]
-                    spacing: "12dp"
+                    spacing: "10dp"
                     orientation: "vertical"
                     adaptive_height: True
                     md_bg_color: app.theme_cls.surfaceContainerLowColor
@@ -34,7 +133,7 @@
                     MDBoxLayout:
                         adaptive_height: True
                         MDLabel:
-                            text: "Frequency Response"
+                            text: f"Response ({app.selected_eq_profile})"
                             font_style: "Title"
                             role: "medium"
                             bold: True
@@ -47,43 +146,140 @@
                             text_color: app.theme_cls.onSurfaceVariantColor
                             adaptive_width: True
 
+                    # Current dB Readout Row
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "18dp"
+                        spacing: "4dp"
+                        MDLabel:
+                            text: f"{app.eq_bands[0]:+.0f}" if len(app.eq_bands) > 0 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[1]:+.0f}" if len(app.eq_bands) > 1 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[2]:+.0f}" if len(app.eq_bands) > 2 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[3]:+.0f}" if len(app.eq_bands) > 3 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[4]:+.0f}" if len(app.eq_bands) > 4 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[5]:+.0f}" if len(app.eq_bands) > 5 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[6]:+.0f}" if len(app.eq_bands) > 6 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[7]:+.0f}" if len(app.eq_bands) > 7 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[8]:+.0f}" if len(app.eq_bands) > 8 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+                        MDLabel:
+                            text: f"{app.eq_bands[9]:+.0f}" if len(app.eq_bands) > 9 else "0"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "center"
+
+                    # 10 Vertical Frequency Sliders
                     MDBoxLayout:
                         orientation: "horizontal"
                         size_hint_y: None
                         height: "180dp"
                         spacing: "4dp"
 
-                        # 10 Frequency Sliders
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[0] if len(app.eq_bands) > 0 else 0.0
+                            on_value: app.on_eq_slider_change(0, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[1] if len(app.eq_bands) > 1 else 0.0
+                            on_value: app.on_eq_slider_change(1, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[2] if len(app.eq_bands) > 2 else 0.0
+                            on_value: app.on_eq_slider_change(2, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[3] if len(app.eq_bands) > 3 else 0.0
+                            on_value: app.on_eq_slider_change(3, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[4] if len(app.eq_bands) > 4 else 0.0
+                            on_value: app.on_eq_slider_change(4, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[5] if len(app.eq_bands) > 5 else 0.0
+                            on_value: app.on_eq_slider_change(5, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[6] if len(app.eq_bands) > 6 else 0.0
+                            on_value: app.on_eq_slider_change(6, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[7] if len(app.eq_bands) > 7 else 0.0
+                            on_value: app.on_eq_slider_change(7, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[8] if len(app.eq_bands) > 8 else 0.0
+                            on_value: app.on_eq_slider_change(8, self.value)
                         MDSlider:
                             orientation: "vertical"
-                            value: 50
+                            min: -12.0
+                            max: 12.0
+                            step: 0.5
+                            value: app.eq_bands[9] if len(app.eq_bands) > 9 else 0.0
+                            on_value: app.on_eq_slider_change(9, self.value)
 
                     # Band Frequency Labels
                     MDBoxLayout:
@@ -180,8 +376,9 @@
                                 text_color: app.theme_cls.onSurfaceVariantColor
 
                         MDSwitch:
-                            active: False
+                            active: app.eq_reverb
                             pos_hint: {"center_y": 0.5}
+                            on_active: app.toggle_eq_reverb(self.active)
 
                     # AutoEq Profile Row
                     MDBoxLayout:

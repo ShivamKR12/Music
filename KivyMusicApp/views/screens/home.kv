@@ -1,29 +1,14 @@
 <HomeScreen>:
     name: "home"
     md_bg_color: app.theme_cls.backgroundColor
-    MDBoxLayout:
-        orientation: "vertical"
-        
-        MDTopAppBar:
-            type: "small"
-            MDTopAppBarTitle:
-                text: app.get_greeting()
-            MDTopAppBarTrailingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "bell-outline"
-                    on_release: app.switch_screen("notifications")
-                MDActionTopAppBarButton:
-                    icon: "history"
-                    on_release: app.switch_screen("recently_played")
-                MDActionTopAppBarButton:
-                    icon: "cog-outline"
-                    on_release: app.switch_screen("settings")
-        
+    MDFloatLayout:
         MDScrollView:
+            size_hint: 1, 1
+            pos_hint: {"x": 0, "y": 0}
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["16dp", "16dp", "16dp", "32dp"]
+                padding: ["16dp", "72dp", "16dp", "32dp"]
                 spacing: "24dp"
 
                 # Mood Chips
@@ -135,3 +120,22 @@
                         orientation: 'horizontal'
                         spacing: dp(16)
                         padding: [dp(16), dp(12)]
+
+        MDTopAppBar:
+            type: "small"
+            pos_hint: {"top": 1, "x": 0}
+            size_hint_y: None
+            height: "64dp"
+            md_bg_color: app.theme_cls.backgroundColor
+            MDTopAppBarTitle:
+                text: app.get_greeting()
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "bell-outline"
+                    on_release: app.switch_screen("notifications")
+                MDActionTopAppBarButton:
+                    icon: "history"
+                    on_release: app.switch_screen("recently_played")
+                MDActionTopAppBarButton:
+                    icon: "cog-outline"
+                    on_release: app.switch_screen("settings")

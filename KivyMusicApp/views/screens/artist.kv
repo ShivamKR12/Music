@@ -16,12 +16,13 @@
             MDTopAppBarTrailingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "share-variant-outline"
+                    on_release: app.show_toast(f"Artist link for '{app.active_artist_name}' copied")
 
         MDScrollView:
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["16dp", "16dp", "16dp", "32dp"]
+                padding: ["16dp", "16dp", "16dp", "88dp"]
                 spacing: "20dp"
 
                 # Artist Header Card
@@ -36,7 +37,7 @@
                     md_bg_color: app.theme_cls.surfaceContainerColor
 
                     FitImage:
-                        source: "album_art.png"
+                        source: app.active_artist_art or "album_art.png"
                         size_hint: None, None
                         size: "130dp", "130dp"
                         radius: [dp(65)]
@@ -47,7 +48,7 @@
                         adaptive_height: True
                         spacing: "4dp"
                         MDLabel:
-                            text: "Synthwave Collective"
+                            text: app.active_artist_name or "Artist"
                             font_style: "Headline"
                             role: "small"
                             bold: True
@@ -73,7 +74,7 @@
                                 adaptive_size: True
 
                         MDLabel:
-                            text: "1,420,890 Monthly Listeners"
+                            text: app.active_artist_info or "Popular Tracks"
                             font_style: "Body"
                             role: "small"
                             halign: "center"
@@ -86,13 +87,14 @@
                         pos_hint: {"center_x": .5}
                         MDButton:
                             style: "filled"
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            on_release: app.play_active_artist()
                             MDButtonIcon:
                                 icon: "play"
                             MDButtonText:
                                 text: "Play"
                         MDButton:
                             style: "tonal"
+                            on_release: app.show_toast(f"Following {app.active_artist_name}")
                             MDButtonIcon:
                                 icon: "heart-outline"
                             MDButtonText:
@@ -101,6 +103,7 @@
                             style: "outlined"
                             icon: "radio-tower"
                             pos_hint: {"center_y": .5}
+                            on_release: app.show_toast(f"Starting {app.active_artist_name} Radio")
 
                 # Section Header: Top Tracks
                 MDLabel:
@@ -111,7 +114,7 @@
                     adaptive_height: True
 
                 # Real Dynamic Top Tracks
-                RecycleView:
+                EmbeddedRecycleView:
                     id: artist_tracks_list
                     viewclass: "TrackListItem"
                     size_hint_y: None
@@ -140,103 +143,8 @@
                     do_scroll_x: True
                     bar_width: "2dp"
                     MDBoxLayout:
+                        id: artist_albums_box
                         adaptive_size: True
                         height: "170dp"
                         spacing: "16dp"
                         padding: ["0dp", "4dp", "0dp", "4dp"]
-
-                        # Album 1
-                        MDCard:
-                            style: "elevated"
-                            size_hint: None, None
-                            size: "140dp", "160dp"
-                            radius: [dp(16)]
-                            padding: "10dp"
-                            spacing: "6dp"
-                            orientation: "vertical"
-                            ripple_behavior: True
-                            on_release: app.switch_screen("album")
-                            md_bg_color: app.theme_cls.surfaceContainerLowColor
-
-                            FitImage:
-                                source: "album_art.png"
-                                size_hint: None, None
-                                size: "120dp", "95dp"
-                                radius: [dp(12)]
-                                pos_hint: {"center_x": .5}
-                            MDLabel:
-                                text: "Future Echoes"
-                                font_style: "Label"
-                                role: "large"
-                                bold: True
-                                adaptive_height: True
-                            MDLabel:
-                                text: "2024 • Album"
-                                font_style: "Body"
-                                role: "small"
-                                text_color: app.theme_cls.onSurfaceVariantColor
-                                adaptive_height: True
-
-                        # Album 2
-                        MDCard:
-                            style: "elevated"
-                            size_hint: None, None
-                            size: "140dp", "160dp"
-                            radius: [dp(16)]
-                            padding: "10dp"
-                            spacing: "6dp"
-                            orientation: "vertical"
-                            ripple_behavior: True
-                            on_release: app.switch_screen("album")
-                            md_bg_color: app.theme_cls.surfaceContainerLowColor
-
-                            FitImage:
-                                source: "album_art2.png"
-                                size_hint: None, None
-                                size: "120dp", "95dp"
-                                radius: [dp(12)]
-                                pos_hint: {"center_x": .5}
-                            MDLabel:
-                                text: "Midnight Drive"
-                                font_style: "Label"
-                                role: "large"
-                                bold: True
-                                adaptive_height: True
-                            MDLabel:
-                                text: "2023 • Album"
-                                font_style: "Body"
-                                role: "small"
-                                text_color: app.theme_cls.onSurfaceVariantColor
-                                adaptive_height: True
-
-                        # Album 3
-                        MDCard:
-                            style: "elevated"
-                            size_hint: None, None
-                            size: "140dp", "160dp"
-                            radius: [dp(16)]
-                            padding: "10dp"
-                            spacing: "6dp"
-                            orientation: "vertical"
-                            ripple_behavior: True
-                            on_release: app.switch_screen("album")
-                            md_bg_color: app.theme_cls.surfaceContainerLowColor
-
-                            FitImage:
-                                source: "album_art.png"
-                                size_hint: None, None
-                                size: "120dp", "95dp"
-                                radius: [dp(12)]
-                                pos_hint: {"center_x": .5}
-                            MDLabel:
-                                text: "Electric Dreams"
-                                font_style: "Label"
-                                role: "large"
-                                bold: True
-                                adaptive_height: True
-                            MDLabel:
-                                text: "2022 • Album"
-                                font_style: "Body"
-                                role: "small"
-                                text_color: app.theme_cls.onSurfaceVariantColor
-                                adaptive_height: True

@@ -9,6 +9,7 @@ from services.audio_engine import AudioEngine
 from utils.theme_utils import update_theme_from_image
 
 class PlayerController(EventDispatcher):
+    playlist_model = ObjectProperty(None, allownone=True)
     active_track = ObjectProperty(None, allownone=True)
     is_playing = BooleanProperty(False)
     is_shuffle = BooleanProperty(False)
@@ -16,11 +17,17 @@ class PlayerController(EventDispatcher):
     repeat_mode = StringProperty("off")
     is_favorite = BooleanProperty(False)
     is_loading = BooleanProperty(False)
+    is_seeking = BooleanProperty(False)
     status_text = StringProperty("")
+    current_time = NumericProperty(0.0)
+    duration = NumericProperty(180.0)
+    formatted_current_time = StringProperty("00:00")
+    formatted_duration = StringProperty("03:00")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.playlist_model = None
+        if not hasattr(self, "playlist_model") or self.playlist_model is None:
+            self.playlist_model = kwargs.get("playlist_model", None)
         self.queue = []
         self.user_ordered_queue = []
         self.queue_index = 0
@@ -50,6 +57,8 @@ class PlayerController(EventDispatcher):
         else:
             self.queue = list(tracks)
             self.queue_index = self.queue.index(start_track) if (start_track and start_track in self.queue) else 0
+        if start_track and start_track in self.queue:
+            self.active_track = start_track
 
     def rebuild_queue(self):
         """Rebuilds internal ordered and shuffled playback queues."""
@@ -69,8 +78,7 @@ class PlayerController(EventDispatcher):
         self.is_shuffle = not self.is_shuffle
         if not self.queue:
             self.rebuild_queue()
-            return
-        if self.is_shuffle:
+        elif self.is_shuffle:
             current = self.active_track or (self.queue[self.queue_index] if self.queue else None)
             rest = [t for t in self.user_ordered_queue if t != current]
             random.shuffle(rest)
@@ -80,12 +88,30 @@ class PlayerController(EventDispatcher):
             self.queue = list(self.user_ordered_queue)
             self.queue_index = self.queue.index(self.active_track) if self.active_track in self.queue else 0
 
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "show_toast"):
+            msg = "Shuffle ON: Tracks randomized" if self.is_shuffle else "Shuffle OFF: Playing sequentially"
+            app.show_toast(msg)
+
     def cycle_repeat_mode(self):
         """Cycles through repeat modes: off -> all -> one -> off."""
         modes = ["off", "all", "one"]
         self.repeat_mode = modes[(modes.index(self.repeat_mode) + 1) % len(modes)]
         self.is_repeat = (self.repeat_mode in ("all", "one"))
         self.audio_engine.repeat_one = (self.repeat_mode == "one")
+
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "show_toast"):
+            if self.repeat_mode == "one":
+                msg = "Repeat: Current Track"
+            elif self.repeat_mode == "all":
+                msg = "Repeat: All Tracks in Queue"
+            else:
+                msg = "Repeat: OFF"
+            app.show_toast(msg)
+
         return self.repeat_mode
 
     def toggle_repeat(self):
@@ -109,7 +135,15 @@ class PlayerController(EventDispatcher):
         if self.active_track != track:
             self.audio_engine.cleanup_player()
         self.active_track = track
-        self.active_track.current_time = 0
+        self.current_time = 0.0
+        self.formatted_current_time = "00:00"
+        dur = float(getattr(track, "duration", 0) or 180.0)
+        self.duration = dur
+        dsec = max(0, int(dur))
+        dm, ds = divmod(dsec, 60)
+        self.formatted_duration = f"{dm:02d}:{ds:02d}"
+        if self.active_track:
+            self.active_track.current_time = 0.0
         if track in self.queue:
             self.queue_index = self.queue.index(track)
         else:
@@ -160,6 +194,10 @@ class PlayerController(EventDispatcher):
 
     def seek(self, pos: float):
         """Seek to position in seconds."""
+        self.current_time = float(pos)
+        sec = max(0, int(pos or 0))
+        m, s = divmod(sec, 60)
+        self.formatted_current_time = f"{m:02d}:{s:02d}"
         if self.active_track:
             self.active_track.current_time = pos
         self.audio_engine.seek(pos)
@@ -204,7 +242,9 @@ class PlayerController(EventDispatcher):
             return
         self.set_track(next_t)
         from kivymd.app import MDApp
-        MDApp.get_running_app().play_selected_track(self.active_track)
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "play_selected_track"):
+            app.play_selected_track(self.active_track)
 
     def prev_track(self):
         prev_t = self.get_prev_track()
@@ -212,17 +252,48 @@ class PlayerController(EventDispatcher):
             return
         self.set_track(prev_t)
         from kivymd.app import MDApp
-        MDApp.get_running_app().play_selected_track(self.active_track)
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "play_selected_track"):
+            app.play_selected_track(self.active_track)
 
     def stop(self):
         self.is_playing = False
         self.audio_engine.cleanup_player()
 
+    def fade_out_and_stop(self, duration: float = 0.25, on_complete=None):
+        """Gradually fades out playback volume over duration, then cleanly halts audio engine."""
+        self.is_playing = False
+        if hasattr(self.audio_engine, "fade_out") and self.audio_engine.player:
+            def _done():
+                self.audio_engine.cleanup_player()
+                if on_complete:
+                    on_complete()
+            self.audio_engine.fade_out(duration=duration, on_complete=_done)
+        else:
+            self.audio_engine.cleanup_player()
+            if on_complete:
+                on_complete()
+
+    def set_equalizer(self, bands: list, reverb: bool = False):
+        """Passes 10-band equalizer settings to the underlying AudioEngine."""
+        if hasattr(self, "audio_engine") and self.audio_engine:
+            self.audio_engine.set_equalizer(bands, reverb)
+
     # AudioEngine Callbacks
     def _on_audio_time_update(self, elapsed, duration):
-        if self.active_track:
-            self.active_track.current_time = elapsed
+        if not self.is_seeking:
+            self.current_time = float(elapsed)
+            sec = max(0, int(elapsed or 0))
+            m, s = divmod(sec, 60)
+            self.formatted_current_time = f"{m:02d}:{s:02d}"
             if duration > 0:
+                self.duration = float(duration)
+                dsec = max(0, int(duration or 0))
+                dm, ds = divmod(dsec, 60)
+                self.formatted_duration = f"{dm:02d}:{ds:02d}"
+        if self.active_track and not self.is_seeking:
+            self.active_track.current_time = elapsed
+            if duration > 0 and self.active_track.duration != duration:
                 self.active_track.duration = duration
 
     def _on_audio_track_end(self):
@@ -236,7 +307,10 @@ class PlayerController(EventDispatcher):
     def _on_audio_artwork_loaded(self, art_path):
         if self.active_track and art_path and os.path.exists(art_path):
             self.active_track.album_art = art_path
-            update_theme_from_image(art_path)
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if not app or getattr(app, "extract_artwork_colors", True):
+                update_theme_from_image(art_path)
 
     def _on_audio_loading(self, is_loading):
         self.is_loading = is_loading

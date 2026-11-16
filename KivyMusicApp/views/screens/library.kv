@@ -3,171 +3,181 @@
 <LibraryScreen>:
     name: "library"
     md_bg_color: app.theme_cls.backgroundColor
-    MDBoxLayout:
-        orientation: "vertical"
+    
+    MDFloatLayout:
+        MDBoxLayout:
+            orientation: "vertical"
+            size_hint: 1, 1
+            pos_hint: {"x": 0, "y": 0}
         
-        MDTopAppBar:
-            type: "small"
-            MDTopAppBarTitle:
-                text: "Library"
-                font_style: "Headline"
-                role: "large"
-            MDTopAppBarTrailingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "plus-circle-outline"
-                    on_release: app.show_add_playlist_dialog()
-
-        MDScrollView:
-            MDBoxLayout:
-                orientation: "vertical"
-                padding: ["16dp", "16dp", "16dp", "88dp"]
-                spacing: "24dp"
-                adaptive_height: True
-
-                # Library Filter Chips
-                DirectionalHorizontalScrollView:
-                    size_hint_y: None
-                    height: "48dp"
-                    do_scroll_y: False
-                    do_scroll_x: True
-                    bar_width: "2dp"
-                    MDBoxLayout:
-                        id: library_chips_box
-                        adaptive_size: True
-                        height: "48dp"
-                        padding: ["8dp", "8dp", "8dp", "8dp"]
-                        spacing: "8dp"
-                        MDChip:
-                            type: "filter"
-                            active: True
-                            md_bg_color: app.theme_cls.primaryColor
-                            on_release: app.select_library_filter(self, "Playlists")
-                            MDChipText:
-                                text: "Playlists"
-                                text_color: app.theme_cls.onPrimaryColor
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_library_filter(self, "Songs")
-                            MDChipText:
-                                text: "Songs"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_library_filter(self, "Albums")
-                            MDChipText:
-                                text: "Albums"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_library_filter(self, "Artists")
-                            MDChipText:
-                                text: "Artists"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_library_filter(self, "Downloaded")
-                            MDChipText:
-                                text: "Downloaded"
-
-                # 2x3 Custom Grid
-                MDGridLayout:
-                    cols: 2
-                    adaptive_height: True
-                    spacing: "16dp"
-                    row_default_height: "80dp"
-                    row_force_default: True
-                    
-                    LibraryGridCard:
-                        icon: "heart"
-                        text: "Favorite"
-                        md_bg_color: get_color_from_hex("#ff5252")
-                        text_color: "white"
-                        icon_color: "white"
-                        on_release: app.show_favorites()
-                    LibraryGridCard:
-                        icon: "account-multiple"
-                        text: "Followed"
-                        md_bg_color: get_color_from_hex("#ffd740")
-                        on_release: app.switch_screen("artist")
-                    LibraryGridCard:
-                        icon: "play-circle-outline"
-                        text: "Most Played"
-                        md_bg_color: get_color_from_hex("#18ffff")
-                        on_release: app.switch_screen("recently_played")
-                    LibraryGridCard:
-                        icon: "download"
-                        text: "Downloaded"
-                        md_bg_color: get_color_from_hex("#69f0ae")
-                        on_release: app.show_downloaded()
-                    LibraryGridCard:
-                        icon: "chart-bar"
-                        text: "Analytics"
-                        md_bg_color: get_color_from_hex("#b388ff")
-                        on_release: app.switch_screen("analytics")
-                    LibraryGridCard:
-                        icon: "star-shooting"
-                        text: "Wrapped 2026"
-                        md_bg_color: get_color_from_hex("#ff4081")
-                        text_color: "white"
-                        icon_color: "white"
-                        on_release: app.switch_screen("wrapped")
-                    LibraryGridCard:
-                        icon: "account-music"
-                        text: "Artists"
-                        on_release: app.open_artist()
-                    LibraryGridCard:
-                        icon: "album"
-                        text: "Albums"
-                        on_release: app.open_album()
-                    LibraryGridCard:
-                        icon: "playlist-music"
-                        text: "Playlists"
-                        on_release: app.show_playlists_overview()
-                    LibraryGridCard:
-                        icon: "podcast"
-                        text: "Podcasts"
-                        on_release: app.switch_screen("podcasts")
-                    LibraryGridCard:
-                        icon: "compass"
-                        text: "Browse"
-                        on_release: app.switch_screen("browse")
-                    LibraryGridCard:
-                        icon: "emoticon-happy-outline"
-                        text: "Moods"
-                        on_release: app.switch_screen("mood")
-                    LibraryGridCard:
-                        icon: "equalizer"
-                        text: "Equalizer"
-                        on_release: app.switch_screen("equalizer")
-                    LibraryGridCard:
-                        icon: "account-group"
-                        text: "Listen Together"
-                        on_release: app.switch_screen("listen_together")
-                    LibraryGridCard:
-                        icon: "login"
-                        text: "Auth/Login"
-                        on_release: app.switch_screen("auth")
-
-                MDLabel:
-                    text: "Recently Added"
-                    font_style: "Title"
+            MDTopAppBar:
+                type: "small"
+                MDTopAppBarTitle:
+                    text: "Library"
+                    font_style: "Headline"
                     role: "large"
+                MDTopAppBarTrailingButtonContainer:
+                    MDActionTopAppBarButton:
+                        icon: "plus-circle-outline"
+                        on_release: app.show_add_playlist_dialog()
+
+            MDScrollView:
+                id: library_scroll
+                do_scroll_x: False
+                do_scroll_y: True
+                MDBoxLayout:
+                    orientation: "vertical"
+                    padding: ["16dp", "16dp", "16dp", "88dp"]
+                    spacing: "24dp"
                     adaptive_height: True
 
-                RecycleView:
-                    id: library_list
-                    viewclass: "TrackListItem"
-                    size_hint_y: None
-                    height: dp(72) * len(self.data) + dp(16) * len(self.data)
-                    RecycleBoxLayout:
-                        default_size: None, dp(72)
-                        default_size_hint: 1, None
+                    # Library Filter Chips
+                    DirectionalHorizontalScrollView:
                         size_hint_y: None
-                        height: self.minimum_height
-                        orientation: 'vertical'
-                        spacing: dp(16)
+                        height: "48dp"
+                        do_scroll_y: False
+                        do_scroll_x: True
+                        bar_width: "2dp"
+                        MDBoxLayout:
+                            id: library_chips_box
+                            adaptive_size: True
+                            height: "48dp"
+                            padding: ["8dp", "8dp", "8dp", "8dp"]
+                            spacing: "8dp"
+                            MDChip:
+                                type: "filter"
+                                active: True
+                                md_bg_color: app.theme_cls.primaryColor
+                                on_release: app.select_library_filter(self, "Playlists")
+                                MDChipText:
+                                    text: "Playlists"
+                                    text_color: app.theme_cls.onPrimaryColor
+                            MDChip:
+                                type: "filter"
+                                on_release: app.select_library_filter(self, "Songs")
+                                MDChipText:
+                                    text: "Songs"
+                            MDChip:
+                                type: "filter"
+                                on_release: app.select_library_filter(self, "Albums")
+                                MDChipText:
+                                    text: "Albums"
+                            MDChip:
+                                type: "filter"
+                                on_release: app.select_library_filter(self, "Artists")
+                                MDChipText:
+                                    text: "Artists"
+                            MDChip:
+                                type: "filter"
+                                on_release: app.select_library_filter(self, "Downloaded")
+                                MDChipText:
+                                    text: "Downloaded"
 
-    # Material 3 Floating Action Button to Import Local Audio Files
-    MDFabButton:
-        icon: "folder-music-outline"
-        style: "standard"
-        color_map: "tertiary"
-        pos_hint: {"right": 0.94, "y": 0.04}
-        on_release: app.show_local_audio_options()
+                    # 2x3 Custom Grid
+                    MDGridLayout:
+                        cols: 2
+                        adaptive_height: True
+                        spacing: "16dp"
+                        row_default_height: "80dp"
+                        row_force_default: True
+                        
+                        LibraryGridCard:
+                            icon: "heart"
+                            text: "Favorite"
+                            md_bg_color: get_color_from_hex("#ff5252")
+                            text_color: "white"
+                            icon_color: "white"
+                            on_release: app.show_favorites()
+                        LibraryGridCard:
+                            icon: "account-multiple"
+                            text: "Followed"
+                            md_bg_color: get_color_from_hex("#ffd740")
+                            on_release: app.switch_screen("artist")
+                        LibraryGridCard:
+                            icon: "play-circle-outline"
+                            text: "Most Played"
+                            md_bg_color: get_color_from_hex("#18ffff")
+                            on_release: app.switch_screen("recently_played")
+                        LibraryGridCard:
+                            icon: "download"
+                            text: "Downloaded"
+                            md_bg_color: get_color_from_hex("#69f0ae")
+                            on_release: app.show_downloaded()
+                        LibraryGridCard:
+                            icon: "chart-bar"
+                            text: "Analytics"
+                            md_bg_color: get_color_from_hex("#b388ff")
+                            on_release: app.switch_screen("analytics")
+                        LibraryGridCard:
+                            icon: "star-shooting"
+                            text: "Wrapped 2026"
+                            md_bg_color: get_color_from_hex("#ff4081")
+                            text_color: "white"
+                            icon_color: "white"
+                            on_release: app.switch_screen("wrapped")
+                        LibraryGridCard:
+                            icon: "account-music"
+                            text: "Artists"
+                            on_release: app.open_artist()
+                        LibraryGridCard:
+                            icon: "album"
+                            text: "Albums"
+                            on_release: app.open_album()
+                        LibraryGridCard:
+                            icon: "playlist-music"
+                            text: "Playlists"
+                            on_release: app.show_playlists_overview()
+                        LibraryGridCard:
+                            icon: "podcast"
+                            text: "Podcasts"
+                            on_release: app.open_podcasts()
+                        LibraryGridCard:
+                            icon: "compass"
+                            text: "Browse"
+                            on_release: app.switch_screen("browse")
+                        LibraryGridCard:
+                            icon: "emoticon-happy-outline"
+                            text: "Moods"
+                            on_release: app.switch_screen("mood")
+                        LibraryGridCard:
+                            icon: "equalizer"
+                            text: "Equalizer"
+                            on_release: app.switch_screen("equalizer")
+                        LibraryGridCard:
+                            icon: "account-group"
+                            text: "Listen Together"
+                            on_release: app.switch_screen("listen_together")
+                        LibraryGridCard:
+                            icon: "login"
+                            text: "Auth/Login"
+                            on_release: app.switch_screen("auth")
+
+                    MDLabel:
+                        text: "Recently Added"
+                        font_style: "Title"
+                        role: "large"
+                        adaptive_height: True
+
+                    EmbeddedRecycleView:
+                        id: library_list
+                        viewclass: "TrackListItem"
+                        size_hint_y: None
+                        height: dp(72) * len(self.data) + dp(16) * len(self.data)
+                        RecycleBoxLayout:
+                            default_size: None, dp(72)
+                            default_size_hint: 1, None
+                            size_hint_y: None
+                            height: self.minimum_height
+                            orientation: 'vertical'
+                            spacing: dp(16)
+
+        # Material 3 Floating Action Button to Import Local Audio Files
+        MDFabButton:
+            icon: "folder-music"
+            style: "standard"
+            theme_bg_color: "Custom"
+            md_bg_color: app.theme_cls.primaryColor if app.theme_cls.primaryColor != [1, 1, 1, 1] else get_color_from_hex("#6750A4")
+            theme_icon_color: "Custom"
+            icon_color: app.theme_cls.onPrimaryColor if app.theme_cls.onPrimaryColor != [1, 1, 1, 1] else get_color_from_hex("#ffffff")
+            pos_hint: {"right": 0.94, "y": 0.05}
+            on_release: app.show_local_audio_options()

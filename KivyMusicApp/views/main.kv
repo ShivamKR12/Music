@@ -1,5 +1,6 @@
 #:import get_color_from_hex kivy.utils.get_color_from_hex
 
+#:include views/screens/splash.kv
 #:include views/screens/home.kv
 #:include views/screens/search.kv
 #:include views/screens/library.kv
@@ -61,29 +62,15 @@ MDBoxLayout:
     orientation: "vertical"
     md_bg_color: app.theme_cls.backgroundColor
 
-    MDScreenManager:
+    LazyScreenManager:
         id: screen_manager
+        current: "splash"
         transition: __import__('kivy.uix.screenmanager').uix.screenmanager.FadeTransition()
 
+        SplashScreen:
         HomeScreen:
         SearchScreen:
         LibraryScreen:
-        SettingsScreen:
-        PlayerScreen:
-        AnalyticsScreen:
-        WrappedScreen:
-        NotificationScreen:
-        RecentlyPlayedScreen:
-        AlbumScreen:
-        ArtistScreen:
-        PlaylistScreen:
-        BrowseScreen:
-        PodcastsScreen:
-        MoodScreen:
-        EqualizerScreen:
-        ListenTogetherScreen:
-        AuthScreen:
-        FavoritesScreen:
 
     # Global Mini Player
     MDBoxLayout:
@@ -120,12 +107,14 @@ MDBoxLayout:
                         role: "medium"
                         bold: True
                         height: "20dp"
+                        touch_pass_through: True
                     MarqueeLabel:
                         text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
                         font_style: "Body"
                         role: "small"
                         text_color: app.theme_cls.onSurfaceVariantColor
                         height: "16dp"
+                        touch_pass_through: True
                 MDIconButton:
                     icon: "heart" if app.player_controller.is_favorite else "heart-outline"
                     theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"

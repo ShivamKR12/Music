@@ -29,6 +29,8 @@ def get_connection(db_path=None):
         _POOL_CONN.row_factory = sqlite3.Row
     return _POOL_CONN
 
+get_db_connection = get_connection
+
 def init_db(db_path=None):
     """Initializes the database schema and seeds default playlists if needed."""
     with DB_LOCK:
@@ -72,6 +74,27 @@ def init_db(db_path=None):
             CREATE TABLE IF NOT EXISTS search_history (
                 query TEXT UNIQUE NOT NULL,
                 searched_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        ''')
+
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('theme_style', 'Light')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('wifi_only', 'False')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('extract_artwork_colors', 'True')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('animated_bg_enabled', 'True')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('sponsorblock_enabled', 'True')")
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cache_store (
+                cache_key TEXT PRIMARY KEY,
+                payload TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
@@ -252,19 +275,99 @@ def delete_playlist(name):
         return True
 
 def get_playlist_tracks(playlist_name):
-    """Retrieves all tracks for a given playlist."""
+    """Retrieves all tracks for a given playlist with pre-computed is_favorite status in a single query."""
     with DB_LOCK:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT t.video_id, t.title, t.artist, t.url, t.local_path, t.duration, t.artwork
+            SELECT t.video_id, t.title, t.artist, t.url, t.local_path, t.duration, t.artwork,
+                   CASE WHEN fav.video_id IS NOT NULL THEN 1 ELSE 0 END AS is_favorite
             FROM playlist_tracks pt
             JOIN playlists p ON pt.playlist_id = p.id
             JOIN tracks t ON pt.video_id = t.video_id
+            LEFT JOIN (
+                SELECT pt_fav.video_id
+                FROM playlist_tracks pt_fav
+                JOIN playlists p_fav ON pt_fav.playlist_id = p_fav.id
+                WHERE p_fav.name = 'Favorites'
+            ) fav ON t.video_id = fav.video_id
             WHERE p.name = ?
             ORDER BY pt.rowid ASC
         ''', (playlist_name,))
         return [dict(row) for row in cursor.fetchall()]
+
+def get_setting(key, default=None):
+    """Retrieves a configuration setting by key from SQLite database."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row[0] if row is not None else default
+        except Exception as e:
+            print(f"[get_setting error]: {e}")
+            return default
+
+def set_setting(key, value):
+    """Saves or updates a configuration setting in SQLite database."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            ''', (key, str(value) if value is not None else ""))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[set_setting error]: {e}")
+            return False
+
+def get_all_settings():
+    """Retrieves all stored configuration settings as a dict."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT key, value FROM settings")
+            return {row[0]: row[1] for row in cursor.fetchall()}
+        except Exception:
+            return {}
+
+def save_cache_payload(cache_key, payload_dict):
+    """Caches JSON data payload to SQLite database for instant offline UI recovery."""
+    import json
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            payload_str = json.dumps(payload_dict)
+            cursor.execute('''
+                INSERT INTO cache_store (cache_key, payload, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(cache_key) DO UPDATE SET payload = excluded.payload, updated_at = CURRENT_TIMESTAMP
+            ''', (cache_key, payload_str))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[save_cache_payload error]: {e}")
+            return False
+
+def load_cache_payload(cache_key, default=None):
+    """Loads cached JSON data payload from SQLite database."""
+    import json
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT payload FROM cache_store WHERE cache_key = ?", (cache_key,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                return json.loads(row[0])
+        except Exception as e:
+            print(f"[load_cache_payload error]: {e}")
+    return default
 
 def add_track_to_playlist(playlist_name, video_id, track_meta=None):
     """Adds a track to a playlist by name, ensuring track exists in database."""
@@ -390,3 +493,102 @@ def clear_search_history():
         cursor = conn.cursor()
         cursor.execute("DELETE FROM search_history")
         conn.commit()
+
+def clear_playlist_tracks(playlist_name):
+    """Removes all track associations from a playlist."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        playlist_id = row['id']
+        cursor.execute("DELETE FROM playlist_tracks WHERE playlist_id = ?", (playlist_id,))
+        conn.commit()
+        return True
+
+def clean_and_resync_offline_tracks(cache_dir=None):
+    """
+    Cleans up stale/duplicate offline tracks in SQLite database and resyncs metadata.
+    Removes ghost duplicate IDs, resolves canonical 11-char YouTube IDs and file hashes,
+    and ensures the 'Offline Songs' playlist contains pristine, accurate titles and artists.
+    """
+    import re
+    import hashlib
+    from utils.local_audio_utils import scan_device_offline_songs
+
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 1. Scan candidate directories for authentic local audio tracks
+        scanned_tracks = scan_device_offline_songs(cache_dir=cache_dir)
+        path_to_canonical = {}
+        canonical_tracks = {}
+
+        for meta in scanned_tracks:
+            c_id = meta["video_id"]
+            abs_p = meta.get("local_path", "")
+            norm_p = os.path.normcase(os.path.abspath(abs_p)) if abs_p else ""
+            if norm_p:
+                path_to_canonical[norm_p] = c_id
+            if c_id not in canonical_tracks:
+                canonical_tracks[c_id] = meta
+
+        # 2. Inspect existing database records and remove stale/duplicate rows
+        cursor.execute("SELECT video_id, local_path FROM tracks WHERE local_path IS NOT NULL AND local_path != ''")
+        existing_rows = cursor.fetchall()
+
+        for row in existing_rows:
+            vid = row['video_id']
+            lp = row['local_path']
+            norm_lp = os.path.normcase(os.path.abspath(lp)) if lp else ""
+
+            if norm_lp in path_to_canonical:
+                canon_id = path_to_canonical[norm_lp]
+                if vid != canon_id:
+                    cursor.execute("DELETE FROM playlist_tracks WHERE video_id = ?", (vid,))
+                    cursor.execute("DELETE FROM tracks WHERE video_id = ?", (vid,))
+            else:
+                # If local file is not in scanned authentic music tracks, or missing on disk, purge stale row
+                if vid.startswith("loc_") or not os.path.exists(lp):
+                    cursor.execute("DELETE FROM playlist_tracks WHERE video_id = ?", (vid,))
+                    cursor.execute("DELETE FROM tracks WHERE video_id = ?", (vid,))
+
+        # 3. Upsert all canonical tracks with pristine metadata
+        for cid, meta in canonical_tracks.items():
+            cursor.execute('''
+                INSERT INTO tracks (video_id, title, artist, url, artwork, duration, local_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(video_id) DO UPDATE SET
+                    title = excluded.title,
+                    artist = excluded.artist,
+                    artwork = CASE WHEN excluded.artwork != '' AND excluded.artwork != 'album_art.png' THEN excluded.artwork ELSE tracks.artwork END,
+                    duration = CASE WHEN excluded.duration > 0 THEN excluded.duration ELSE tracks.duration END,
+                    local_path = excluded.local_path
+            ''', (
+                cid,
+                sanitize_text(meta.get("title", "Unknown Title")),
+                sanitize_text(meta.get("artist", "Unknown Artist")),
+                meta.get("url", ""),
+                meta.get("artwork", ""),
+                meta.get("duration", 0),
+                meta.get("local_path", "")
+            ))
+
+        # 4. Clean and repopulate 'Offline Songs' playlist
+        cursor.execute("SELECT id FROM playlists WHERE name = 'Offline Songs'")
+        p_row = cursor.fetchone()
+        if not p_row:
+            cursor.execute("INSERT INTO playlists (name) VALUES ('Offline Songs')")
+            offline_pid = cursor.lastrowid
+        else:
+            offline_pid = p_row['id']
+
+        cursor.execute("DELETE FROM playlist_tracks WHERE playlist_id = ?", (offline_pid,))
+        for cid in canonical_tracks.keys():
+            cursor.execute("INSERT OR IGNORE INTO playlist_tracks (playlist_id, video_id) VALUES (?, ?)", (offline_pid, cid))
+
+        conn.commit()
+    return len(canonical_tracks)

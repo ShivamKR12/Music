@@ -56,6 +56,14 @@ class StreamToLogger:
         pass
 
 def init_logging():
+    # Suppress verbose debug logs from third-party libraries (e.g. Pillow format scanner)
+    for lib in ("PIL", "PIL.Image", "PIL.PngImagePlugin", "urllib3"):
+        logging.getLogger(lib).setLevel(logging.INFO)
+    try:
+        from kivy.config import Config
+        Config.set('kivy', 'log_level', 'info')
+    except Exception:
+        pass
     app_logger.info("--- Application Session Started ---")
     app_logger.info(f"Logging initialized at: {log_file}")
     return app_logger

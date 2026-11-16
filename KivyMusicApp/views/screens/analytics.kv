@@ -19,15 +19,99 @@
         MDScrollView:
             MDBoxLayout:
                 orientation: "vertical"
-                padding: "16dp"
-                spacing: "24dp"
+                padding: ["16dp", "16dp", "16dp", "88dp"]
+                spacing: "20dp"
                 adaptive_height: True
                 
                 MDLabel:
-                    text: "Your Listening Habits"
+                    text: "Your Listening Insights"
                     font_style: "Title"
                     role: "large"
+                    bold: True
                     adaptive_height: True
+
+                # Top Summary Metric Cards (2x2 Grid)
+                MDGridLayout:
+                    cols: 2
+                    spacing: "12dp"
+                    adaptive_height: True
+
+                    MDCard:
+                        style: "elevated"
+                        padding: "16dp"
+                        adaptive_height: True
+                        orientation: "vertical"
+                        MDLabel:
+                            text: "Total Tracks"
+                            font_style: "Label"
+                            role: "medium"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_height: True
+                        MDLabel:
+                            text: root.total_tracks_text
+                            font_style: "Headline"
+                            role: "small"
+                            bold: True
+                            adaptive_height: True
+                            text_color: app.theme_cls.primaryColor
+
+                    MDCard:
+                        style: "elevated"
+                        padding: "16dp"
+                        adaptive_height: True
+                        orientation: "vertical"
+                        MDLabel:
+                            text: "Total Artists"
+                            font_style: "Label"
+                            role: "medium"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_height: True
+                        MDLabel:
+                            text: root.total_artists_text
+                            font_style: "Headline"
+                            role: "small"
+                            bold: True
+                            adaptive_height: True
+                            text_color: app.theme_cls.secondaryColor
+
+                    MDCard:
+                        style: "elevated"
+                        padding: "16dp"
+                        adaptive_height: True
+                        orientation: "vertical"
+                        MDLabel:
+                            text: "Music Library Duration"
+                            font_style: "Label"
+                            role: "medium"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_height: True
+                        MDLabel:
+                            text: root.total_playtime_text
+                            font_style: "Headline"
+                            role: "small"
+                            bold: True
+                            adaptive_height: True
+                            text_color: app.theme_cls.tertiaryColor
+
+                    MDCard:
+                        style: "elevated"
+                        padding: "16dp"
+                        adaptive_height: True
+                        orientation: "vertical"
+                        MDLabel:
+                            text: "Last Played Track"
+                            font_style: "Label"
+                            role: "medium"
+                            text_color: app.theme_cls.onSurfaceVariantColor
+                            adaptive_height: True
+                        MDLabel:
+                            text: root.most_played_text
+                            font_style: "Title"
+                            role: "medium"
+                            bold: True
+                            adaptive_height: True
+                            shorten: True
+                            shorten_from: "right"
                     
                 # A card representing a Bar Chart using Box Layouts
                 MDCard:
@@ -39,9 +123,10 @@
                     height: "250dp"
                     
                     MDLabel:
-                        text: "Weekly Playtime (hours)"
+                        text: "Weekly Activity"
                         font_style: "Title"
                         role: "medium"
+                        bold: True
                         adaptive_height: True
                         
                     MDBoxLayout:
@@ -53,7 +138,8 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 0.5
+                                size_hint_y: max(0.08, root.bar_mon_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "M"
                                 halign: "center"
@@ -64,7 +150,8 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 0.8
+                                size_hint_y: max(0.08, root.bar_tue_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "T"
                                 halign: "center"
@@ -75,7 +162,8 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 0.3
+                                size_hint_y: max(0.08, root.bar_wed_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "W"
                                 halign: "center"
@@ -86,7 +174,8 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 0.7
+                                size_hint_y: max(0.08, root.bar_thu_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "T"
                                 halign: "center"
@@ -97,7 +186,8 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 0.9
+                                size_hint_y: max(0.08, root.bar_fri_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "F"
                                 halign: "center"
@@ -108,7 +198,8 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 1.0
+                                size_hint_y: max(0.08, root.bar_sat_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "S"
                                 halign: "center"
@@ -119,70 +210,80 @@
                             MDBoxLayout:
                             MDBoxLayout:
                                 md_bg_color: app.theme_cls.primaryColor
-                                size_hint_y: 0.6
+                                size_hint_y: max(0.08, root.bar_sun_h)
+                                radius: [dp(4), dp(4), 0, 0]
                             MDLabel:
                                 text: "S"
                                 halign: "center"
                                 adaptive_height: True
 
-                # A card for a Pie chart using Canvas
+                # Top Artists Breakdown Donut Chart
                 MDCard:
                     style: "elevated"
                     orientation: "vertical"
                     padding: "16dp"
                     spacing: "16dp"
                     size_hint_y: None
-                    height: "250dp"
+                    height: "260dp"
                     
                     MDLabel:
-                        text: "Top Genres"
+                        text: "Top Artists Breakdown"
                         font_style: "Title"
                         role: "medium"
+                        bold: True
                         adaptive_height: True
                         
                     MDFloatLayout:
                         canvas:
-                            # Segment 1 (Pop)
+                            # Segment 1
                             Color:
                                 rgba: app.theme_cls.primaryColor
                             Ellipse:
-                                pos: self.center_x - dp(75), self.center_y - dp(75)
-                                size: dp(150), dp(150)
+                                pos: self.center_x - dp(70), self.center_y - dp(70)
+                                size: dp(140), dp(140)
                                 angle_start: 0
-                                angle_end: 180
-                            # Segment 2 (Hip-hop)
+                                angle_end: root.segment_1_end
+                            # Segment 2
                             Color:
                                 rgba: app.theme_cls.secondaryColor
                             Ellipse:
-                                pos: self.center_x - dp(75), self.center_y - dp(75)
-                                size: dp(150), dp(150)
-                                angle_start: 180
-                                angle_end: 270
-                            # Segment 3 (Rock)
+                                pos: self.center_x - dp(70), self.center_y - dp(70)
+                                size: dp(140), dp(140)
+                                angle_start: root.segment_1_end
+                                angle_end: root.segment_2_end
+                            # Segment 3
                             Color:
                                 rgba: app.theme_cls.tertiaryColor
                             Ellipse:
-                                pos: self.center_x - dp(75), self.center_y - dp(75)
-                                size: dp(150), dp(150)
-                                angle_start: 270
-                                angle_end: 360
+                                pos: self.center_x - dp(70), self.center_y - dp(70)
+                                size: dp(140), dp(140)
+                                angle_start: root.segment_2_end
+                                angle_end: root.segment_3_end
+                            # Donut Center Cutout
+                            Color:
+                                rgba: app.theme_cls.surfaceContainerColor
+                            Ellipse:
+                                pos: self.center_x - dp(45), self.center_y - dp(45)
+                                size: dp(90), dp(90)
                     
                     MDBoxLayout:
                         adaptive_height: True
                         spacing: "8dp"
                         MDLabel:
-                            text: "Pop (50%)"
-                            
+                            text: root.segment_1_name + " (" + root.segment_1_pct + ")"
                             text_color: app.theme_cls.primaryColor
                             halign: "center"
+                            shorten: True
+                            shorten_from: "right"
                         MDLabel:
-                            text: "Hip-hop (25%)"
-                            
+                            text: root.segment_2_name + " (" + root.segment_2_pct + ")"
                             text_color: app.theme_cls.secondaryColor
                             halign: "center"
+                            shorten: True
+                            shorten_from: "right"
                         MDLabel:
-                            text: "Rock (25%)"
-                            
+                            text: root.segment_3_name + " (" + root.segment_3_pct + ")"
                             text_color: app.theme_cls.tertiaryColor
                             halign: "center"
-
+                            shorten: True
+                            shorten_from: "right"

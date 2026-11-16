@@ -1,110 +1,143 @@
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+
 <PlayerScreen>:
     name: "player"
     md_bg_color: app.theme_cls.backgroundColor
-    MDBoxLayout:
-        orientation: "vertical"
-        
-        MDTopAppBar:
-            type: "small"
-            MDTopAppBarLeadingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "chevron-down"
-                    on_release: app.go_back()
-            MDTopAppBarTitle:
-                text: "NOW PLAYING"
-                font_style: "Body"
-                role: "small"
-            MDTopAppBarTrailingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "dots-vertical"
-                    on_release: app.show_track_options()
+    
+    MDFloatLayout:
+        AnimatedBackground:
+            id: player_animated_bg
+            size_hint: 1, 1
+            pos_hint: {"x": 0, "y": 0}
+            is_active: app.animated_bg_enabled
+            variation: app.animated_bg_variation
+            speed: app.animated_bg_speed
 
         MDBoxLayout:
             orientation: "vertical"
-            padding: "24dp"
-            spacing: "16dp"
-
-            Carousel:
-                id: album_carousel
-                size_hint: 1, 1
-                pos_hint: {"center_x": .5}
-                on_index: app.on_carousel_index(self.index)
-
-            MDBoxLayout:
-                orientation: "vertical"
-                adaptive_height: True
-                spacing: "4dp"
-                MarqueeLabel:
-                    text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
+            
+            MDTopAppBar:
+                type: "small"
+                theme_bg_color: "Custom"
+                md_bg_color: [0, 0, 0, 0]
+                MDTopAppBarLeadingButtonContainer:
+                    MDActionTopAppBarButton:
+                        icon: "chevron-down"
+                        on_release: app.go_back()
+                MDTopAppBarTitle:
+                    text: "NOW PLAYING"
                     font_style: "Title"
                     role: "large"
                     bold: True
                     halign: "center"
-                    height: "32dp"
-                MarqueeLabel:
-                    text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
-                    font_style: "Body"
-                    role: "medium"
-                    halign: "center"
-                    text_color: app.theme_cls.onSurfaceVariantColor
-                    height: "22dp"
+                    pos_hint: {"center_x": .5}
+                MDTopAppBarTrailingButtonContainer:
+                    MDActionTopAppBarButton:
+                        icon: "text-box-outline"
+                        on_release: app.show_lyrics()
+                    MDActionTopAppBarButton:
+                        icon: "dots-vertical"
+                        on_release: app.show_track_options()
 
             MDBoxLayout:
-                adaptive_height: True
-                MDLabel:
-                    text: app.player_controller.active_track.formatted_current_time if app.player_controller.active_track else "00:00"
-                    font_style: "Body"
-                    role: "small"
-                    text_color: app.theme_cls.onSurfaceVariantColor
-                    adaptive_width: True
-                MDSlider:
-                    value: app.player_controller.active_track.current_time if app.player_controller.active_track else 0
-                    min: 0
-                    max: app.player_controller.active_track.duration if app.player_controller.active_track else 100
-                    on_value: if app.player_controller.active_track: app.player_controller.active_track.current_time = self.value
-                    size_hint_y: None
-                    height: "4dp"
-                    pos_hint: {"center_y": .5}
-                MDLabel:
-                    text: app.player_controller.active_track.formatted_duration if app.player_controller.active_track else "00:00"
-                    font_style: "Body"
-                    role: "small"
-                    text_color: app.theme_cls.onSurfaceVariantColor
-                    adaptive_width: True
-
-            MDBoxLayout:
-                adaptive_size: True
+                orientation: "vertical"
+                padding: "24dp"
                 spacing: "16dp"
-                pos_hint: {"center_x": .5}
 
-                MDIconButton:
-                    icon: "shuffle"
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom" if app.player_controller.is_shuffle else "Primary"
-                    icon_color: app.theme_cls.primaryColor if app.player_controller.is_shuffle else app.theme_cls.onSurfaceVariantColor
-                    on_release: app.player_controller.toggle_shuffle()
-                MDIconButton:
-                    icon: "skip-previous"
-                    pos_hint: {"center_y": .5}
-                    on_release: app.player_controller.prev_track()
-                    
-                MDFabButton:
-                    icon: "pause" if app.player_controller.is_playing else "play"
-                    style: "standard"
-                    color_map: "tertiary"
-                    pos_hint: {"center_y": .5}
-                    on_release: app.player_controller.toggle_play()
+                Carousel:
+                    id: album_carousel
+                    size_hint: 1, 1
+                    pos_hint: {"center_x": .5}
+                    on_index: app.on_carousel_index(self.index)
 
-                MDIconButton:
-                    icon: "skip-next"
-                    pos_hint: {"center_y": .5}
-                    on_release: app.player_controller.next_track()
-                MDIconButton:
-                    icon: "repeat"
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom" if app.player_controller.is_repeat else "Primary"
-                    icon_color: app.theme_cls.primaryColor if app.player_controller.is_repeat else app.theme_cls.onSurfaceVariantColor
-                    on_release: app.player_controller.toggle_repeat()
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    spacing: "4dp"
+                    MarqueeLabel:
+                        text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
+                        font_style: "Title"
+                        role: "large"
+                        bold: True
+                        halign: "center"
+                        height: "32dp"
+                    MarqueeLabel:
+                        text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
+                        font_style: "Body"
+                        role: "medium"
+                        halign: "center"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        height: "22dp"
+
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "8dp"
+                    padding: ["8dp", "0dp"]
+                    MDLabel:
+                        id: player_current_time_label
+                        text: app.player_controller.formatted_current_time if app.player_controller else "00:00"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_width: True
+                        pos_hint: {"center_y": .5}
+                    PlayerTimelineSlider:
+                        id: timeline_slider
+                        value: app.player_controller.current_time if (app.player_controller and not self.is_seeking) else self.value
+                        min: 0
+                        max: app.player_controller.duration if (app.player_controller and app.player_controller.duration > 0) else 100
+                        size_hint_y: None
+                        height: "44dp"
+                        track_active_color: app.theme_cls.primaryColor
+                        track_inactive_color: app.theme_cls.surfaceContainerHighestColor
+                        pos_hint: {"center_y": .5}
+                    MDLabel:
+                        id: player_duration_label
+                        text: app.player_controller.formatted_duration if app.player_controller else "00:00"
+                        font_style: "Body"
+                        role: "small"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+                        adaptive_width: True
+                        pos_hint: {"center_y": .5}
+
+                MDBoxLayout:
+                    adaptive_size: True
+                    spacing: "16dp"
+                    pos_hint: {"center_x": .5}
+
+                    MDIconButton:
+                        icon: "shuffle-variant" if app.player_controller.is_shuffle else "shuffle-disabled"
+                        style: "tonal" if app.player_controller.is_shuffle else "standard"
+                        pos_hint: {"center_y": .5}
+                        theme_icon_color: "Custom" if app.player_controller.is_shuffle else "Primary"
+                        icon_color: app.theme_cls.primaryColor if app.player_controller.is_shuffle else app.theme_cls.onSurfaceVariantColor
+                        on_release: app.player_controller.toggle_shuffle()
+                    MDIconButton:
+                        icon: "skip-previous"
+                        pos_hint: {"center_y": .5}
+                        on_release: app.player_controller.prev_track()
+                        
+                    MDFabButton:
+                        icon: "pause" if app.player_controller.is_playing else "play"
+                        style: "standard"
+                        theme_bg_color: "Custom"
+                        md_bg_color: app.theme_cls.primaryColor
+                        theme_icon_color: "Custom"
+                        icon_color: app.theme_cls.onPrimaryColor
+                        pos_hint: {"center_y": .5}
+                        on_release: app.player_controller.toggle_play()
+
+                    MDIconButton:
+                        icon: "skip-next"
+                        pos_hint: {"center_y": .5}
+                        on_release: app.player_controller.next_track()
+                    MDIconButton:
+                        icon: "repeat-once" if app.player_controller.repeat_mode == "one" else ("repeat" if app.player_controller.repeat_mode == "all" else "repeat-off")
+                        style: "tonal" if app.player_controller.is_repeat else "standard"
+                        pos_hint: {"center_y": .5}
+                        theme_icon_color: "Custom" if app.player_controller.is_repeat else "Primary"
+                        icon_color: app.theme_cls.primaryColor if app.player_controller.is_repeat else app.theme_cls.onSurfaceVariantColor
+                        on_release: app.player_controller.toggle_repeat()
                     
             # YouTube Music Style Up-Next Bottom Pill
             MDCard:
@@ -112,7 +145,8 @@
                 size_hint_y: None
                 height: "48dp"
                 radius: [dp(24)]
-                md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                theme_bg_color: "Custom"
+                md_bg_color: app.theme_cls.surfaceContainerColor
                 padding: ["16dp", "0dp"]
                 ripple_behavior: True
                 pos_hint: {"center_x": .5}

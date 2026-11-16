@@ -60,3 +60,40 @@ Whenever any UI modification is made (in `.kv` or Python UI components), you MUS
   4. Symmetrical alignment (difference $< 1.0\text{dp}$ on centered rows).
   5. Directional scrolling delegation (vertical swipe over horizontal container scrolls parent).
   6. Screenshot captures saved for visual regression review.
+
+## 12. Zero-Mock & Dynamic Live Streaming Invariant
+- **No Hardcoded Mock Content:** Production screens (Artist, Album, Podcasts, Browse) must never display hardcoded dummy cards, fake album titles (*"Future Echoes"*, *"Midnight Drive"*), or fake podcast episodes (*"The Sound Architecture"*).
+- **No Unrelated Fallback Data:** If an artist or category has no local tracks, never grab arbitrary songs from other artists. Show an authentic loading or empty state and immediately query YouTube asynchronously (`yt-dlp`).
+- **Live YouTube Integration:** Always extract real metadata (video ID, title, uploader/artist, duration, thumbnail) via `fetch_youtube_metadata(..., extract_flat=True)` and stream real audio.
+
+## 13. Main-Thread UI Dispatch & Thread-Safety Invariant
+- **Zero Graphics Calls on Background Threads:** Never modify UI widgets, properties, `RecycleView.data`, or start animations from background threads. Doing so raises fatal OpenGL/SDL2 exceptions (`Cannot create graphics instruction outside the main Kivy thread`).
+- **Mandatory `Clock.schedule_once` Marshalling:** Every thread completion must schedule UI mutations back on the main thread loop: `Clock.schedule_once(lambda dt: update_ui(), 0)`.
+- **Bidirectional Serialization:** Any data model (`TrackModel`) passed across threads or cached in SQLite/JSON must implement both `from_dict()` and `to_dict()`.
+
+## 14. Settings Persistence & Trailing Toggle Invariant
+- **Instant SQLite Persistence:** Every setting toggle (theme style, Wi-Fi only, background animation, SponsorBlock, EQ, audio quality) must immediately persist to disk via `set_setting(...)` and apply to the active theme/engine.
+- **Default Theme is Light:** The default theme style must strictly be `Light` unless the user explicitly toggles Dark Mode.
+- **Passive Trailing Checkboxes:** In list items with toggle checkboxes, trailing widgets must use `disabled: True` (`PassiveTrailingCheckbox`) so touches dispatch cleanly to the parent `MDListItem.on_release` without event hijacking.
+
+## 15. Synced Lyrics Engine & Centered Viewport Standards
+- **Vertical Centering Math:** The currently active lyric line must always be centered in the viewport: $y_{\text{target}} = y_{\text{line}} - \frac{H_{\text{viewport}} - H_{\text{line}}}{2}$.
+- **User Scroll Detection & Debounce:** Any user drag gesture on lyrics must pause auto-scroll (`user_scrolling = True`). A 3.0-second debounced timer must verify the user has finished interacting before resuming auto-scroll.
+- **Track Transition Reset:** When changing songs or looping, immediately reset `scroll_y = 1.0`, line index to 0, and clear `user_scrolling = False`.
+- **Teardown Animation Safety:** On bottom sheet close, always cancel in-flight scroll animations (`Animation.stop_all(self, 'scroll_y')`) to prevent callbacks from firing on dismantled widgets.
+
+## 16. Cross-Platform Unicode Font Fallback
+- **Missing Glyph Prevention:** Standard Roboto lacks glyphs for international scripts (Hindi, Devanagari, Japanese, Chinese, Cyrillic, emoji), causing "tofu" squares.
+- **Dynamic System Resolution:** Inspect host font directories (Windows `segoeui.ttf` / `Nirmala.ttf`, Android `/system/fonts/NotoSansDevanagari-Regular.ttf` / `Roboto-Regular.ttf`, Linux `/usr/share/fonts/`) and register the resolved font in `LabelBase.register(DEFAULT_FONT, ...)` on startup.
+
+## 17. Unobstructed Header Artwork Invariant
+- In playlist, album, and favorites headers, never overlay icons, badges, or circular cards directly in the middle of album artwork.
+- Header artwork must be prominent, centered, and unobstructed (`180x180dp`, radius `16dp`). Status indicators (like Verified Artist) belong in the metadata subtitle section below the title.
+
+## 18. Queue Synchronization & Offline Audio Precision
+- The "Up Next" queue bottomsheet must strictly reflect the active playback context (`player_controller.queue`). When playing offline songs or custom playlists, call `set_custom_queue(...)` so queue reflects all active tracks.
+- Audio durations for offline songs must be accurately read from file headers (`mutagen` or `ffprobe`) rather than defaulting to arbitrary 5:00 fallbacks.
+
+## 19. ScreenManager Lifecycle & Transition Arbitration
+- In headless test suites, splash screen completion (`_splash_completed`) and screen slide transitions take non-zero time. Always use `NoTransition()` or schedule assertions after frame completion.
+- The splash screen fadeout callback (`_on_fade_complete`) must only switch to `"home"` if the current screen is still `"splash"`, preventing it from overriding user navigations.

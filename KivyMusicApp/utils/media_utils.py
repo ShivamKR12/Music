@@ -128,8 +128,8 @@ def get_thumbnail_path(video_id, cache_dir=None, custom_url=None, on_success=Non
 
 def ensure_artworks_downloaded(tracks, on_track_updated=None, cache_dir=None):
     """
-    Asynchronously checks and downloads album artwork for all provided tracks.
-    Invokes on_track_updated(track, local_art_path) on main thread as each item finishes.
+    Asynchronously checks and downloads album artwork for tracks in a controlled background worker.
+    Processes missing artwork politely without saturating system threads or network sockets.
     """
     if not tracks:
         return
@@ -137,6 +137,7 @@ def ensure_artworks_downloaded(tracks, on_track_updated=None, cache_dir=None):
         cache_dir = get_cache_dir()
 
     def _batch_worker():
+        import time
         for t in list(tracks):
             vid = getattr(t, "video_id", None) or (t.get("video_id") if isinstance(t, dict) else None)
             if not vid or str(vid).startswith("loc_") or str(vid).startswith("local_"):
@@ -158,6 +159,7 @@ def ensure_artworks_downloaded(tracks, on_track_updated=None, cache_dir=None):
                     on_track_updated(trk, local_path)
 
             download_artwork(vid, custom_url=custom_url, cache_dir=cache_dir, on_success=_success)
+            time.sleep(0.08)  # Polite spacing between downloads
 
     threading.Thread(target=_batch_worker, daemon=True).start()
 

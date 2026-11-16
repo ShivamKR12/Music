@@ -18,17 +18,26 @@
             padding: ["16dp", "16dp", "16dp", "24dp"]
             spacing: "16dp"
             
-            MDTextField:
-                id: search_input
-                mode: "outlined"
-                on_text_validate: app.perform_search(self.text)
-                MDTextFieldHintText:
-                    text: "Search songs, artists, podcasts..."
-                MDTextFieldLeadingIcon:
-                    icon: "magnify"
-                MDTextFieldTrailingIcon:
+            MDBoxLayout:
+                adaptive_height: True
+                spacing: "8dp"
+                MDTextField:
+                    id: search_input
+                    mode: "outlined"
+                    size_hint_x: 1
+                    on_text_validate: app.perform_search(self.text)
+                    MDTextFieldHintText:
+                        text: "Search songs, artists, podcasts..."
+                    MDTextFieldLeadingIcon:
+                        icon: "magnify"
+                MDIconButton:
+                    id: search_clear_btn
                     icon: "close"
-                    on_touch_down: if self.collide_point(*args[1].pos): search_input.text = ""; app.clear_search_results()
+                    style: "standard"
+                    pos_hint: {"center_y": .5}
+                    opacity: 1 if search_input.text else 0
+                    disabled: False if search_input.text else True
+                    on_release: app.clear_search_input()
 
             # Browse Category Chips
             DirectionalHorizontalScrollView:

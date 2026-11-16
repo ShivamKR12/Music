@@ -18,8 +18,10 @@
             MDTopAppBarTrailingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "share-variant-outline"
+                    on_release: app.show_toast("Favorites playlist link copied")
                 MDActionTopAppBarButton:
                     icon: "dots-vertical"
+                    on_release: app.show_toast("Favorites options")
 
         MDScrollView:
             MDBoxLayout:
@@ -39,20 +41,13 @@
                     orientation: "vertical"
                     md_bg_color: app.theme_cls.surfaceContainerColor
 
-                    MDCard:
-                        style: "filled"
+                    FitImage:
+                        id: favorites_art
+                        source: app.favorites_top_art if app.favorites_top_art else "album_art2.png"
                         size_hint: None, None
-                        size: "140dp", "140dp"
-                        radius: [dp(20)]
+                        size: "180dp", "180dp"
+                        radius: [dp(16)]
                         pos_hint: {"center_x": .5}
-                        md_bg_color: get_color_from_hex("#ff5252")
-
-                        MDIcon:
-                            icon: "heart"
-                            font_size: "64sp"
-                            pos_hint: {"center_x": .5, "center_y": .5}
-                            theme_icon_color: "Custom"
-                            icon_color: "white"
 
                     MDBoxLayout:
                         orientation: "vertical"
@@ -74,7 +69,7 @@
                             text_color: app.theme_cls.primaryColor
                             adaptive_height: True
                         MDLabel:
-                            text: "Auto-synced • 6 tracks • 21 min"
+                            text: app.favorites_info or "0 tracks"
                             font_style: "Body"
                             role: "small"
                             halign: "center"
@@ -87,14 +82,14 @@
                         pos_hint: {"center_x": .5}
                         MDButton:
                             style: "filled"
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            on_release: app.play_favorites(False)
                             MDButtonIcon:
                                 icon: "play"
                             MDButtonText:
                                 text: "Play All"
                         MDButton:
                             style: "tonal"
-                            on_release: if app.playlist_model.tracks: app.play_selected_track(app.playlist_model.tracks[0])
+                            on_release: app.play_favorites(True)
                             MDButtonIcon:
                                 icon: "shuffle"
                             MDButtonText:

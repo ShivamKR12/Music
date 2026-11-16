@@ -1,16 +1,21 @@
+import os
+import math
+import random
 from kivy.lang import Builder
-from kivy.properties import StringProperty, ObjectProperty, BooleanProperty, ColorProperty, NumericProperty
-from kivymd.uix.list import MDListItem
+from kivy.properties import StringProperty, ObjectProperty, BooleanProperty, ColorProperty, NumericProperty, ListProperty
+from kivymd.uix.list import MDListItem, MDListItemTrailingCheckbox
 from kivymd.uix.card import MDCard
 from kivymd.uix.label import MDLabel
+from kivymd.uix.slider import MDSlider
 from kivymd.uix.scrollview import MDScrollView
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.widget import Widget
+from kivy.graphics import Color, Ellipse, Rectangle, Mesh
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.uix.recycleview import RecycleView
 from kivy.metrics import dp
 from kivy.factory import Factory
-import random
 
 class MarqueeLabel(ScrollView):
     """
@@ -31,6 +36,7 @@ class MarqueeLabel(ScrollView):
     text_color = ColorProperty(None, allownone=True)
     halign = StringProperty("left")
     speed = NumericProperty(28.0)
+    touch_pass_through = BooleanProperty(False)
 
     def __init__(self, **kwargs):
         kwargs.setdefault('do_scroll_y', False)
@@ -83,7 +89,10 @@ class MarqueeLabel(ScrollView):
 
     def _update_marquee(self, dt):
         if self._anim:
-            self._anim.cancel(self)
+            try:
+                self._anim.stop(self)
+            except Exception:
+                pass
             self._anim = None
 
         container_w = self.width
@@ -111,19 +120,24 @@ class MarqueeLabel(ScrollView):
             diff = tex_w - container_w
             dur = max(2.5, diff / float(self.speed))
             self._anim = (
-                Animation(duration=2.5) +
+                Animation(scroll_x=0.0, duration=2.5) +
                 Animation(scroll_x=1.0, duration=dur, t='linear') +
-                Animation(duration=2.0) +
+                Animation(scroll_x=1.0, duration=2.0) +
                 Animation(scroll_x=0.0, duration=dur, t='linear') +
-                Animation(duration=2.5)
+                Animation(scroll_x=0.0, duration=2.5)
             )
             self._anim.repeat = True
-            self._anim.start(self)
+            Clock.schedule_once(lambda d: self._anim.start(self) if self._anim else None, 0)
 
     def on_touch_down(self, touch):
+        if self.touch_pass_through:
+            return False
         if self.collide_point(*touch.pos):
             if self._anim:
-                self._anim.cancel(self)
+                try:
+                    self._anim.stop(self)
+                except Exception:
+                    pass
                 self._anim = None
         return super().on_touch_down(touch)
 
@@ -134,6 +148,106 @@ class MarqueeLabel(ScrollView):
         return res
 
 Factory.register('MarqueeLabel', cls=MarqueeLabel)
+
+class PassiveTrailingCheckbox(MDListItemTrailingCheckbox):
+    """
+    Trailing checkbox that visually reflects active state without intercepting touch events,
+    allowing parent MDListItem to handle row activation reliably without double-toggle collisions.
+    """
+    def on_touch_down(self, touch):
+        return False
+
+    def on_touch_move(self, touch):
+        return False
+
+    def on_touch_up(self, touch):
+        return False
+
+Factory.register('PassiveTrailingCheckbox', cls=PassiveTrailingCheckbox)
+
+class LyricsScrollView(MDScrollView):
+    """
+    Interactive scroll view for synchronized lyrics:
+    - Smoothly animates active lyric line to remain centered at 50% viewport height.
+    - Pauses auto-scrolling immediately when the user manually touches or scrolls.
+    - Starts a 3-second inactivity timer once the user stops scrolling.
+    - Resumes auto-scrolling and re-centers the current active lyric line once 3 seconds elapse.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.user_scrolling = False
+        self.resume_event = None
+        self.on_resume_callback = None
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            self.user_scrolling = True
+            if self.resume_event:
+                self.resume_event.cancel()
+                self.resume_event = None
+            try:
+                Animation.stop_all(self, 'scroll_y')
+            except Exception:
+                pass
+        return super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        if self.collide_point(*touch.pos):
+            self.user_scrolling = True
+            if self.resume_event:
+                self.resume_event.cancel()
+                self.resume_event = None
+        return super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        res = super().on_touch_up(touch)
+        if self.user_scrolling:
+            def _resume(dt):
+                self.user_scrolling = False
+                self.resume_event = None
+                if self.on_resume_callback:
+                    self.on_resume_callback()
+            if self.resume_event:
+                self.resume_event.cancel()
+            self.resume_event = Clock.schedule_once(_resume, 3.0)
+        return res
+
+Factory.register('LyricsScrollView', cls=LyricsScrollView)
+
+from kivymd.uix.screenmanager import MDScreenManager
+
+class LazyScreenManager(MDScreenManager):
+    """
+    High-performance ScreenManager that dynamically instantiates screens on-demand:
+    - Eliminates 3.5+ seconds of startup overhead by not building 16 unviewed screens at launch.
+    - Transparent drop-in replacement for MDScreenManager.
+    - Guarantees screen existence on get_screen() and switch_screen().
+    """
+    def get_screen(self, name):
+        if not self.has_screen(name):
+            import views.screens as screens
+            clean_name = name.replace("_", "").lower()
+            candidates = {
+                clean_name + "screen",
+                clean_name.rstrip("s") + "screen",
+                clean_name + "sscreen",
+            }
+            found_cls = None
+            for attr in dir(screens):
+                if attr.lower() in candidates:
+                    found_cls = getattr(screens, attr)
+                    break
+            if found_cls:
+                s = found_cls(name=name)
+                self.add_widget(s)
+            else:
+                import logging
+                logging.getLogger("kivy_music_app").warning(
+                    f"LazyScreenManager: No class found for screen '{name}' (candidates: {candidates})"
+                )
+        return super().get_screen(name)
+
+Factory.register('LazyScreenManager', cls=LazyScreenManager)
 
 class DirectionalHorizontalScrollMixin:
     """
@@ -190,16 +304,62 @@ class DirectionalHorizontalRecycleView(DirectionalHorizontalScrollMixin, Recycle
     """Horizontal RecycleView with directional gesture arbitration."""
     pass
 
+class EmbeddedRecycleView(RecycleView):
+    """
+    RecycleView embedded inside a parent vertical ScrollView.
+    - Seamlessly yields vertical and horizontal scroll gestures to parent scroll containers.
+    - Preserves child touch dispatching (item click and ripple effects).
+    - Prevents scrolling lockups and snapping-back glitches in nested layouts.
+    """
+    def __init__(self, **kwargs):
+        kwargs.setdefault('do_scroll_x', False)
+        kwargs.setdefault('do_scroll_y', False)
+        super().__init__(**kwargs)
+
+    def on_touch_down(self, touch):
+        # Ensure touch is strictly inside any ancestor ScrollView viewport
+        p = self.parent
+        from kivy.uix.scrollview import ScrollView
+        while p:
+            if isinstance(p, ScrollView):
+                if not p.collide_point(*touch.pos):
+                    return False
+            p = p.parent
+        if not self.collide_point(*touch.pos):
+            return False
+        return super().on_touch_down(touch)
+
+    def on_scroll_start(self, touch, check_children=True):
+        pos = getattr(touch, 'pos', None)
+        if pos and not self.collide_point(*pos):
+            return False
+        if hasattr(self, 'simulate_touch_down'):
+            return self.simulate_touch_down(touch)
+        return False
+
+    def on_scroll_move(self, touch):
+        return False
+
+    def on_scroll_stop(self, touch, check_children=True):
+        return False
+
 Factory.register('DirectionalHorizontalScrollView', cls=DirectionalHorizontalScrollView)
 Factory.register('DirectionalHorizontalRecycleView', cls=DirectionalHorizontalRecycleView)
+Factory.register('EmbeddedRecycleView', cls=EmbeddedRecycleView)
 
 from kivymd.uix.fitimage import FitImage
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
 
-class TrackListItem(MDListItem):
+class TrackListItem(RecycleDataViewBehavior, MDListItem):
     title = StringProperty("")
     artist = StringProperty("")
     artwork = StringProperty("album_art.png")
     track_obj = ObjectProperty(None, allownone=True)
+    index = NumericProperty(0)
+
+    def refresh_view_attrs(self, rv, index, data):
+        self.index = index
+        return super().refresh_view_attrs(rv, index, data)
     
     def on_release(self):
         from kivymd.app import MDApp
@@ -207,8 +367,21 @@ class TrackListItem(MDListItem):
         if self.track_obj:
             app.play_selected_track(self.track_obj)
         elif hasattr(app, "playlist_model") and app.playlist_model.tracks:
-            track = random.choice(app.playlist_model.tracks)
-            app.play_selected_track(track)
+            matched = None
+            if self.title:
+                norm_title = self.title.strip().lower()
+                for t in app.playlist_model.tracks:
+                    if t.title.strip().lower() == norm_title:
+                        matched = t
+                        break
+            if not matched:
+                from models.track_model import Track
+                matched = Track(
+                    title=self.title or "Unknown Title",
+                    artist=self.artist or "Unknown Artist",
+                    album_art=self.artwork or "album_art.png",
+                )
+            app.play_selected_track(matched)
 
 class SearchHistoryItem(MDListItem):
     text = StringProperty("")
@@ -243,14 +416,28 @@ class HomeCardItem(MDCard):
             track = downloaded[0] if downloaded else random.choice(app.playlist_model.tracks)
             app.play_selected_track(track)
 
+class ArtistAlbumCard(MDCard):
+    title = StringProperty("Unknown Album")
+    subtitle = StringProperty("Album")
+    artwork = StringProperty("album_art.png")
+    artist = StringProperty("")
+    album_tracks = ListProperty([])
+
+    def on_release(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        app.open_album(self.title, self.artist or app.active_artist_name, self.artwork, self.album_tracks)
+
 Builder.load_string('''
 <TrackListItem>:
     radius: [16, 16, 16, 16]
     md_bg_color: app.theme_cls.surfaceContainerColor
+    ripple_behavior: True
     
     MDListItemLeadingAvatar:
         source: root.artwork if root.artwork else "album_art.png"
         radius: [dp(8), dp(8), dp(8), dp(8)]
+        disabled: True
         
     MDListItemHeadlineText:
         text: root.title
@@ -312,4 +499,301 @@ Builder.load_string('''
                 shorten_from: "right"
                 theme_text_color: "Custom"
                 text_color: app.theme_cls.onSurfaceVariantColor
+
+<ArtistAlbumCard>:
+    style: "elevated"
+    size_hint: None, None
+    size: "140dp", "160dp"
+    radius: [dp(16)]
+    padding: "10dp"
+    spacing: "6dp"
+    orientation: "vertical"
+    ripple_behavior: True
+    md_bg_color: app.theme_cls.surfaceContainerLowColor
+
+    FitImage:
+        source: root.artwork if root.artwork else "album_art.png"
+        size_hint: None, None
+        size: "120dp", "95dp"
+        radius: [dp(12)]
+        pos_hint: {"center_x": .5}
+    MDLabel:
+        text: root.title
+        font_style: "Label"
+        role: "large"
+        bold: True
+        adaptive_height: True
+        max_lines: 1
+        shorten: True
+        shorten_from: "right"
+    MDLabel:
+        text: root.subtitle
+        font_style: "Body"
+        role: "small"
+        text_color: app.theme_cls.onSurfaceVariantColor
+        adaptive_height: True
+        max_lines: 1
 ''')
+
+
+class PlayerTimelineSlider(MDSlider):
+    """
+    High-precision Material 3 timeline scrubber for music playback:
+    - Binds smoothly with audio engine progress without state jumping.
+    - Captures touch scrubbing gestures and updates start timer in real-time.
+    - Dispatches atomic seek to player_controller upon release.
+    - Meets accessibility guidelines with 44dp touch target height.
+    """
+    is_seeking = BooleanProperty(False)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('size_hint_y', None)
+        kwargs.setdefault('height', dp(44))
+        kwargs.setdefault('track_active_width', dp(4))
+        kwargs.setdefault('track_inactive_width', dp(4))
+        super().__init__(**kwargs)
+
+    def on_value(self, instance, value):
+        if self.is_seeking:
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if app and hasattr(app, "player_controller") and app.player_controller:
+                app.player_controller.current_time = float(value)
+                sec = max(0, int(value or 0))
+                m, s = divmod(sec, 60)
+                app.player_controller.formatted_current_time = f"{m:02d}:{s:02d}"
+                if app.player_controller.active_track:
+                    app.player_controller.active_track.current_time = float(value)
+
+    def on_touch_down(self, touch):
+        if self.disabled or not self.collide_point(*touch.pos):
+            return super().on_touch_down(touch)
+        self.is_seeking = True
+        touch.grab(self)
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "player_controller") and app.player_controller:
+            app.player_controller.is_seeking = True
+        res = super().on_touch_down(touch)
+        if app and hasattr(app, "player_controller") and app.player_controller:
+            app.player_controller.current_time = float(self.value)
+            sec = max(0, int(self.value or 0))
+            m, s = divmod(sec, 60)
+            app.player_controller.formatted_current_time = f"{m:02d}:{s:02d}"
+            if app.player_controller.active_track:
+                app.player_controller.active_track.current_time = float(self.value)
+        return res
+
+    def on_touch_move(self, touch):
+        res = super().on_touch_move(touch)
+        if (touch.grab_current == self or self.is_seeking):
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if app and hasattr(app, "player_controller") and app.player_controller:
+                app.player_controller.current_time = float(self.value)
+                sec = max(0, int(self.value or 0))
+                m, s = divmod(sec, 60)
+                app.player_controller.formatted_current_time = f"{m:02d}:{s:02d}"
+                if app.player_controller.active_track:
+                    app.player_controller.active_track.current_time = float(self.value)
+        return res
+
+    def on_touch_up(self, touch):
+        was_seeking = self.is_seeking or (touch.grab_current == self)
+        res = super().on_touch_up(touch)
+        if was_seeking:
+            self.is_seeking = False
+            if touch.grab_current == self:
+                touch.ungrab(self)
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if app and hasattr(app, "player_controller") and app.player_controller:
+                app.player_controller.seek(float(self.value))
+                Clock.schedule_once(lambda dt: setattr(app.player_controller, "is_seeking", False), 0.2)
+        return res
+
+Factory.register('PlayerTimelineSlider', cls=PlayerTimelineSlider)
+
+
+class AnimatedBackground(Widget):
+    """
+    Continuous, organic fluid animated background supporting multiple smooth visual variations:
+    - 'gradient': Continuous chromatic gradient flow interpolating seamlessly across the viewport.
+    - 'ripple': Water ripple effect with gentle concentric liquid undulations expanding outward.
+    - 'aurora': Soft aurora wave curtains drifting harmonically across the screen.
+    - 'off': Clean solid theme backdrop.
+    Seamlessly harmonizes with album art color extraction or active theme colors, preserving text legibility.
+    """
+    is_active = BooleanProperty(True)
+    variation = StringProperty("gradient") # "gradient", "ripple", "aurora", "off"
+    speed = NumericProperty(1.0)
+    intensity = NumericProperty(0.6)
+    color_primary = ListProperty([0.48, 0.30, 1.0, 0.45])
+    color_secondary = ListProperty([0.15, 0.60, 0.90, 0.40])
+    color_tertiary = ListProperty([0.90, 0.25, 0.55, 0.35])
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cols = 8
+        self.rows = 8
+        self._t = 0.0
+
+        with self.canvas.before:
+            self._bg_col = Color(0.08, 0.08, 0.12, 1.0)
+            self._bg_rect = Rectangle(pos=self.pos, size=self.size)
+
+            Color(1, 1, 1, 1)
+            fmt = [(b'vPosition', 2, 'float'), (b'vColor', 4, 'float')]
+            self.mesh = Mesh(fmt=fmt, mode='triangles')
+
+            # Readability contrast overlay
+            self._overlay_col = Color(0, 0, 0, 0.40)
+            self._overlay_rect = Rectangle(pos=self.pos, size=self.size)
+
+        # Precompute mesh triangle indices for (cols x rows) grid
+        indices = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                i0 = r * (self.cols + 1) + c
+                i1 = i0 + 1
+                i2 = (r + 1) * (self.cols + 1) + c
+                i3 = i2 + 1
+                indices.extend([i0, i1, i2, i1, i3, i2])
+        self.mesh.indices = indices
+
+        self.bind(pos=self._update_geom, size=self._update_geom)
+        self.bind(color_primary=self._update_colors, color_secondary=self._update_colors, color_tertiary=self._update_colors)
+        self.bind(is_active=self._on_active_change)
+        Clock.schedule_interval(self._tick, 1.0 / 30.0)
+
+    def _update_geom(self, *args):
+        self._bg_rect.pos = self.pos
+        self._bg_rect.size = self.size
+        self._overlay_rect.pos = self.pos
+        self._overlay_rect.size = self.size
+
+    def _update_colors(self, *args):
+        pass
+
+    def _on_active_change(self, instance, active):
+        if not active or self.variation == "off":
+            self.mesh.vertices = []
+        else:
+            self._tick(0.016)
+
+    def update_colors_from_theme(self, app=None):
+        """Harmonizes backdrop colors with album art extraction or active theme palette."""
+        if not app:
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+        if not app:
+            return
+
+        bg = getattr(app.theme_cls, "backgroundColor", [0.08, 0.08, 0.12, 1.0])
+        if bg and bg != [1, 1, 1, 1]:
+            self._bg_col.rgba = bg
+
+        if getattr(app, "extract_artwork_colors", True) and hasattr(app, "player_controller") and app.player_controller.active_track:
+            art = app.player_controller.active_track.album_art
+            if art and os.path.exists(art) and not art.endswith("album_art.png"):
+                try:
+                    from PIL import Image
+                    with Image.open(art) as img:
+                        img = img.resize((32, 32)).convert("RGB")
+                        colors = img.getcolors(1024)
+                        if colors:
+                            colors.sort(key=lambda c: c[0], reverse=True)
+                            p = [c / 255.0 for c in colors[0][1]] + [0.45 * self.intensity]
+                            s = [c / 255.0 for c in colors[min(1, len(colors)-1)][1]] + [0.40 * self.intensity]
+                            t = [c / 255.0 for c in colors[min(2, len(colors)-1)][1]] + [0.35 * self.intensity]
+                            self.color_primary = p
+                            self.color_secondary = s
+                            self.color_tertiary = t
+                            return
+                except Exception:
+                    pass
+
+        # Fallback / Non-extraction mode: harmonize with active theme
+        p = list(getattr(app.theme_cls, "primaryColor", [0.48, 0.30, 1.0, 1.0]))
+        p = (p[:3] + [0.45 * self.intensity]) if p != [1, 1, 1, 1] else [0.48, 0.30, 1.0, 0.45 * self.intensity]
+        s = list(getattr(app.theme_cls, "secondaryColor", [0.15, 0.60, 0.90, 1.0]))
+        s = (s[:3] + [0.40 * self.intensity]) if s != [1, 1, 1, 1] else [0.15, 0.60, 0.90, 0.40 * self.intensity]
+        t = list(getattr(app.theme_cls, "tertiaryColor", [0.90, 0.25, 0.55, 1.0]))
+        t = (t[:3] + [0.35 * self.intensity]) if t != [1, 1, 1, 1] else [0.90, 0.25, 0.55, 0.35 * self.intensity]
+        self.color_primary = p
+        self.color_secondary = s
+        self.color_tertiary = t
+
+    def _tick(self, dt):
+        if not self.is_active or self.variation == "off":
+            if self.mesh.vertices:
+                self.mesh.vertices = []
+            return
+        self._t += dt * self.speed
+        w, h = max(10, self.width), max(10, self.height)
+        ox, oy = self.x, self.y
+        t = self._t
+
+        vertices = []
+        c1 = self.color_primary
+        c2 = self.color_secondary
+        c3 = self.color_tertiary
+
+        cx, cy = ox + w * 0.5, oy + h * 0.55
+
+        for r in range(self.rows + 1):
+            v = r / self.rows
+            for c in range(self.cols + 1):
+                u = c / self.cols
+                base_x = ox + u * w
+                base_y = oy + v * h
+
+                if self.variation == "ripple":
+                    # Gentle radial water ripple expanding outward
+                    dx = base_x - cx
+                    dy = base_y - cy
+                    dist = math.hypot(dx, dy)
+                    wave = math.sin(dist * 0.015 - t * 2.0)
+                    wave2 = math.cos((dx + dy) * 0.01 + t * 1.2)
+                    blend = (wave * 0.5 + 0.5) * 0.7 + (wave2 * 0.5 + 0.5) * 0.3
+
+                    r_col = c1[0] * blend + c2[0] * (1.0 - blend)
+                    g_col = c1[1] * blend + c2[1] * (1.0 - blend)
+                    b_col = c1[2] * blend + c3[2] * (1.0 - blend)
+                    a_col = min(0.65, (c1[3] + c2[3]) * 0.5 * (0.8 + 0.2 * wave))
+
+                    px = base_x + wave * 3.0
+                    py = base_y + wave2 * 3.0
+
+                elif self.variation == "aurora":
+                    # Gentle vertical wave ribbons
+                    ribbon = math.sin(u * 3.5 + t * 0.8) + math.cos(v * 2.0 - t * 0.6)
+                    blend = (ribbon * 0.25 + 0.5)
+                    blend = max(0.0, min(1.0, blend))
+
+                    r_col = c1[0] * blend + c3[0] * (1.0 - blend)
+                    g_col = c2[1] * blend + c1[1] * (1.0 - blend)
+                    b_col = c3[2] * blend + c2[2] * (1.0 - blend)
+                    a_col = 0.45 + 0.15 * math.sin(t * 0.5 + u * 2.0)
+                    px = base_x + math.sin(v * 4.0 + t) * 4.0
+                    py = base_y
+
+                else: # "gradient" (Smooth continuous flowing gradient)
+                    rot_x = 0.5 + 0.25 * math.sin(t * 0.6)
+                    rot_y = 0.5 + 0.25 * math.cos(t * 0.5)
+                    dist_to_center = math.hypot(u - rot_x, v - rot_y)
+                    blend = max(0.0, min(1.0, 1.0 - dist_to_center))
+
+                    r_col = c1[0] * u + c2[0] * (1.0 - u)
+                    g_col = c2[1] * v + c3[1] * (1.0 - v)
+                    b_col = c3[2] * blend + c1[2] * (1.0 - blend)
+                    a_col = 0.50
+                    px = base_x
+                    py = base_y
+
+                vertices.extend([px, py, r_col, g_col, b_col, a_col])
+
+        self.mesh.vertices = vertices
+
+Factory.register('AnimatedBackground', cls=AnimatedBackground)
+

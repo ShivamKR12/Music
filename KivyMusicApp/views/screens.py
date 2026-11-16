@@ -1,4 +1,9 @@
 from kivymd.uix.screen import MDScreen
+from kivy.properties import StringProperty, NumericProperty
+from kivy.clock import Clock
+
+class SplashScreen(MDScreen):
+    pass
 
 class HomeScreen(MDScreen):
     pass
@@ -15,16 +20,49 @@ class SettingsScreen(MDScreen):
 class PlayerScreen(MDScreen):
     pass
 
-from kivy.clock import Clock
-
 class AnalyticsScreen(MDScreen):
-    pass
+    total_tracks_text = StringProperty("0 Tracks")
+    total_artists_text = StringProperty("0 Artists")
+    total_playtime_text = StringProperty("0h 0m")
+    most_played_text = StringProperty("None")
+
+    bar_mon_h = NumericProperty(0.2)
+    bar_tue_h = NumericProperty(0.2)
+    bar_wed_h = NumericProperty(0.2)
+    bar_thu_h = NumericProperty(0.2)
+    bar_fri_h = NumericProperty(0.2)
+    bar_sat_h = NumericProperty(0.2)
+    bar_sun_h = NumericProperty(0.2)
+
+    segment_1_name = StringProperty("Top Artist 1")
+    segment_1_pct = StringProperty("40%")
+    segment_1_end = NumericProperty(144)
+
+    segment_2_name = StringProperty("Top Artist 2")
+    segment_2_pct = StringProperty("35%")
+    segment_2_end = NumericProperty(270)
+
+    segment_3_name = StringProperty("Top Artist 3")
+    segment_3_pct = StringProperty("25%")
+    segment_3_end = NumericProperty(360)
+
+    def on_enter(self, *args):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "load_analytics_data"):
+            app.load_analytics_data()
 
 class NotificationScreen(MDScreen):
     pass
+
+NotificationsScreen = NotificationScreen
     
 class RecentlyPlayedScreen(MDScreen):
-    pass
+    def on_enter(self, *args):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "load_recently_played_data"):
+            app.load_recently_played_data()
 
 class WrappedScreen(MDScreen):
     def __init__(self, **kwargs):
