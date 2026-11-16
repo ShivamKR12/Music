@@ -20,6 +20,7 @@
 #:include views/screens/listen_together.kv
 #:include views/screens/auth.kv
 #:include views/screens/favorites.kv
+#:include views/desktop_components.kv
 
 
 
@@ -62,24 +63,43 @@ MDBoxLayout:
     orientation: "vertical"
     md_bg_color: app.theme_cls.backgroundColor
 
-    LazyScreenManager:
-        id: screen_manager
-        current: "splash"
-        transition: __import__('kivy.uix.screenmanager').uix.screenmanager.FadeTransition()
+    # Horizontal Main Content Container: Desktop Nav Rail + Screen Manager + Desktop Side Panel
+    MDBoxLayout:
+        orientation: "horizontal"
+        size_hint: 1, 1
 
-        SplashScreen:
-        HomeScreen:
-        SearchScreen:
-        LibraryScreen:
+        DesktopNavRail:
+            id: desktop_nav_rail
+            size_hint_x: None
+            width: dp(72) if app.is_desktop_layout else 0
+            opacity: 1 if app.is_desktop_layout else 0
+            disabled: not app.is_desktop_layout
 
-    # Global Mini Player
+        LazyScreenManager:
+            id: screen_manager
+            current: "splash"
+            transition: __import__('kivy.uix.screenmanager').uix.screenmanager.FadeTransition()
+
+            SplashScreen:
+            HomeScreen:
+            SearchScreen:
+            LibraryScreen:
+
+        DesktopSidePanel:
+            id: desktop_side_panel
+            size_hint_x: None
+            width: dp(340) if (app.is_desktop_layout and app.desktop_panel_open) else 0
+            opacity: 1 if (app.is_desktop_layout and app.desktop_panel_open) else 0
+            disabled: not (app.is_desktop_layout and app.desktop_panel_open)
+
+    # Global Mini Player (Mobile Only)
     MDBoxLayout:
         id: mini_player
         size_hint_y: None
-        padding: ["8dp", "0dp", "8dp", "8dp"]
-        opacity: 1 if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
-        height: dp(72) if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
-        disabled: False if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else True
+        padding: ["8dp", "0dp", "8dp", "8dp"] if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else ["0dp", "0dp", "0dp", "0dp"]
+        opacity: 1 if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
+        height: dp(72) if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
+        disabled: False if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else True
         MDCard:
             style: "elevated"
             size_hint_y: None
@@ -130,9 +150,9 @@ MDBoxLayout:
         id: bottom_nav
         on_switch_tabs: app.on_switch_tabs(*args)
         size_hint_y: None
-        opacity: 1 if screen_manager.current in ["home", "search", "library"] else 0
-        height: dp(80) if screen_manager.current in ["home", "search", "library"] else 0
-        disabled: False if screen_manager.current in ["home", "search", "library"] else True
+        opacity: 1 if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library"]) else 0
+        height: dp(80) if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library"]) else 0
+        disabled: False if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library"]) else True
 
         NavBarItem:
             icon: "home"
@@ -146,3 +166,11 @@ MDBoxLayout:
         NavBarItem:
             icon: "music-box-multiple"
             text: "Library"
+
+    # Master Desktop Bottom Player Bar
+    DesktopPlayerBar:
+        id: desktop_player_bar
+        size_hint_y: None
+        height: dp(84) if (app.is_desktop_layout and screen_manager.current != "splash") else 0
+        opacity: 1 if (app.is_desktop_layout and screen_manager.current != "splash") else 0
+        disabled: not (app.is_desktop_layout and screen_manager.current != "splash")

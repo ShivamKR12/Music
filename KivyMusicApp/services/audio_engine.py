@@ -57,6 +57,8 @@ class AudioEngine:
         self.current_path = None
         self.repeat_one = False
         self._has_started_playing = False
+        self.volume = 1.0
+        self.muted = False
         self.eq_bands = [0.0] * 10
         self.eq_reverb = False
         self.crossfade_duration = 0.0
@@ -310,7 +312,7 @@ class AudioEngine:
             self._has_started_playing = False
             self._is_crossfading = False
             if hasattr(self.player, 'volume'):
-                self.player.volume = 1.0
+                self.player.volume = 0.0 if self.muted else self.volume
 
             artwork = info.get("artwork") if info else None
             if artwork and os.path.exists(artwork) and self.on_artwork_loaded:
@@ -374,7 +376,8 @@ class AudioEngine:
                         if self.on_crossfade_trigger:
                             self.on_crossfade_trigger()
                     if hasattr(self.player, 'volume'):
-                        self.player.volume = max(0.0, min(1.0, rem_time / self.crossfade_duration))
+                        base_vol = 0.0 if self.muted else self.volume
+                        self.player.volume = max(0.0, min(base_vol, base_vol * (rem_time / self.crossfade_duration)))
 
         if self.on_time_update:
             self.on_time_update(self.elapsed, self.duration)
@@ -429,6 +432,18 @@ class AudioEngine:
         self.elapsed = max(0.0, min(target_pos, self.duration if self.duration > 0 else target_pos))
         self.last_tick = time.time()
         self._safe_seek(self.elapsed)
+
+    def set_volume(self, val: float):
+        """Sets playback volume level in range [0.0, 1.0]."""
+        self.volume = max(0.0, min(1.0, float(val)))
+        if self.player and hasattr(self.player, 'volume'):
+            self.player.volume = 0.0 if self.muted else self.volume
+
+    def set_muted(self, muted: bool):
+        """Mutes or unmutes audio playback without discarding current volume setting."""
+        self.muted = bool(muted)
+        if self.player and hasattr(self.player, 'volume'):
+            self.player.volume = 0.0 if self.muted else self.volume
 
     def _safe_seek(self, pos: float):
         if hasattr(self.player, 'seek'):

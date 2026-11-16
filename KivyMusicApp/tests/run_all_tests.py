@@ -21,6 +21,7 @@ TEST_MODULES = [
     ("Backend & SQLite Integration", "test_backend_integration.py"),
     ("Historical Verification Battery", "test_battery_fixes.py"),
     ("SimpMusic Features & Dynamic Playlists", "test_simpmusic_features_and_dynamic_playlists.py"),
+    ("Desktop Responsive UI/UX & Controls", "test_desktop_ui_layout.py"),
     ("Comprehensive 13-Suite UI/UX Audit", "test_comprehensive_audit.py"),
 ]
 

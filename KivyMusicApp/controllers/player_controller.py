@@ -25,6 +25,8 @@ class PlayerController(EventDispatcher):
     duration = NumericProperty(180.0)
     formatted_current_time = StringProperty("00:00")
     formatted_duration = StringProperty("03:00")
+    volume = NumericProperty(1.0)
+    is_muted = BooleanProperty(False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -45,6 +47,7 @@ class PlayerController(EventDispatcher):
         self.audio_engine.on_crossfade_trigger = self._on_crossfade_trigger
 
         self.discord_rpc = DiscordRPCService()
+        self._pre_mute_volume = 1.0
 
     def set_playlist(self, playlist_model):
         self.playlist_model = playlist_model
@@ -123,6 +126,29 @@ class PlayerController(EventDispatcher):
     def toggle_repeat(self):
         """Toggle track repeat mode."""
         self.cycle_repeat_mode()
+
+    def set_volume(self, val: float):
+        """Sets master volume level in range [0.0, 1.0]."""
+        self.volume = max(0.0, min(1.0, float(val)))
+        if self.volume > 0.0:
+            self.is_muted = False
+        self.audio_engine.set_volume(self.volume)
+
+    def toggle_mute(self):
+        """Toggles audio mute state."""
+        self.is_muted = not self.is_muted
+        if self.is_muted:
+            self._pre_mute_volume = self.volume if self.volume > 0 else 1.0
+            self.audio_engine.set_muted(True)
+        else:
+            self.audio_engine.set_muted(False)
+            if self.volume == 0:
+                self.set_volume(self._pre_mute_volume)
+
+    def adjust_volume(self, delta: float):
+        """Adjusts master volume by delta (+0.05 / -0.05)."""
+        new_vol = max(0.0, min(1.0, self.volume + delta))
+        self.set_volume(new_vol)
 
     def toggle_favorite(self):
         """Toggle active track favorite status in SQLite database."""

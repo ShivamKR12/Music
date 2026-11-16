@@ -1,13 +1,20 @@
-from kivy.config import Config
-from kivy.utils import platform
-if platform in ('win', 'macosx', 'linux'):
-    Config.set('graphics', 'width', '360')
-    Config.set('graphics', 'height', '640')
-    Config.set('graphics', 'resizable', False)
-    Config.set('graphics', 'fullscreen', False)
-
 import os
 import sys
+from kivy.config import Config
+from kivy.utils import platform
+
+is_headless = os.environ.get("KIVY_HEADLESS") == "1"
+if platform in ('win', 'macosx', 'linux'):
+    if is_headless:
+        Config.set('graphics', 'width', '360')
+        Config.set('graphics', 'height', '640')
+        Config.set('graphics', 'resizable', False)
+        Config.set('graphics', 'fullscreen', False)
+    else:
+        Config.set('graphics', 'width', '1024')
+        Config.set('graphics', 'height', '720')
+        Config.set('graphics', 'resizable', True)
+        Config.set('graphics', 'fullscreen', False)
 
 # Cross-platform Unicode font resolver for Android, Windows, Linux, and macOS
 from kivy.core.text import LabelBase, DEFAULT_FONT
@@ -240,6 +247,7 @@ from views.components import (
     DirectionalHorizontalScrollView,
     DirectionalHorizontalRecycleView,
     ArtistAlbumCard,
+    MarqueeLabel,
 )
 from utils.theme_utils import update_theme_from_image
 from services.logger import app_logger, init_logging
@@ -335,6 +343,13 @@ class MusicApp(MDApp):
 
     favorites_info = StringProperty("0 tracks • 0 min")
     favorites_top_art = StringProperty("album_art.png")
+
+    # Responsive Desktop Layout & Ergonomics
+    is_desktop_layout = BooleanProperty(False)
+    desktop_panel_open = BooleanProperty(False)
+    desktop_panel_tab = StringProperty("lyrics")
+    active_tab_name = StringProperty("home")
+    current_volume = NumericProperty(1.0)
 
     @property
     def cache_dir(self):
@@ -883,6 +898,7 @@ class MusicApp(MDApp):
 
     def sync_nav_bar(self, screen_name: str):
         """Keep the MDNavigationBar active indicator in sync with the ScreenManager."""
+        self.active_tab_name = screen_name
         mapping = {
             "home": "Home",
             "search": "Search",
@@ -899,6 +915,13 @@ class MusicApp(MDApp):
     def on_start(self):
         """Cooperative pre-warm pipeline: animates splash screen while pre-rendering all screens."""
         from kivy.clock import Clock
+        from kivy.core.window import Window
+        Window.bind(on_resize=lambda win, w, h: self.check_responsive_layout(w))
+        if platform not in ('android', 'ios'):
+            from utils.desktop_utils import DesktopKeyboardManager, setup_desktop_window
+            self.keyboard_manager = DesktopKeyboardManager(self)
+            setup_desktop_window(self)
+        self.check_responsive_layout(Window.width)
         Clock.schedule_once(lambda dt: self.start_warmup_pipeline(), 0.02)
 
     def start_warmup_pipeline(self):
@@ -914,6 +937,7 @@ class MusicApp(MDApp):
             Clock.schedule_once(lambda dt: self.start_warmup_pipeline(), 0.05)
             return
         sm = self.root.ids.screen_manager
+        self.check_responsive_layout()
         if os.environ.get("KIVY_HEADLESS") == "1":
             # In headless test execution, complete warmup instantly with zero timer delays
             self._stage_1_populate_home(0)
@@ -3593,6 +3617,286 @@ class MusicApp(MDApp):
             Clock.schedule_once(lambda dt: add_queue_chunks(batch_size), 0.03)
 
         self.queue_sheet.set_state("open")
+
+    def check_responsive_layout(self, width=None):
+        """Arbitrates between mobile phone layout and wide Windows/Desktop layout."""
+        from kivy.core.window import Window
+        from kivy.metrics import dp
+        from kivy.utils import platform
+
+        if platform in ('android', 'ios'):
+            self.is_desktop_layout = False
+            return
+
+        if width is not None:
+            should_be_desktop = (width >= dp(840))
+        elif os.environ.get("KIVY_HEADLESS") == "1":
+            should_be_desktop = False
+        else:
+            w = Window.width
+            should_be_desktop = (w >= dp(840))
+
+        if self.is_desktop_layout != should_be_desktop:
+            self.is_desktop_layout = should_be_desktop
+            if not should_be_desktop and self.desktop_panel_open:
+                self.desktop_panel_open = False
+
+    def close_desktop_panel(self):
+        """Closes the desktop inspector side panel."""
+        self.desktop_panel_open = False
+        if hasattr(self, "_desktop_lyrics_event") and self._desktop_lyrics_event:
+            self._desktop_lyrics_event.cancel()
+            self._desktop_lyrics_event = None
+
+    def toggle_desktop_lyrics_panel(self):
+        """Toggles the synced lyrics inspector in the desktop side panel (or mobile sheet)."""
+        if not self.is_desktop_layout:
+            self.show_lyrics()
+            return
+        if self.desktop_panel_open and self.desktop_panel_tab == "lyrics":
+            self.close_desktop_panel()
+        else:
+            self.desktop_panel_tab = "lyrics"
+            self.desktop_panel_open = True
+            self.sync_desktop_side_panel()
+
+    def toggle_desktop_queue_panel(self):
+        """Toggles the Up Next queue inspector in the desktop side panel (or mobile sheet)."""
+        if not self.is_desktop_layout:
+            self.show_queue_sheet()
+            return
+        if self.desktop_panel_open and self.desktop_panel_tab == "queue":
+            self.close_desktop_panel()
+        else:
+            self.desktop_panel_tab = "queue"
+            self.desktop_panel_open = True
+            self.sync_desktop_side_panel()
+
+    def sync_desktop_side_panel(self):
+        """Populates and refreshes the desktop side panel with active lyrics or queue."""
+        if not hasattr(self, "root") or not self.root or not hasattr(self.root, "ids"):
+            return
+        side_panel = self.root.ids.get("desktop_side_panel")
+        if not side_panel or "desktop_panel_content" not in side_panel.ids:
+            return
+
+        content = side_panel.ids.desktop_panel_content
+        content.clear_widgets()
+
+        if self.desktop_panel_tab == "queue":
+            self._populate_desktop_queue_content(content)
+        elif self.desktop_panel_tab == "lyrics":
+            self._populate_desktop_lyrics_content(content)
+
+    def _populate_desktop_queue_content(self, container):
+        from kivymd.uix.scrollview import MDScrollView
+        from kivymd.uix.list import MDList, MDListItem, MDListItemLeadingAvatar, MDListItemHeadlineText, MDListItemSupportingText
+        from kivy.metrics import dp
+
+        scroll = MDScrollView(size_hint=(1, 1), do_scroll_x=False)
+        box = MDList(spacing="4dp")
+        scroll.add_widget(box)
+        container.add_widget(scroll)
+
+        tracks = list(self.player_controller.queue) if (hasattr(self, "player_controller") and self.player_controller.queue) else []
+        active = self.player_controller.active_track if hasattr(self, "player_controller") else None
+
+        for tr in tracks:
+            is_active = (tr == active)
+            art = tr.album_art if (tr.album_art and os.path.exists(tr.album_art)) else "album_art.png"
+            item = MDListItem(
+                MDListItemLeadingAvatar(
+                    source=art,
+                    radius=[dp(8), dp(8), dp(8), dp(8)],
+                    disabled=True
+                ),
+                MDListItemHeadlineText(
+                    text=f"▶  {tr.title}" if is_active else tr.title,
+                    bold=is_active,
+                    theme_text_color="Custom" if is_active else "Primary",
+                    text_color=self.theme_cls.primaryColor if is_active else self.theme_cls.onSurfaceColor
+                ),
+                MDListItemSupportingText(
+                    text=f"{tr.artist} • {tr.formatted_duration}"
+                ),
+                on_release=lambda x, t=tr: self.play_selected_track(t),
+                radius=[dp(12), dp(12), dp(12), dp(12)],
+                md_bg_color=self.theme_cls.surfaceContainerHighestColor if is_active else self.theme_cls.surfaceContainerColor
+            )
+            box.add_widget(item)
+
+    def _populate_desktop_lyrics_content(self, container):
+        from views.components import LyricsScrollView
+        from kivymd.uix.boxlayout import MDBoxLayout
+        from kivymd.uix.label import MDLabel
+        from kivymd.uix.button import MDButton, MDButtonText
+        from services.lyrics_service import parse_lrc, find_active_line_index, fetch_lyrics_async
+        from kivy.metrics import dp
+
+        track = self.player_controller.active_track if hasattr(self, "player_controller") else None
+        if not track:
+            lbl = MDLabel(
+                text="No track playing",
+                halign="center",
+                font_style="Body",
+                role="medium",
+                pos_hint={"center_y": .5}
+            )
+            container.add_widget(lbl)
+            return
+
+        # Header Info Row
+        header_box = MDBoxLayout(orientation="vertical", adaptive_height=True, spacing="2dp", padding=["4dp", "4dp", "4dp", "8dp"])
+        title_lbl = MDLabel(
+            text=track.title,
+            font_style="Title",
+            role="medium",
+            bold=True,
+            halign="center",
+            adaptive_height=True,
+            font_name=self.resolved_unicode_font_name
+        )
+        artist_lbl = MDLabel(
+            text=track.artist,
+            font_style="Body",
+            role="small",
+            halign="center",
+            adaptive_height=True,
+            text_color=self.theme_cls.onSurfaceVariantColor,
+            font_name=self.resolved_unicode_font_name
+        )
+        header_box.add_widget(title_lbl)
+        header_box.add_widget(artist_lbl)
+
+        # Timing offset row for desktop
+        offset_row = MDBoxLayout(orientation="horizontal", adaptive_size=True, pos_hint={"center_x": .5}, spacing="8dp", padding=["8dp", "4dp", "8dp", "8dp"])
+        btn_minus = MDButton(style="outlined", size_hint=(None, None), size=("68dp", "34dp"), on_release=lambda x: self.adjust_lyrics_offset(-0.5))
+        btn_minus.add_widget(MDButtonText(text="-0.5s"))
+        offset_lbl = MDLabel(text=f"Sync: {self.lyrics_timing_offset:+.1f}s", halign="center", font_style="Label", role="small", adaptive_width=True)
+        btn_plus = MDButton(style="outlined", size_hint=(None, None), size=("68dp", "34dp"), on_release=lambda x: self.adjust_lyrics_offset(+0.5))
+        btn_plus.add_widget(MDButtonText(text="+0.5s"))
+        offset_row.add_widget(btn_minus)
+        offset_row.add_widget(offset_lbl)
+        offset_row.add_widget(btn_plus)
+
+        header_box.add_widget(offset_row)
+        container.add_widget(header_box)
+
+        lyrics_scroll = LyricsScrollView(size_hint=(1, 1), do_scroll_x=False)
+        lyrics_box = MDBoxLayout(
+            orientation="vertical",
+            adaptive_height=True,
+            padding=["12dp", "60dp", "12dp", "100dp"],
+            spacing="10dp"
+        )
+        lyrics_scroll.add_widget(lyrics_box)
+        container.add_widget(lyrics_scroll)
+
+        self._desktop_lyrics_scroll = lyrics_scroll
+        self._desktop_lyrics_box = lyrics_box
+        self._desktop_lyric_widgets = []
+
+        def render_desktop_lyrics(synced_src, plain_src):
+            lyrics_box.clear_widgets()
+            self._desktop_lyric_widgets = []
+            if synced_src:
+                parsed = parse_lrc(synced_src, timing_offset=self.lyrics_timing_offset)
+                if parsed:
+                    for sec, text in parsed:
+                        lbl = MDLabel(
+                            text=text,
+                            font_style="Title",
+                            role="medium",
+                            halign="center",
+                            adaptive_height=True,
+                            text_color=self.theme_cls.onSurfaceVariantColor,
+                            font_name=self.resolved_unicode_font_name
+                        )
+                        lyrics_box.add_widget(lbl)
+                        self._desktop_lyric_widgets.append((sec, lbl))
+                    return
+            
+            # Plain fallback
+            text_to_show = plain_src if plain_src else "No synchronized lyrics found."
+            lbl = MDLabel(
+                text=text_to_show,
+                font_style="Body",
+                role="medium",
+                halign="center",
+                adaptive_height=True,
+                font_name=self.resolved_unicode_font_name
+            )
+            lyrics_box.add_widget(lbl)
+
+        synced = getattr(track, "synced_lyrics", "").strip()
+        plain = getattr(track, "lyrics", "").strip()
+        if synced or plain:
+            render_desktop_lyrics(synced, plain)
+        else:
+            loading_lbl = MDLabel(
+                text="Fetching lyrics...",
+                font_style="Body",
+                role="medium",
+                halign="center",
+                adaptive_height=True,
+                opacity=0.7
+            )
+            lyrics_box.add_widget(loading_lbl)
+
+            def on_fetched(res):
+                track.lyrics = getattr(res, "plain", str(res))
+                track.synced_lyrics = getattr(res, "synced", "")
+                render_desktop_lyrics(track.synced_lyrics, track.lyrics)
+
+            fetch_lyrics_async(track.artist, track.title, getattr(track, "duration", 0), on_success=on_fetched)
+
+        def _update_desktop_lyrics_tick(dt):
+            if not self.desktop_panel_open or self.desktop_panel_tab != "lyrics":
+                return False
+            if not self.player_controller:
+                return True
+            cur_time = self.player_controller.current_time + self.lyrics_timing_offset
+            active_idx = -1
+            for i, (t_sec, w) in enumerate(self._desktop_lyric_widgets):
+                if t_sec <= cur_time:
+                    active_idx = i
+                else:
+                    break
+            for i, (t_sec, w) in enumerate(self._desktop_lyric_widgets):
+                if i == active_idx:
+                    w.text_color = self.theme_cls.primaryColor
+                    w.bold = True
+                else:
+                    w.text_color = self.theme_cls.onSurfaceVariantColor
+                    w.bold = False
+            return True
+
+        if hasattr(self, "_desktop_lyrics_event") and self._desktop_lyrics_event:
+            self._desktop_lyrics_event.cancel()
+        self._desktop_lyrics_event = Clock.schedule_interval(_update_desktop_lyrics_tick, 0.25)
+
+    def toggle_fullscreen(self):
+        """Toggles window fullscreen mode for immersive desktop listening."""
+        from kivy.core.window import Window
+        Window.fullscreen = not Window.fullscreen
+
+    def set_volume(self, val):
+        """Sets playback volume in range [0.0, 1.0]."""
+        self.current_volume = max(0.0, min(1.0, float(val)))
+        if hasattr(self, "player_controller") and self.player_controller:
+            self.player_controller.set_volume(self.current_volume)
+
+    def toggle_mute(self):
+        """Toggles audio mute state."""
+        if hasattr(self, "player_controller") and self.player_controller:
+            self.player_controller.toggle_mute()
+            self.current_volume = 0.0 if self.player_controller.is_muted else self.player_controller.volume
+
+    def adjust_volume_delta(self, delta):
+        """Adjusts playback volume incrementally (e.g. keyboard Up/Down arrows)."""
+        if hasattr(self, "player_controller") and self.player_controller:
+            self.player_controller.adjust_volume(delta)
+            self.current_volume = self.player_controller.volume
 
     def on_stop(self):
         """Clean up audio streams, threads, and background workers on application exit."""

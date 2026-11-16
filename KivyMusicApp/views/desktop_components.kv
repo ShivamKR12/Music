@@ -1,0 +1,288 @@
+# Desktop UI Components for KivyMusicApp (Widescreen >= 840dp)
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+
+<DesktopNavButton@MDIconButton>:
+    size_hint: None, None
+    size: "48dp", "48dp"
+    pos_hint: {"center_x": .5}
+    on_release: pass
+
+<DesktopNavRail@MDCard>:
+    style: "elevated"
+    size_hint_x: None
+    width: "72dp"
+    size_hint_y: 1
+    radius: [0, dp(16), dp(16), 0]
+    md_bg_color: app.theme_cls.surfaceContainerColor
+    padding: ["8dp", "16dp", "8dp", "16dp"] if app.is_desktop_layout else ["0dp", "0dp", "0dp", "0dp"]
+    spacing: "8dp"
+    orientation: "vertical"
+
+    # App Logo Icon
+    MDIconButton:
+        icon: "music-circle"
+        size_hint: None, None
+        size: "48dp", "48dp"
+        pos_hint: {"center_x": .5}
+        theme_icon_color: "Custom"
+        icon_color: app.theme_cls.primaryColor
+        on_release: app.switch_screen("home")
+
+    Widget:
+        size_hint_y: None
+        height: "12dp"
+
+    # Navigation Targets
+    DesktopNavButton:
+        icon: "home" if app.active_tab_name == "home" else "home-outline"
+        theme_icon_color: "Custom" if app.active_tab_name == "home" else "Primary"
+        icon_color: app.theme_cls.primaryColor if app.active_tab_name == "home" else app.theme_cls.onSurfaceVariantColor
+        on_release: app.switch_screen("home")
+
+    DesktopNavButton:
+        icon: "magnify"
+        theme_icon_color: "Custom" if app.active_tab_name == "search" else "Primary"
+        icon_color: app.theme_cls.primaryColor if app.active_tab_name == "search" else app.theme_cls.onSurfaceVariantColor
+        on_release: app.switch_screen("search")
+
+    DesktopNavButton:
+        icon: "compass" if app.active_tab_name == "browse" else "compass-outline"
+        theme_icon_color: "Custom" if app.active_tab_name == "browse" else "Primary"
+        icon_color: app.theme_cls.primaryColor if app.active_tab_name == "browse" else app.theme_cls.onSurfaceVariantColor
+        on_release: app.switch_screen("browse")
+
+    DesktopNavButton:
+        icon: "music-box-multiple" if app.active_tab_name == "library" else "music-box-multiple-outline"
+        theme_icon_color: "Custom" if app.active_tab_name == "library" else "Primary"
+        icon_color: app.theme_cls.primaryColor if app.active_tab_name == "library" else app.theme_cls.onSurfaceVariantColor
+        on_release: app.switch_screen("library")
+
+    DesktopNavButton:
+        icon: "playlist-music"
+        on_release: app.show_playlists_overview()
+
+    DesktopNavButton:
+        icon: "equalizer"
+        theme_icon_color: "Custom" if app.active_tab_name == "equalizer" else "Primary"
+        icon_color: app.theme_cls.primaryColor if app.active_tab_name == "equalizer" else app.theme_cls.onSurfaceVariantColor
+        on_release: app.switch_screen("equalizer")
+
+    Widget:
+
+    DesktopNavButton:
+        icon: "cog-outline"
+        theme_icon_color: "Custom" if app.active_tab_name == "settings" else "Primary"
+        icon_color: app.theme_cls.primaryColor if app.active_tab_name == "settings" else app.theme_cls.onSurfaceVariantColor
+        on_release: app.switch_screen("settings")
+
+
+<DesktopPlayerBar@MDCard>:
+    style: "elevated"
+    size_hint_y: None
+    height: "84dp"
+    radius: [dp(16), dp(16), 0, 0]
+    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+    padding: ["16dp", "8dp", "16dp", "8dp"] if app.is_desktop_layout else ["0dp", "0dp", "0dp", "0dp"]
+    spacing: "16dp"
+
+    # Left Section: Track Info & Artwork (~260dp)
+    MDBoxLayout:
+        size_hint_x: None
+        width: "260dp"
+        spacing: "12dp"
+        pos_hint: {"center_y": .5}
+
+        FitImage:
+            source: app.player_controller.active_track.album_art if app.player_controller.active_track and app.player_controller.active_track.album_art else "album_art.png"
+            size_hint: None, None
+            size: "56dp", "56dp"
+            radius: [dp(10)]
+            pos_hint: {"center_y": .5}
+
+        MDBoxLayout:
+            orientation: "vertical"
+            spacing: "2dp"
+            pos_hint: {"center_y": .5}
+            size_hint_x: 1
+
+            MarqueeLabel:
+                text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track Playing"
+                font_style: "Title"
+                role: "small"
+                bold: True
+                height: "22dp"
+                touch_pass_through: True
+
+            MarqueeLabel:
+                text: app.player_controller.active_track.artist if app.player_controller.active_track else "Select a song to start"
+                font_style: "Body"
+                role: "small"
+                text_color: app.theme_cls.onSurfaceVariantColor
+                height: "18dp"
+                touch_pass_through: True
+
+        MDIconButton:
+            icon: "heart" if app.player_controller.is_favorite else "heart-outline"
+            theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
+            icon_color: [1, 0.2, 0.3, 1] if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
+            pos_hint: {"center_y": .5}
+            on_release: app.player_controller.toggle_favorite()
+
+    # Center Section: Playback Controls & Progress Scrubber
+    MDBoxLayout:
+        orientation: "vertical"
+        size_hint_x: 1
+        spacing: "2dp"
+        pos_hint: {"center_y": .5}
+
+        # Center Controls Row
+        MDBoxLayout:
+            orientation: "horizontal"
+            adaptive_size: True
+            pos_hint: {"center_x": .5}
+            spacing: "12dp"
+
+            MDIconButton:
+                icon: "shuffle"
+                theme_icon_color: "Custom" if app.player_controller.is_shuffle else "Primary"
+                icon_color: app.theme_cls.primaryColor if app.player_controller.is_shuffle else app.theme_cls.onSurfaceVariantColor
+                on_release: app.player_controller.toggle_shuffle()
+
+            MDIconButton:
+                icon: "skip-previous"
+                on_release: app.player_controller.prev_track()
+
+            MDIconButton:
+                icon: "pause" if app.player_controller.is_playing else "play"
+                style: "filled"
+                size_hint: None, None
+                size: "44dp", "44dp"
+                md_bg_color: app.theme_cls.primaryColor
+                theme_icon_color: "Custom"
+                icon_color: app.theme_cls.onPrimaryColor
+                on_release: app.player_controller.toggle_play()
+
+            MDIconButton:
+                icon: "skip-next"
+                on_release: app.player_controller.next_track()
+
+            MDIconButton:
+                icon: "repeat-once" if app.player_controller.repeat_mode == "one" else "repeat"
+                theme_icon_color: "Custom" if app.player_controller.repeat_mode != "off" else "Primary"
+                icon_color: app.theme_cls.primaryColor if app.player_controller.repeat_mode != "off" else app.theme_cls.onSurfaceVariantColor
+                on_release: app.player_controller.cycle_repeat_mode()
+
+        # Scrubber Row
+        MDBoxLayout:
+            orientation: "horizontal"
+            spacing: "8dp"
+            size_hint_x: 1
+            pos_hint: {"center_y": .5}
+
+            MDLabel:
+                text: app.player_controller.formatted_current_time
+                font_style: "Label"
+                role: "small"
+                adaptive_width: True
+                pos_hint: {"center_y": .5}
+                text_color: app.theme_cls.onSurfaceVariantColor
+
+            PlayerTimelineSlider:
+                id: desktop_progress_slider
+                size_hint_x: 1
+                size_hint_y: None
+                height: "44dp"
+                min: 0
+                max: app.player_controller.duration if (app.player_controller and app.player_controller.duration > 0) else 100
+                value: app.player_controller.current_time if (app.player_controller and not self.is_seeking) else self.value
+                track_active_color: app.theme_cls.primaryColor
+                track_inactive_color: app.theme_cls.surfaceContainerHighestColor
+                pos_hint: {"center_y": .5}
+
+            MDLabel:
+                text: app.player_controller.formatted_duration
+                font_style: "Label"
+                role: "small"
+                adaptive_width: True
+                pos_hint: {"center_y": .5}
+                text_color: app.theme_cls.onSurfaceVariantColor
+
+    # Right Section: Volume & Panels (~280dp)
+    MDBoxLayout:
+        size_hint_x: None
+        width: "280dp"
+        spacing: "4dp"
+        pos_hint: {"center_y": .5}
+
+        MDIconButton:
+            icon: "volume-off" if (app.current_volume == 0 or app.player_controller.is_muted) else ("volume-low" if app.current_volume < 0.5 else "volume-high")
+            pos_hint: {"center_y": .5}
+            on_release: app.toggle_mute()
+
+        MDSlider:
+            id: desktop_volume_slider
+            size_hint_x: None
+            width: "90dp"
+            min: 0.0
+            max: 1.0
+            step: 0.02
+            value: app.current_volume
+            pos_hint: {"center_y": .5}
+            on_value: app.set_volume(self.value)
+
+        MDIconButton:
+            icon: "text-box-outline"
+            theme_icon_color: "Custom" if (app.desktop_panel_open and app.desktop_panel_tab == "lyrics") else "Primary"
+            icon_color: app.theme_cls.primaryColor if (app.desktop_panel_open and app.desktop_panel_tab == "lyrics") else app.theme_cls.onSurfaceVariantColor
+            pos_hint: {"center_y": .5}
+            on_release: app.toggle_desktop_lyrics_panel()
+
+        MDIconButton:
+            icon: "playlist-play"
+            theme_icon_color: "Custom" if (app.desktop_panel_open and app.desktop_panel_tab == "queue") else "Primary"
+            icon_color: app.theme_cls.primaryColor if (app.desktop_panel_open and app.desktop_panel_tab == "queue") else app.theme_cls.onSurfaceVariantColor
+            pos_hint: {"center_y": .5}
+            on_release: app.toggle_desktop_queue_panel()
+
+        MDIconButton:
+            icon: "fullscreen"
+            pos_hint: {"center_y": .5}
+            on_release: app.toggle_fullscreen()
+
+
+<DesktopSidePanel@MDCard>:
+    style: "elevated"
+    size_hint_x: None
+    width: "340dp"
+    size_hint_y: 1
+    radius: [dp(16), 0, 0, dp(16)]
+    md_bg_color: app.theme_cls.surfaceContainerLowColor
+    padding: ["12dp", "16dp", "12dp", "16dp"] if (app.is_desktop_layout and app.desktop_panel_open) else ["0dp", "0dp", "0dp", "0dp"]
+    spacing: "12dp"
+    orientation: "vertical"
+
+    # Panel Header Row
+    MDBoxLayout:
+        size_hint_y: None
+        height: "40dp"
+        spacing: "8dp"
+
+        MDLabel:
+            text: "Live Synced Lyrics" if app.desktop_panel_tab == "lyrics" else "Up Next Queue"
+            font_style: "Title"
+            role: "medium"
+            bold: True
+            pos_hint: {"center_y": .5}
+
+        Widget:
+
+        MDIconButton:
+            icon: "close"
+            pos_hint: {"center_y": .5}
+            on_release: app.close_desktop_panel()
+
+    # Dynamic Host Container
+    MDBoxLayout:
+        id: desktop_panel_content
+        orientation: "vertical"
+        size_hint: 1, 1
