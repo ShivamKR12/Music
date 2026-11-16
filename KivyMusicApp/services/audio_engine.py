@@ -40,6 +40,39 @@ def extract_video_id(url):
     cleaned = re.sub(r'[^a-zA-Z0-9_-]', '', url)
     return cleaned[:11] if cleaned else "unknown"
 
+def is_valid_audio_header(path: str) -> bool:
+    """Verifies that a local file contains valid audio headers and sufficient bytes before ffpyplayer/SoundLoader."""
+    try:
+        if not os.path.exists(path) or not os.path.isfile(path):
+            return False
+        if os.path.getsize(path) < 1024:
+            return False
+        with open(path, "rb") as f:
+            header = f.read(64)
+        if len(header) < 64:
+            return False
+        # ID3 tag (MP3)
+        if header[:3] == b"ID3":
+            return True
+        # Raw MPEG frame sync: 11 bits set (0xFF followed by 0xE0 mask)
+        if header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
+            return True
+        # Ogg container (.ogg, .opus)
+        if header[:4] == b"OggS":
+            return True
+        # RIFF / WAVE (.wav)
+        if header[:4] == b"RIFF" and b"WAVE" in header[:16]:
+            return True
+        # FLAC (.flac)
+        if header[:4] == b"fLaC":
+            return True
+        # MP4 / M4A / AAC container
+        if b"ftyp" in header[:16] or b"moov" in header[:16]:
+            return True
+        return False
+    except Exception:
+        return False
+
 class AudioEngine:
     """
     Asynchronous, non-blocking audio streaming and playback engine.
@@ -96,6 +129,11 @@ class AudioEngine:
 
         # 1. If it's an existing local audio file, play immediately on main thread
         if os.path.exists(url_or_path) and os.path.isfile(url_or_path):
+            if not is_valid_audio_header(url_or_path):
+                print(f"[AudioEngine] Rejected invalid/corrupt audio file: {url_or_path}")
+                if self.on_error:
+                    Clock.schedule_once(lambda dt: self.on_error(f"Cannot play empty or corrupt file: {os.path.basename(url_or_path)}"), 0)
+                return False
             info = track_info or {"title": os.path.basename(url_or_path), "duration": 0}
             self.cleanup_player()
             self._set_main_thread_info(info, url_or_path)
@@ -291,6 +329,12 @@ class AudioEngine:
         abs_path = os.path.abspath(path)
         if not os.path.exists(abs_path):
             print(f"[AudioEngine] File not found: {abs_path}")
+            return
+
+        if not is_valid_audio_header(abs_path):
+            print(f"[AudioEngine] File invalid or corrupted: {abs_path}")
+            if self.on_error:
+                Clock.schedule_once(lambda dt: self.on_error(f"Corrupt or empty audio file: {os.path.basename(abs_path)}"), 0)
             return
 
         self.player = SoundLoader.load(abs_path)
