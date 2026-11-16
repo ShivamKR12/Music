@@ -1,11 +1,13 @@
 import os
 import random
+import threading
 from kivy.clock import Clock
 from kivy.event import EventDispatcher
 from kivy.properties import ObjectProperty, BooleanProperty, StringProperty, NumericProperty
 from models.track_model import TrackModel
 from models.database import is_favorite, toggle_favorite, mark_track_played, update_local_track_path
 from services.audio_engine import AudioEngine
+from services.discord_rpc_service import DiscordRPCService
 from utils.theme_utils import update_theme_from_image
 
 class PlayerController(EventDispatcher):
@@ -39,6 +41,10 @@ class PlayerController(EventDispatcher):
         self.audio_engine.on_download_progress = self._on_audio_download_progress
         self.audio_engine.on_error = self._on_audio_error
         self.audio_engine.on_track_loaded = self._on_audio_track_loaded
+        self.audio_engine.on_sponsorblock_skipped = self._on_sponsorblock_skipped
+        self.audio_engine.on_crossfade_trigger = self._on_crossfade_trigger
+
+        self.discord_rpc = DiscordRPCService()
 
     def set_playlist(self, playlist_model):
         self.playlist_model = playlist_model
@@ -166,6 +172,14 @@ class PlayerController(EventDispatcher):
         if self.audio_engine.paused and self.audio_engine.player:
             self.audio_engine.unpause()
             self.is_playing = True
+            if self.discord_rpc and self.active_track:
+                self.discord_rpc.update_track(
+                    self.active_track.title,
+                    self.active_track.artist,
+                    self.current_time,
+                    self.duration,
+                    True
+                )
         else:
             target_src = getattr(self.active_track, "local_path", "") or getattr(self.active_track, "url", "")
             track_meta = {
@@ -181,6 +195,14 @@ class PlayerController(EventDispatcher):
 
             started = self.audio_engine.start_play(target_src, track_meta)
             self.is_playing = bool(started)
+            if self.discord_rpc and self.active_track:
+                self.discord_rpc.update_track(
+                    self.active_track.title,
+                    self.active_track.artist,
+                    0.0,
+                    self.duration,
+                    True
+                )
 
     def toggle_play(self):
         if not self.active_track:
@@ -189,6 +211,14 @@ class PlayerController(EventDispatcher):
         if self.is_playing:
             self.audio_engine.pause()
             self.is_playing = False
+            if self.discord_rpc and self.active_track:
+                self.discord_rpc.update_track(
+                    self.active_track.title,
+                    self.active_track.artist,
+                    self.current_time,
+                    self.duration,
+                    False
+                )
         else:
             self.play()
 
@@ -258,11 +288,15 @@ class PlayerController(EventDispatcher):
 
     def stop(self):
         self.is_playing = False
+        if self.discord_rpc:
+            self.discord_rpc.clear()
         self.audio_engine.cleanup_player()
 
     def fade_out_and_stop(self, duration: float = 0.25, on_complete=None):
         """Gradually fades out playback volume over duration, then cleanly halts audio engine."""
         self.is_playing = False
+        if self.discord_rpc:
+            self.discord_rpc.clear()
         if hasattr(self.audio_engine, "fade_out") and self.audio_engine.player:
             def _done():
                 self.audio_engine.cleanup_player()
@@ -278,6 +312,36 @@ class PlayerController(EventDispatcher):
         """Passes 10-band equalizer settings to the underlying AudioEngine."""
         if hasattr(self, "audio_engine") and self.audio_engine:
             self.audio_engine.set_equalizer(bands, reverb)
+
+    def set_crossfade_duration(self, seconds: float):
+        """Sets the DJ-style crossfade duration on the audio engine."""
+        if hasattr(self, "audio_engine") and self.audio_engine:
+            self.audio_engine.crossfade_duration = max(0.0, float(seconds))
+
+    def _on_sponsorblock_skipped(self, start_pos: float, end_pos: float):
+        """Callback when SponsorBlock automatically skips a non-music segment."""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "show_toast"):
+            Clock.schedule_once(
+                lambda dt: app.show_toast(f"Skipped non-music segment ({start_pos:.0f}s - {end_pos:.0f}s)"),
+                0
+            )
+
+    def _on_crossfade_trigger(self):
+        """Triggered when track reaches crossfade window before ending."""
+        # Pre-cache next track if in queue
+        next_t = self.get_next_track()
+        if next_t and hasattr(next_t, "video_id") and next_t.video_id:
+            vid = next_t.video_id
+            from services.audio_engine import get_cache_dir
+            cp = os.path.join(get_cache_dir(), f"{vid}.mp3")
+            if not os.path.exists(cp):
+                from utils.media_utils import fetch_youtube_metadata
+                threading.Thread(
+                    target=lambda: fetch_youtube_metadata(f"https://www.youtube.com/watch?v={vid}", extract_flat=True),
+                    daemon=True
+                ).start()
 
     # AudioEngine Callbacks
     def _on_audio_time_update(self, elapsed, duration):

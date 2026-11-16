@@ -8,6 +8,7 @@ import urllib.request
 from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
 from yt_dlp import YoutubeDL
+from services.sponsorblock_service import SponsorBlockService
 
 class SilentLogger:
     def debug(self, msg): pass
@@ -58,15 +59,21 @@ class AudioEngine:
         self._has_started_playing = False
         self.eq_bands = [0.0] * 10
         self.eq_reverb = False
+        self.crossfade_duration = 0.0
+        self._is_crossfading = False
+        self.sponsorblock_enabled = True
+        self.sponsorblock_service = SponsorBlockService()
 
         # Decoupled UI Callbacks
-        self.on_time_update = None       # callback(elapsed, duration)
-        self.on_track_end = None         # callback()
-        self.on_artwork_loaded = None    # callback(artwork_path)
-        self.on_loading = None           # callback(is_loading)
-        self.on_download_progress = None # callback(percent_str)
-        self.on_error = None             # callback(error_msg)
-        self.on_track_loaded = None      # callback(local_path, info)
+        self.on_time_update = None           # callback(elapsed, duration)
+        self.on_track_end = None             # callback()
+        self.on_artwork_loaded = None        # callback(artwork_path)
+        self.on_loading = None               # callback(is_loading)
+        self.on_download_progress = None     # callback(percent_str)
+        self.on_error = None                 # callback(error_msg)
+        self.on_track_loaded = None          # callback(local_path, info)
+        self.on_sponsorblock_skipped = None  # callback(start_pos, end_pos)
+        self.on_crossfade_trigger = None     # callback()
 
         self.lock = threading.Lock()
         self.cancel_event = threading.Event()
@@ -95,6 +102,8 @@ class AudioEngine:
 
         # 2. Check if this YouTube track/video ID is already installed/cached in local cache
         video_id = extract_video_id(url_or_path)
+        if video_id and self.sponsorblock_enabled:
+            self.sponsorblock_service.fetch_segments_async(video_id)
         cache_dir = get_cache_dir()
         cached_audio = self._cache_path_from_id(video_id) if video_id else ""
         if cached_audio and os.path.exists(cached_audio) and os.path.isfile(cached_audio):
@@ -299,6 +308,9 @@ class AudioEngine:
             self.last_tick = None
             self.paused = False
             self._has_started_playing = False
+            self._is_crossfading = False
+            if hasattr(self.player, 'volume'):
+                self.player.volume = 1.0
 
             artwork = info.get("artwork") if info else None
             if artwork and os.path.exists(artwork) and self.on_artwork_loaded:
@@ -341,6 +353,28 @@ class AudioEngine:
                 if pos is not None and pos > 0:
                     if pos > self.elapsed and (pos - self.elapsed) < 2.0:
                         self.elapsed = pos
+
+            # SponsorBlock segment check
+            if self.sponsorblock_enabled and self.current_info:
+                vid = self.current_info.get("id") or extract_video_id(self.current_path or "")
+                if vid:
+                    skip_to = self.sponsorblock_service.get_skip_target(vid, self.elapsed)
+                    if skip_to is not None and skip_to > (self.elapsed + 0.5):
+                        old_pos = self.elapsed
+                        self.seek(skip_to)
+                        if self.on_sponsorblock_skipped:
+                            self.on_sponsorblock_skipped(old_pos, skip_to)
+
+            # Audio Crossfade Check (DJ-style fade out near track conclusion)
+            if self.crossfade_duration > 0 and self.duration > (self.crossfade_duration + 4.0):
+                rem_time = self.duration - self.elapsed
+                if rem_time <= self.crossfade_duration:
+                    if not self._is_crossfading:
+                        self._is_crossfading = True
+                        if self.on_crossfade_trigger:
+                            self.on_crossfade_trigger()
+                    if hasattr(self.player, 'volume'):
+                        self.player.volume = max(0.0, min(1.0, rem_time / self.crossfade_duration))
 
         if self.on_time_update:
             self.on_time_update(self.elapsed, self.duration)

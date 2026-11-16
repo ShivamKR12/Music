@@ -110,6 +110,25 @@
                             icon: "chevron-right"
                             
                     MDListItem:
+                        on_release: app.show_crossfade_dialog()
+                        MDListItemHeadlineText:
+                            text: "Audio Crossfade"
+                        MDListItemSupportingText:
+                            text: f"{int(app.crossfade_duration)}s transition" if app.crossfade_duration > 0 else "Off (Gapless)"
+                        MDListItemTrailingIcon:
+                            icon: "swap-horizontal"
+
+                    MDListItem:
+                        on_release: app.toggle_discord_rpc()
+                        MDListItemHeadlineText:
+                            text: "Discord Rich Presence"
+                        MDListItemSupportingText:
+                            text: "Broadcast song to Discord (Desktop)"
+                        PassiveTrailingCheckbox:
+                            id: discord_checkbox
+                            active: app.discord_rpc_enabled
+
+                    MDListItem:
                         on_release: app.show_clear_cache_dialog()
                         MDListItemHeadlineText:
                             text: "Clear Cache"

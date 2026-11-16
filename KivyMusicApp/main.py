@@ -197,6 +197,11 @@ from models.database import (
     add_track,
     get_all_tracks,
     get_playlist_tracks,
+    get_dynamic_playlist_tracks,
+    get_on_repeat,
+    get_heavy_rotation,
+    get_forgotten_favorites,
+    get_daily_mix,
     add_playlist,
     get_all_playlists,
     delete_playlist,
@@ -217,6 +222,7 @@ from models.database import (
     save_cache_payload,
     load_cache_payload,
 )
+from services.autoeq_service import get_autoeq_curve, get_all_autoeq_profiles
 from services.lyrics_service import fetch_lyrics_async, get_cached_lyrics
 from services.listen_together_service import ListenTogetherService
 from models.track_model import TrackModel, PlaylistModel
@@ -304,6 +310,10 @@ class MusicApp(MDApp):
     animated_bg_speed_label = StringProperty("Normal (1.0x)")
     wifi_only = BooleanProperty(True)
     sponsorblock_enabled = BooleanProperty(True)
+    selected_autoeq_profile = StringProperty("Harman In-Ear Target")
+    crossfade_duration = NumericProperty(3.0)
+    discord_rpc_enabled = BooleanProperty(True)
+    lyrics_timing_offset = NumericProperty(0.0)
 
     # Dynamic Artist, Album, Podcasts & Favorites Screen Properties
     active_artist_name = StringProperty("Artist Profile")
@@ -397,9 +407,29 @@ class MusicApp(MDApp):
         saved_sponsor = get_setting("sponsorblock_enabled", "True")
         self.sponsorblock_enabled = (str(saved_sponsor).lower() in ("true", "1"))
 
+        saved_crossfade = get_setting("crossfade_duration", "3")
+        try:
+            self.crossfade_duration = float(saved_crossfade)
+        except Exception:
+            self.crossfade_duration = 3.0
+
+        saved_autoeq = get_setting("autoeq_profile", "Harman In-Ear Target")
+        if saved_autoeq and saved_autoeq != "None":
+            self.selected_autoeq_profile = saved_autoeq
+
+        saved_discord = get_setting("discord_rpc_enabled", "True")
+        self.discord_rpc_enabled = (str(saved_discord).lower() in ("true", "1"))
+
+        saved_offset = get_setting("lyrics_offset", "0.0")
+        try:
+            self.lyrics_timing_offset = float(saved_offset)
+        except Exception:
+            self.lyrics_timing_offset = 0.0
+
         self.playlist_model = PlaylistModel()
         self.player_controller = PlayerController()
         self.player_controller.set_playlist(self.playlist_model)
+        self.player_controller.set_crossfade_duration(self.crossfade_duration)
         
         # Set default track
         if self.playlist_model.tracks:
@@ -483,6 +513,97 @@ class MusicApp(MDApp):
         """Set SponsorBlock skip non-music segments and persist."""
         self.sponsorblock_enabled = is_enabled
         set_setting("sponsorblock_enabled", str(self.sponsorblock_enabled))
+
+    def toggle_discord_rpc(self):
+        """Toggle Discord Rich Presence broadcasting and persist."""
+        self.discord_rpc_enabled = not self.discord_rpc_enabled
+        set_setting("discord_rpc_enabled", str(self.discord_rpc_enabled))
+        if hasattr(self, "player_controller") and hasattr(self.player_controller, "discord_rpc"):
+            if not self.discord_rpc_enabled:
+                self.player_controller.discord_rpc.clear()
+            else:
+                track = self.player_controller.active_track
+                if track and self.player_controller.is_playing:
+                    self.player_controller.discord_rpc.update_track(
+                        track.title, track.artist,
+                        self.player_controller.current_time,
+                        self.player_controller.duration,
+                        True
+                    )
+        self.show_toast(f"Discord RPC {'enabled' if self.discord_rpc_enabled else 'disabled'}")
+
+    def show_crossfade_dialog(self):
+        """Displays dialog to select DJ-style crossfade duration between tracks."""
+        options = [
+            (0.0, "Off (Gapless)", "Standard immediate transition between tracks"),
+            (3.0, "3 Seconds", "Recommended smooth audio overlap"),
+            (5.0, "5 Seconds", "Extended gradual crossfade transition"),
+            (8.0, "8 Seconds", "DJ-style long atmospheric mix"),
+            (12.0, "12 Seconds", "Continuous ambient club mixing"),
+        ]
+        list_container = MDList()
+        for sec, title, desc in options:
+            def on_sel(inst, s=sec):
+                self.set_crossfade_duration(s)
+                if hasattr(self, "crossfade_dialog") and self.crossfade_dialog:
+                    self.crossfade_dialog.dismiss()
+            is_sel = (abs(self.crossfade_duration - sec) < 0.1)
+            item = MDListItem(
+                MDListItemHeadlineText(text=title),
+                MDListItemSupportingText(text=desc),
+                on_release=on_sel
+            )
+            if is_sel:
+                item.add_widget(MDListItemTrailingIcon(icon="check"))
+            list_container.add_widget(item)
+
+        self.crossfade_dialog = MDDialog(
+            MDDialogHeadlineText(text="Audio Crossfade Duration"),
+            MDDialogContentContainer(
+                list_container,
+                orientation="vertical",
+            ),
+            MDDialogButtonContainer(
+                MDButton(
+                    MDButtonText(text="CANCEL"),
+                    style="text",
+                    on_release=lambda x: self.crossfade_dialog.dismiss(),
+                ),
+            ),
+        )
+        self.crossfade_dialog.open()
+
+    def set_crossfade_duration(self, seconds: float):
+        """Sets crossfade duration in seconds, applies to audio engine, and persists."""
+        self.crossfade_duration = max(0.0, float(seconds))
+        set_setting("crossfade_duration", str(int(self.crossfade_duration)))
+        if hasattr(self, "player_controller") and self.player_controller:
+            self.player_controller.set_crossfade_duration(self.crossfade_duration)
+        lbl = f"{int(self.crossfade_duration)}s" if self.crossfade_duration > 0 else "Off"
+        self.show_toast(f"Audio crossfade set to {lbl}")
+
+    def apply_autoeq_profile(self, profile_name: str):
+        """Applies an AutoEq headphone calibration curve to the 10-band equalizer."""
+        curve = get_autoeq_curve(profile_name)
+        if curve:
+            self.selected_autoeq_profile = profile_name
+            self.selected_eq_profile = profile_name
+            self.eq_bands = list(curve)
+            set_setting("autoeq_profile", profile_name)
+            self.apply_audio_eq()
+            self.show_toast(f"Calibrated for {profile_name}")
+
+    def adjust_lyrics_offset(self, delta: float):
+        """Adjusts synchronized lyrics timing offset in seconds (+/-) and persists."""
+        if delta == 0.0:
+            self.lyrics_timing_offset = 0.0
+        else:
+            self.lyrics_timing_offset = round(self.lyrics_timing_offset + delta, 2)
+        set_setting("lyrics_offset", str(self.lyrics_timing_offset))
+        if hasattr(self, "lyrics_sheet") and self.lyrics_sheet:
+            self.reload_lyrics_for_active_track()
+        lbl = f"{self.lyrics_timing_offset:+.1f}s" if self.lyrics_timing_offset != 0.0 else "Synced (0.0s)"
+        self.show_toast(f"Lyrics timing offset: {lbl}")
 
     def update_player_animated_bg(self):
         """Synchronize animated background state and theme colors across views."""
@@ -1577,21 +1698,35 @@ class MusicApp(MDApp):
         self.active_playlist_name = playlist_name
         self.switch_screen("playlist")
         self.sync_active_playlist_screen()
-        # If playlist has no tracks and is a curated category, fetch real YouTube tracks!
-        if (not getattr(self, "active_playlist_tracks", []) or len(self.active_playlist_tracks) == 0) and playlist_name in ["Top Charts", "Community Picks", "Radio Stations", "Trending Hits", "Global Top 50"]:
+        # If playlist has no tracks or is a dynamic YouTube trending category, fetch real YouTube tracks!
+        curated_dynamic_categories = [
+            "Top Charts", "Community Picks", "Radio Stations", "Trending Hits",
+            "Global Top 50", "YouTube Global Top 50", "Viral Hits Today",
+            "Chillwave", "Workout", "Late Night"
+        ]
+        if (not getattr(self, "active_playlist_tracks", []) or len(self.active_playlist_tracks) < 5) and playlist_name in curated_dynamic_categories:
             self._fetch_playlist_tracks_async(playlist_name)
 
     def _fetch_playlist_tracks_async(self, playlist_name: str):
         """Fetches real trending YouTube songs for the given playlist asynchronously."""
         def _bg():
             try:
-                search_query = f"ytsearch20:{playlist_name} official hits music audio"
-                if playlist_name == "Top Charts":
-                    search_query = "ytsearch20:billboard hot 100 global top hits audio"
+                search_query = f"ytsearch25:{playlist_name} official hits music audio"
+                if playlist_name in ("Top Charts", "Global Top 50", "YouTube Global Top 50"):
+                    search_query = "ytsearch25:billboard global top 50 official music audio"
+                elif playlist_name in ("Viral Hits Today", "Trending Hits"):
+                    search_query = "ytsearch25:viral hits today trending songs official audio"
+                elif playlist_name == "Chillwave":
+                    search_query = "ytsearch25:chillwave lofi beats relaxing study audio"
+                elif playlist_name == "Workout":
+                    search_query = "ytsearch25:workout gym motivation high energy music audio"
+                elif playlist_name == "Late Night":
+                    search_query = "ytsearch25:late night drive slow chill aesthetic songs audio"
                 elif playlist_name == "Radio Stations":
-                    search_query = "ytsearch20:radio hits non stop official audio"
+                    search_query = "ytsearch25:radio hits non stop official audio"
                 elif playlist_name == "Community Picks":
-                    search_query = "ytsearch20:community favorites viral music hits audio"
+                    search_query = "ytsearch25:community favorites viral music hits audio"
+
                 info = fetch_youtube_metadata(search_query, extract_flat=True)
                 entries = info.get("entries", []) if info else []
                 add_playlist(playlist_name)
@@ -1616,8 +1751,16 @@ class MusicApp(MDApp):
             return
         try:
             pl_screen = self.root.ids.screen_manager.get_screen("playlist")
-            raw_tracks = get_playlist_tracks(self.active_playlist_name)
             
+            # Check for dynamic behavioral playlist first
+            raw_tracks = get_dynamic_playlist_tracks(self.active_playlist_name)
+            if not raw_tracks:
+                raw_tracks = get_playlist_tracks(self.active_playlist_name)
+            
+            # If behavioral playlist is fresh for new user, augment with recently added/played
+            if not raw_tracks and self.active_playlist_name in ("Your Daily Mix", "On Repeat", "Heavy Rotation", "Forgotten Favorites"):
+                raw_tracks = get_all_tracks()[:20]
+
             track_objs = []
             for r in raw_tracks:
                 existing = self.playlist_model.get_track_by_video_id(r["video_id"])
@@ -3168,7 +3311,39 @@ class MusicApp(MDApp):
             )
             box.add_widget(title_lbl)
 
-            parsed = parse_lrc(synced_src or plain_src)
+            if synced_src:
+                from kivymd.uix.button import MDButton, MDButtonText
+                offset_bar = MDBoxLayout(
+                    orientation="horizontal",
+                    adaptive_size=True,
+                    pos_hint={"center_x": .5},
+                    spacing="8dp",
+                    padding=["0dp", "4dp"]
+                )
+                btn_minus = MDButton(
+                    MDButtonText(text="-0.5s"),
+                    style="tonal",
+                    height="32dp",
+                    on_release=lambda x: self.adjust_lyrics_offset(-0.5)
+                )
+                btn_reset = MDButton(
+                    MDButtonText(text=f"Sync ({self.lyrics_timing_offset:+.1f}s)" if self.lyrics_timing_offset != 0.0 else "Sync (0.0s)"),
+                    style="text",
+                    height="32dp",
+                    on_release=lambda x: self.adjust_lyrics_offset(0.0)
+                )
+                btn_plus = MDButton(
+                    MDButtonText(text="+0.5s"),
+                    style="tonal",
+                    height="32dp",
+                    on_release=lambda x: self.adjust_lyrics_offset(+0.5)
+                )
+                offset_bar.add_widget(btn_minus)
+                offset_bar.add_widget(btn_reset)
+                offset_bar.add_widget(btn_plus)
+                box.add_widget(offset_bar)
+
+            parsed = parse_lrc(synced_src or plain_src, timing_offset=self.lyrics_timing_offset)
             if parsed:
                 self._active_parsed_lyrics = parsed
                 self._lyric_line_widgets = []

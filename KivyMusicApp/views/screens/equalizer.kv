@@ -120,6 +120,101 @@
                                 MDButtonText:
                                     text: "Treble"
 
+                # AutoEq Headphone Correction Profiles Strip
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    spacing: "6dp"
+
+                    MDLabel:
+                        text: "AutoEq Headphone Profiles"
+                        font_style: "Title"
+                        role: "small"
+                        bold: True
+                        adaptive_height: True
+
+                    DirectionalHorizontalScrollView:
+                        size_hint_y: None
+                        height: "48dp"
+                        do_scroll_y: False
+                        bar_color: [0, 0, 0, 0]
+
+                        MDBoxLayout:
+                            orientation: "horizontal"
+                            adaptive_width: True
+                            spacing: "8dp"
+                            padding: ["4dp", "4dp", "4dp", "4dp"]
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Harman In-Ear Target" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Harman In-Ear Target")
+                                MDButtonText:
+                                    text: "Harman In-Ear"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Harman Over-Ear Target" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Harman Over-Ear Target")
+                                MDButtonText:
+                                    text: "Harman Over-Ear"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Sony WH-1000XM5" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Sony WH-1000XM5")
+                                MDButtonText:
+                                    text: "Sony WH-1000XM5"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Sony WH-1000XM4" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Sony WH-1000XM4")
+                                MDButtonText:
+                                    text: "Sony WH-1000XM4"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Apple AirPods Pro 2" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Apple AirPods Pro 2")
+                                MDButtonText:
+                                    text: "AirPods Pro 2"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Apple AirPods Max" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Apple AirPods Max")
+                                MDButtonText:
+                                    text: "AirPods Max"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Bose QuietComfort 45" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Bose QuietComfort 45")
+                                MDButtonText:
+                                    text: "Bose QC 45"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Sennheiser HD 650" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Sennheiser HD 650")
+                                MDButtonText:
+                                    text: "Sennheiser HD 650"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Audio-Technica ATH-M50x" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Audio-Technica ATH-M50x")
+                                MDButtonText:
+                                    text: "ATH-M50x"
+
+                            MDButton:
+                                style: "filled" if app.selected_autoeq_profile == "Samsung Galaxy Buds Pro" else "tonal"
+                                height: "40dp"
+                                on_release: app.apply_autoeq_profile("Samsung Galaxy Buds Pro")
+                                MDButtonText:
+                                    text: "Galaxy Buds Pro"
+
                 # 10-Band Sliders Card
                 MDCard:
                     style: "elevated"

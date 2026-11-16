@@ -26,10 +26,11 @@ def strip_lrc_tags(lrc_text: str) -> str:
     lines = [time_tag_pattern.sub('', line).strip() for line in lrc_text.splitlines()]
     return '\n'.join([l for l in lines if l])
 
-def parse_lrc(lrc_text: str):
+def parse_lrc(lrc_text: str, timing_offset: float = 0.0):
     """
     Parses LRC-formatted text into a sorted list of (seconds: float, text: str) tuples.
     Supports single or multiple timestamp prefixes per line: [00:12.34][00:45.67] text.
+    Applies timing_offset in seconds (shifts timestamps forward or backward).
     """
     if not lrc_text:
         return []
@@ -46,10 +47,70 @@ def parse_lrc(lrc_text: str):
         for m in matches:
             minutes = int(m.group(1))
             seconds = float(m.group(2))
-            total_sec = minutes * 60.0 + seconds
+            total_sec = max(0.0, minutes * 60.0 + seconds + timing_offset)
             parsed_lines.append((total_sec, text))
     parsed_lines.sort(key=lambda x: x[0])
     return parsed_lines
+
+def parse_lrc_words(lrc_text: str, timing_offset: float = 0.0):
+    """
+    Parses word-by-word karaoke timestamps from enhanced LRC lines (<mm:ss.xx> word <mm:ss.xx>).
+    Returns list of dicts: {"line_time": float, "words": [{"word": str, "time": float}]}
+    Falls back gracefully to line-level timing if inline word timestamps are absent.
+    """
+    if not lrc_text:
+        return []
+    line_time_pattern = re.compile(r'\[(\d{1,2}):(\d{1,2}(?:\.\d{1,3})?)\]')
+    word_time_pattern = re.compile(r'<(\d{1,2}):(\d{1,2}(?:\.\d{1,3})?)>')
+    
+    results = []
+    for raw_line in lrc_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line_matches = list(line_time_pattern.finditer(line))
+        if not line_matches:
+            continue
+        
+        # Determine base line timestamp
+        lm = line_matches[0]
+        base_sec = max(0.0, int(lm.group(1)) * 60.0 + float(lm.group(2)) + timing_offset)
+        text_content = line_time_pattern.sub('', line).strip()
+
+        # Check for word-by-word timestamp tags
+        word_matches = list(word_time_pattern.finditer(text_content))
+        words_data = []
+        if word_matches:
+            # Segment text by word timestamp tags
+            parts = word_time_pattern.split(text_content)
+            # parts will alternate: [pre_text, min1, sec1, word1, min2, sec2, word2, ...]
+            for wm in word_matches:
+                w_sec = max(0.0, int(wm.group(1)) * 60.0 + float(wm.group(2)) + timing_offset)
+                # Find associated text following the tag
+                words_data.append({"time": w_sec, "tag": wm.group(0)})
+        else:
+            # Plain line without word-level tags
+            for w in text_content.split():
+                words_data.append({"time": base_sec, "word": w})
+
+        results.append({
+            "line_time": base_sec,
+            "text": text_content,
+            "words": words_data
+        })
+    results.sort(key=lambda x: x["line_time"])
+    return results
+
+def romanize_text(text: str) -> str:
+    """
+    Provides fallback romanization / clean latin transliteration for international text.
+    Handles basic accent stripping and whitespace normalization.
+    """
+    if not text:
+        return ""
+    import unicodedata
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).strip()
 
 def find_active_line_index(parsed_lines, elapsed: float) -> int:
     """

@@ -4,7 +4,7 @@ import threading
 from kivy.app import App
 from kivy.utils import platform
 
-DB_LOCK = threading.Lock()
+DB_LOCK = threading.RLock()
 _POOL_CONN = None
 
 def sanitize_text(text):
@@ -47,9 +47,15 @@ def init_db(db_path=None):
                 duration INTEGER DEFAULT 0,
                 artwork TEXT,
                 added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_played DATETIME
+                last_played DATETIME,
+                play_count INTEGER DEFAULT 0
             )
         ''')
+
+        try:
+            cursor.execute("ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0")
+        except Exception:
+            pass
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS playlists (
@@ -89,6 +95,9 @@ def init_db(db_path=None):
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('extract_artwork_colors', 'True')")
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('animated_bg_enabled', 'True')")
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('sponsorblock_enabled', 'True')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('crossfade_duration', '3')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autoeq_profile', 'None')")
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('lyrics_offset', '0.0')")
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS cache_store (
@@ -98,11 +107,20 @@ def init_db(db_path=None):
             )
         ''')
 
-        # Seed default playlists if table is newly created
-        cursor.execute("SELECT COUNT(*) FROM playlists")
-        if cursor.fetchone()[0] == 0:
-            default_playlists = [("Favorites",), ("Late Night",), ("Workout",), ("Chillwave",)]
-            cursor.executemany("INSERT INTO playlists (name) VALUES (?)", default_playlists)
+        # Seed dynamic and default playlists
+        dynamic_seed_playlists = [
+            ("Favorites",),
+            ("YouTube Global Top 50",),
+            ("Viral Hits Today",),
+            ("Your Daily Mix",),
+            ("On Repeat",),
+            ("Heavy Rotation",),
+            ("Forgotten Favorites",),
+            ("Chillwave",),
+            ("Workout",),
+            ("Late Night",)
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO playlists (name) VALUES (?)", dynamic_seed_playlists)
 
         # Seed initial tracks to default playlists if playlist_tracks is empty
         cursor.execute("SELECT COUNT(*) FROM playlist_tracks")
@@ -192,12 +210,127 @@ def update_track_artwork(video_id, artwork_path):
         conn.commit()
 
 def mark_track_played(video_id):
-    """Records the timestamp when a track is played."""
+    """Records the timestamp when a track is played and increments its play count."""
     with DB_LOCK:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE tracks SET last_played = CURRENT_TIMESTAMP WHERE video_id = ?", (video_id,))
+        cursor.execute('''
+            UPDATE tracks 
+            SET last_played = CURRENT_TIMESTAMP,
+                play_count = COALESCE(play_count, 0) + 1
+            WHERE video_id = ?
+        ''', (video_id,))
         conn.commit()
+
+def get_on_repeat(limit=25):
+    """
+    Fetches tracks user listens to repeatedly (play_count >= 2).
+    Falls back to recently played if library is fresh.
+    """
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT video_id, title, artist, url, local_path, duration, artwork,
+                   COALESCE(play_count, 0) as play_count
+            FROM tracks 
+            WHERE play_count >= 2
+            ORDER BY play_count DESC, last_played DESC 
+            LIMIT ?
+        ''', (limit,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        if len(rows) < 3:
+            return get_recently_played(limit=limit)
+        return rows
+
+def get_heavy_rotation(limit=25):
+    """Fetches user's all-time most played tracks."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT video_id, title, artist, url, local_path, duration, artwork,
+                   COALESCE(play_count, 0) as play_count
+            FROM tracks 
+            ORDER BY play_count DESC, added_at DESC 
+            LIMIT ?
+        ''', (limit,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_forgotten_favorites(limit=25):
+    """
+    Fetches favorited tracks that haven't been played in a while or have older last_played.
+    """
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT t.video_id, t.title, t.artist, t.url, t.local_path, t.duration, t.artwork, 1 as is_favorite
+            FROM playlist_tracks pt
+            JOIN playlists p ON pt.playlist_id = p.id
+            JOIN tracks t ON pt.video_id = t.video_id
+            WHERE p.name = 'Favorites'
+            ORDER BY CASE WHEN t.last_played IS NULL THEN 0 ELSE 1 END ASC, t.last_played ASC
+            LIMIT ?
+        ''', (limit,))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_daily_mix(limit=25):
+    """
+    Synthesizes a personalized Daily Mix from user's top played artists and favorites.
+    """
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        # Find top 3 artists
+        cursor.execute('''
+            SELECT artist, SUM(COALESCE(play_count, 1)) as weight
+            FROM tracks
+            WHERE artist IS NOT NULL AND artist != '' AND artist != 'Unknown Artist'
+            GROUP BY artist
+            ORDER BY weight DESC
+            LIMIT 3
+        ''')
+        top_artists = [r[0] for r in cursor.fetchall()]
+        
+        mix_tracks = []
+        if top_artists:
+            placeholders = ','.join('?' for _ in top_artists)
+            cursor.execute(f'''
+                SELECT video_id, title, artist, url, local_path, duration, artwork
+                FROM tracks
+                WHERE artist IN ({placeholders})
+                ORDER BY RANDOM()
+                LIMIT ?
+            ''', (*top_artists, limit))
+            mix_tracks = [dict(r) for r in cursor.fetchall()]
+
+        if len(mix_tracks) < 5:
+            # Augment with recently played or all tracks
+            cursor.execute('''
+                SELECT video_id, title, artist, url, local_path, duration, artwork
+                FROM tracks
+                ORDER BY added_at DESC
+                LIMIT ?
+            ''', (limit,))
+            mix_tracks = [dict(r) for r in cursor.fetchall()]
+
+        return mix_tracks
+
+def get_dynamic_playlist_tracks(playlist_name: str, limit: int = 25):
+    """
+    Routes dynamic behavioral playlists to real aggregated SQLite data.
+    """
+    clean_name = playlist_name.strip()
+    if clean_name == "On Repeat":
+        return get_on_repeat(limit=limit)
+    elif clean_name == "Heavy Rotation":
+        return get_heavy_rotation(limit=limit)
+    elif clean_name == "Forgotten Favorites":
+        return get_forgotten_favorites(limit=limit)
+    elif clean_name == "Your Daily Mix":
+        return get_daily_mix(limit=limit)
+    return None
 
 def get_recently_played(limit=10):
     """Fetches the most recently played tracks."""
