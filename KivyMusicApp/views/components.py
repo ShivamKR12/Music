@@ -694,31 +694,30 @@ class AnimatedBackground(Widget):
         if not app:
             return
 
+        from utils.theme_utils import get_active_palette, get_active_immersive_bg
+
+        palette = get_active_palette()
+        if palette and getattr(app, "extract_artwork_colors", True):
+            imm = get_active_immersive_bg()
+            self._bg_col.rgba = imm
+            sw = palette.get("swatches", {})
+            is_dark = (app.theme_cls.theme_style == "Dark")
+            p_rgb = palette.get("dark_primary") if is_dark else palette.get("light_primary")
+            if not p_rgb:
+                p_rgb = palette.get("dominant", [0.48, 0.30, 1.0])
+            s_rgb = sw.get("vibrant") if is_dark else sw.get("dark_vibrant")
+            if not s_rgb:
+                s_rgb = sw.get("muted") or [0.15, 0.60, 0.90]
+            t_rgb = sw.get("light_vibrant") or sw.get("dominant") or [0.90, 0.25, 0.55]
+
+            self.color_primary = [p_rgb[0], p_rgb[1], p_rgb[2], 0.45 * self.intensity]
+            self.color_secondary = [s_rgb[0], s_rgb[1], s_rgb[2], 0.40 * self.intensity]
+            self.color_tertiary = [t_rgb[0], t_rgb[1], t_rgb[2], 0.35 * self.intensity]
+            return
+
         bg = getattr(app.theme_cls, "backgroundColor", [0.08, 0.08, 0.12, 1.0])
         if bg and bg != [1, 1, 1, 1]:
             self._bg_col.rgba = bg
-
-        if getattr(app, "extract_artwork_colors", True) and hasattr(app, "player_controller") and app.player_controller.active_track:
-            art = app.player_controller.active_track.album_art
-            if art and os.path.exists(art) and not art.endswith("album_art.png"):
-                import threading
-                intensity = self.intensity
-                def _worker():
-                    try:
-                        from PIL import Image
-                        with Image.open(art) as img:
-                            img = img.resize((32, 32)).convert("RGB")
-                            colors = img.getcolors(1024)
-                            if colors:
-                                colors.sort(key=lambda c: c[0], reverse=True)
-                                p = [c / 255.0 for c in colors[0][1]] + [0.45 * intensity]
-                                s = [c / 255.0 for c in colors[min(1, len(colors)-1)][1]] + [0.40 * intensity]
-                                t = [c / 255.0 for c in colors[min(2, len(colors)-1)][1]] + [0.35 * intensity]
-                                Clock.schedule_once(lambda dt: self._apply_extracted_colors(p, s, t), 0)
-                    except Exception:
-                        pass
-                threading.Thread(target=_worker, daemon=True).start()
-                return
 
         # Fallback / Non-extraction mode: harmonize with active theme
         p = list(getattr(app.theme_cls, "primaryColor", [0.48, 0.30, 1.0, 1.0]))

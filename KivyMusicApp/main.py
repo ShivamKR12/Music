@@ -475,6 +475,8 @@ class MusicApp(MDApp):
         new_style = "Dark" if self.theme_cls.theme_style == "Light" else "Light"
         self.theme_cls.theme_style = new_style
         set_setting("theme_style", new_style)
+        from utils.theme_utils import apply_simpmusic_theme, update_theme_from_image
+        apply_simpmusic_theme(self)
         if self.extract_artwork_colors and self.player_controller.active_track:
             update_theme_from_image(self.player_controller.active_track.album_art)
         self.update_player_animated_bg()
@@ -483,6 +485,8 @@ class MusicApp(MDApp):
         """Explicitly set theme style from boolean and persist."""
         self.theme_cls.theme_style = "Dark" if is_dark else "Light"
         set_setting("theme_style", self.theme_cls.theme_style)
+        from utils.theme_utils import apply_simpmusic_theme, update_theme_from_image
+        apply_simpmusic_theme(self)
         if self.extract_artwork_colors and self.player_controller.active_track:
             update_theme_from_image(self.player_controller.active_track.album_art)
         self.update_player_animated_bg()
@@ -494,9 +498,10 @@ class MusicApp(MDApp):
         else:
             self.extract_artwork_colors = bool(is_enabled)
         set_setting("extract_artwork_colors", str(self.extract_artwork_colors))
+        from utils.theme_utils import clear_palette, apply_simpmusic_theme, update_theme_from_image
         if not self.extract_artwork_colors:
-            self.theme_cls.path_to_wallpaper = ""
-            self.theme_cls.primary_palette = "Indigo"
+            clear_palette()
+            apply_simpmusic_theme(self)
         elif self.player_controller.active_track and getattr(self.player_controller.active_track, "album_art", None):
             update_theme_from_image(self.player_controller.active_track.album_art)
         self.update_player_animated_bg()
@@ -723,7 +728,8 @@ class MusicApp(MDApp):
         saved_theme = get_setting("theme_style", "Light")
         self.theme_cls.theme_style = saved_theme
         self.theme_cls.primary_palette = "Indigo"
-        self.theme_cls.dynamic_color = True
+        from utils.theme_utils import apply_simpmusic_theme
+        apply_simpmusic_theme(self)
 
         # Apply resolved unicode font across all KivyMD typography styles
         if self.resolved_unicode_font_name:
@@ -1313,8 +1319,11 @@ class MusicApp(MDApp):
 
     def _stage_3_apply_initial_theme(self, dt):
         """Stage 3: Apply dynamic Material You palette off-peak to eliminate initial frame stutter."""
+        from utils.theme_utils import apply_simpmusic_theme, update_theme_from_image
         if self.extract_artwork_colors and self.player_controller.active_track and getattr(self.player_controller.active_track, "album_art", None):
             update_theme_from_image(self.player_controller.active_track.album_art)
+        else:
+            apply_simpmusic_theme(self)
         self.update_player_animated_bg()
 
     def _stage_4_background_tasks(self, dt):

@@ -23,6 +23,7 @@ TEST_MODULES = [
     ("SimpMusic Features & Dynamic Playlists", "test_simpmusic_features_and_dynamic_playlists.py"),
     ("Multi-Source Providers (YouTube, Spotify, JioSaavn)", "test_multi_source_providers.py"),
     ("SimpMusic UI/UX Parity & Fluid Transitions", "test_simpmusic_ui_ux_parity.py"),
+    ("SimpMusic Dynamic Palette & Theming", "test_simpmusic_color_palette.py"),
     ("Comprehensive 13-Suite UI/UX Audit", "test_comprehensive_audit.py"),
 ]
 
