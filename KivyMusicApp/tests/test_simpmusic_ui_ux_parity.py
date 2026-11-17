@@ -148,11 +148,11 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
         self.assertTrue(len(fav_btn) > 0)
         self.assertEqual(fav_btn[0].icon_color[:3], expected_pink[:3])
 
-        # 2. Desktop player bar favorite button
-        dt_bar = self.root.ids.desktop_player_bar
-        dt_fav = [b for b in dt_bar.walk() if "MDIconButton" in b.__class__.__name__ and "heart" in getattr(b, "icon", "")]
-        if dt_fav:
-            self.assertEqual(dt_fav[0].icon_color[:3], expected_pink[:3])
+        # 2. Player screen favorite button
+        player_screen = self.root.ids.screen_manager.get_screen("player")
+        p_fav = [b for b in player_screen.walk() if "MDIconButton" in b.__class__.__name__ and "heart" in getattr(b, "icon", "")]
+        if p_fav:
+            self.assertEqual(p_fav[0].icon_color[:3], expected_pink[:3])
 
         self.app.player_controller.is_favorite = False
         print("[PASS] Test 4: SimpMusic favorite pink #FF4081 verified across components")

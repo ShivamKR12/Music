@@ -20,9 +20,6 @@
 #:include views/screens/listen_together.kv
 #:include views/screens/auth.kv
 #:include views/screens/favorites.kv
-#:include views/desktop_components.kv
-
-
 
 <FitImage>:
     mipmap: True
@@ -57,14 +54,12 @@
     icon_color: app.theme_cls.primaryColor
     MDIcon:
         icon: root.icon
-        
         text_color: root.icon_color
         font_size: "32sp"
     MDLabel:
         text: root.text
         font_style: "Title"
         role: "medium"
-        
         text_color: root.text_color
         bold: True
 
@@ -72,43 +67,24 @@ MDBoxLayout:
     orientation: "vertical"
     md_bg_color: app.theme_cls.backgroundColor
 
-    # Horizontal Main Content Container: Desktop Nav Rail + Screen Manager + Desktop Side Panel
-    MDBoxLayout:
-        orientation: "horizontal"
-        size_hint: 1, 1
+    LazyScreenManager:
+        id: screen_manager
+        current: "splash"
+        transition: __import__('kivy.uix.screenmanager').uix.screenmanager.SlideTransition(duration=0.22)
 
-        DesktopNavRail:
-            id: desktop_nav_rail
-            size_hint_x: None
-            width: dp(72) if app.is_desktop_layout else 0
-            opacity: 1 if app.is_desktop_layout else 0
-            disabled: not app.is_desktop_layout
+        SplashScreen:
+        HomeScreen:
+        SearchScreen:
+        LibraryScreen:
 
-        LazyScreenManager:
-            id: screen_manager
-            current: "splash"
-            transition: __import__('kivy.uix.screenmanager').uix.screenmanager.SlideTransition(duration=0.22)
-
-            SplashScreen:
-            HomeScreen:
-            SearchScreen:
-            LibraryScreen:
-
-        DesktopSidePanel:
-            id: desktop_side_panel
-            size_hint_x: None
-            width: dp(340) if (app.is_desktop_layout and app.desktop_panel_open) else 0
-            opacity: 1 if (app.is_desktop_layout and app.desktop_panel_open) else 0
-            disabled: not (app.is_desktop_layout and app.desktop_panel_open)
-
-    # Global Mini Player (Mobile Only - SimpMusic Floating Capsule Pill)
+    # Global Mini Player (Mobile Only - Floating Capsule Pill)
     MDBoxLayout:
         id: mini_player
         size_hint_y: None
-        padding: ["12dp", "0dp", "12dp", "8dp"] if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else ["0dp", "0dp", "0dp", "0dp"]
-        opacity: 1 if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
-        height: dp(72) if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
-        disabled: False if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else True
+        padding: ["12dp", "0dp", "12dp", "8dp"] if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else ["0dp", "0dp", "0dp", "0dp"]
+        opacity: 1 if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
+        height: dp(72) if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
+        disabled: False if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else True
         MDCard:
             style: "elevated"
             size_hint_y: None
@@ -149,7 +125,7 @@ MDBoxLayout:
                             touch_pass_through: True
 
                         MarqueeLabel:
-                            text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
+                            text: (("⚡ 320k " if getattr(app.player_controller.active_track, "source", "") == "jiosaavn" else ("🟢 " if getattr(app.player_controller.active_track, "source", "") == "spotify" else "")) + app.player_controller.active_track.artist) if app.player_controller.active_track else "Unknown"
                             font_style: "Body"
                             role: "small"
                             text_color: app.theme_cls.onSurfaceVariantColor
@@ -186,9 +162,9 @@ MDBoxLayout:
         id: bottom_nav
         on_switch_tabs: app.on_switch_tabs(*args)
         size_hint_y: None
-        opacity: 1 if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library"]) else 0
-        height: dp(80) if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library"]) else 0
-        disabled: False if (not app.is_desktop_layout and screen_manager.current in ["home", "search", "library"]) else True
+        opacity: 1 if screen_manager.current in ["home", "search", "library"] else 0
+        height: dp(80) if screen_manager.current in ["home", "search", "library"] else 0
+        disabled: False if screen_manager.current in ["home", "search", "library"] else True
 
         NavBarItem:
             icon: "home"
@@ -202,11 +178,3 @@ MDBoxLayout:
         NavBarItem:
             icon: "music-box-multiple"
             text: "Library"
-
-    # Master Desktop Bottom Player Bar
-    DesktopPlayerBar:
-        id: desktop_player_bar
-        size_hint_y: None
-        height: dp(84) if (app.is_desktop_layout and screen_manager.current != "splash") else 0
-        opacity: 1 if (app.is_desktop_layout and screen_manager.current != "splash") else 0
-        disabled: not (app.is_desktop_layout and screen_manager.current != "splash")
