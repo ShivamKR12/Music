@@ -46,11 +46,8 @@ class AnalyticsScreen(MDScreen):
     segment_3_pct = StringProperty("25%")
     segment_3_end = NumericProperty(360)
 
-    def on_enter(self, *args):
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        if app and hasattr(app, "load_analytics_data"):
-            app.load_analytics_data()
+    # Data loading is handled by MusicApp.switch_screen(); a former on_enter
+    # duplicate ran 6 SQL queries a second time on every visit.
 
 class NotificationScreen(MDScreen):
     pass
@@ -58,11 +55,8 @@ class NotificationScreen(MDScreen):
 NotificationsScreen = NotificationScreen
     
 class RecentlyPlayedScreen(MDScreen):
-    def on_enter(self, *args):
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        if app and hasattr(app, "load_recently_played_data"):
-            app.load_recently_played_data()
+    # Data loading is handled by MusicApp.switch_screen() (see note above).
+    pass
 
 class WrappedScreen(MDScreen):
     def __init__(self, **kwargs):

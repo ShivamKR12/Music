@@ -1,5 +1,11 @@
 import os, sys, time
 os.environ["KIVY_HEADLESS"] = "1"
+# Lyrics and titles can contain non-cp1252 text (Hindi, Punjabi...); make stdout
+# UTF-8-tolerant so Windows console encodings never crash the battery mid-run.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 os.chdir(r"C:\Users\Shivam\Desktop\Music\KivyMusicApp")
 sys.path.insert(0, r"C:\Users\Shivam\Desktop\Music\KivyMusicApp")
 

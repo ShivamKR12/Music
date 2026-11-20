@@ -41,28 +41,6 @@
     MDNavigationItemLabel:
         text: root.text
 
-<LibraryGridCard@MDCard>:
-    style: "elevated"
-    radius: [dp(16)]
-    ripple_behavior: True
-    padding: "16dp"
-    spacing: "8dp"
-    orientation: "vertical"
-    icon: "music"
-    text: "Title"
-    text_color: app.theme_cls.onSurfaceColor
-    icon_color: app.theme_cls.primaryColor
-    MDIcon:
-        icon: root.icon
-        text_color: root.icon_color
-        font_size: "32sp"
-    MDLabel:
-        text: root.text
-        font_style: "Title"
-        role: "medium"
-        text_color: root.text_color
-        bold: True
-
 MDBoxLayout:
     orientation: "vertical"
     md_bg_color: app.theme_cls.backgroundColor
@@ -70,7 +48,7 @@ MDBoxLayout:
     LazyScreenManager:
         id: screen_manager
         current: "splash"
-        transition: __import__('kivy.uix.screenmanager').uix.screenmanager.SlideTransition(duration=0.22)
+        transition: __import__('kivy.uix.screenmanager').uix.screenmanager.SlideTransition(duration=0.18)
 
         SplashScreen:
         HomeScreen:

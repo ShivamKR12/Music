@@ -1,0 +1,666 @@
+{
+  "mode": "new",
+  "generated_at": "2026-11-20T02:39:58",
+  "python": "3.13.3",
+  "screen_count": 20,
+  "screens": [
+    "album",
+    "analytics",
+    "artist",
+    "auth",
+    "browse",
+    "equalizer",
+    "favorites",
+    "home",
+    "library",
+    "listen_together",
+    "mood",
+    "notifications",
+    "player",
+    "playlist",
+    "podcasts",
+    "recently_played",
+    "search",
+    "settings",
+    "splash",
+    "wrapped"
+  ],
+  "checkpoints": [
+    {
+      "label": "process_start",
+      "t_ms": 47.91,
+      "delta_ms": 47.91,
+      "rss_mb": 19.5
+    },
+    {
+      "label": "import_kivy",
+      "t_ms": 400.98,
+      "delta_ms": 353.07
+    },
+    {
+      "label": "import_kivy_core",
+      "t_ms": 993.92,
+      "delta_ms": 592.94
+    },
+    {
+      "label": "import_kivymd",
+      "t_ms": 1018.51,
+      "delta_ms": 24.59
+    },
+    {
+      "label": "import_main",
+      "t_ms": 1904.16,
+      "delta_ms": 885.65
+    },
+    {
+      "label": "app_construct",
+      "t_ms": 1991.62,
+      "delta_ms": 87.46
+    },
+    {
+      "label": "kv_build",
+      "t_ms": 3358.44,
+      "delta_ms": 1366.82
+    },
+    {
+      "label": "app_ready",
+      "t_ms": 3681.22,
+      "delta_ms": 322.78,
+      "frames": 1
+    }
+  ],
+  "startup_frames_to_ready": 1,
+  "screen_creation_ms": {
+    "album": 178.97,
+    "analytics": 275.02,
+    "artist": 154.55,
+    "auth": 178.58,
+    "browse": 199.33,
+    "equalizer": 881.55,
+    "favorites": 336.65,
+    "listen_together": 441.95,
+    "mood": 240.91,
+    "notifications": 116.5,
+    "player": 683.95,
+    "playlist": 172.85,
+    "podcasts": 89.31,
+    "recently_played": 162.78,
+    "settings": 1718.8,
+    "wrapped": 47.31
+  },
+  "instrumented_calls": {
+    "get_continue_listening": {
+      "count": 1,
+      "total_ms": 7.949399994686246,
+      "max_ms": 7.949399994686246
+    },
+    "get_recently_played": {
+      "count": 1,
+      "total_ms": 5.09819999570027,
+      "max_ms": 5.09819999570027
+    },
+    "get_playlist_tracks": {
+      "count": 7,
+      "total_ms": 13.73869995586574,
+      "max_ms": 3.631700004916638
+    },
+    "get_on_repeat": {
+      "count": 1,
+      "total_ms": 2.6837000041268766,
+      "max_ms": 2.6837000041268766
+    },
+    "populate_home_screen_data": {
+      "count": 1,
+      "total_ms": 29.231299995444715,
+      "max_ms": 29.231299995444715
+    },
+    "_stage_1_populate_home": {
+      "count": 1,
+      "total_ms": 29.24539998639375,
+      "max_ms": 29.24539998639375
+    },
+    "get_search_history": {
+      "count": 1,
+      "total_ms": 0.17230003140866756,
+      "max_ms": 0.17230003140866756
+    },
+    "load_search_history_from_db": {
+      "count": 1,
+      "total_ms": 0.4526000120677054,
+      "max_ms": 0.4526000120677054
+    },
+    "_update_library_tile": {
+      "count": 12,
+      "total_ms": 0.6454999675042927,
+      "max_ms": 0.12099999003112316
+    },
+    "get_heavy_rotation": {
+      "count": 3,
+      "total_ms": 37.68670005956665,
+      "max_ms": 29.242000018712133
+    },
+    "get_recently_added": {
+      "count": 3,
+      "total_ms": 121.26819987315685,
+      "max_ms": 50.20119994878769
+    },
+    "_sync_library_songs": {
+      "count": 3,
+      "total_ms": 0.8306000963784754,
+      "max_ms": 0.5549000343307853
+    },
+    "refresh_library_data": {
+      "count": 3,
+      "total_ms": 291.6779000079259,
+      "max_ms": 155.52309999475256
+    },
+    "_stage_2_populate_library_and_history": {
+      "count": 1,
+      "total_ms": 70.59439999284223,
+      "max_ms": 70.59439999284223
+    },
+    "_stage_3_apply_initial_theme": {
+      "count": 1,
+      "total_ms": 5.129600001964718,
+      "max_ms": 5.129600001964718
+    },
+    "load_analytics_data": {
+      "count": 2,
+      "total_ms": 58.27310006134212,
+      "max_ms": 30.57580004679039
+    },
+    "ensure_player_carousel": {
+      "count": 2,
+      "total_ms": 83.89329997589812,
+      "max_ms": 83.88439996633679
+    },
+    "_render_podcasts_list": {
+      "count": 3,
+      "total_ms": 0.07570005254819989,
+      "max_ms": 0.044000043999403715
+    },
+    "load_podcasts_data": {
+      "count": 2,
+      "total_ms": 14.805299986619502,
+      "max_ms": 10.348599986173213
+    },
+    "load_recently_played_data": {
+      "count": 2,
+      "total_ms": 276.16850001504645,
+      "max_ms": 226.0647999937646
+    },
+    "fetch_youtube_metadata": {
+      "count": 1,
+      "total_ms": 4605.542799981777,
+      "max_ms": 4605.542799981777
+    },
+    "ensure_artworks_downloaded": {
+      "count": 1,
+      "total_ms": 1.0412000119686127,
+      "max_ms": 1.0412000119686127
+    }
+  },
+  "nav_from_home": {
+    "album": {
+      "call_ms": 180.7,
+      "total_ms": 342.49,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "analytics": {
+      "call_ms": 308.23,
+      "total_ms": 373.71,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "artist": {
+      "call_ms": 155.09,
+      "total_ms": 202.38,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "auth": {
+      "call_ms": 179.38,
+      "total_ms": 226.39,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "browse": {
+      "call_ms": 199.92,
+      "total_ms": 240.55,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "equalizer": {
+      "call_ms": 882.59,
+      "total_ms": 996.86,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "favorites": {
+      "call_ms": 337.9,
+      "total_ms": 389.86,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "library": {
+      "call_ms": 67.94,
+      "total_ms": 102.62,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "listen_together": {
+      "call_ms": 442.89,
+      "total_ms": 512.87,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "mood": {
+      "call_ms": 241.75,
+      "total_ms": 289.87,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "notifications": {
+      "call_ms": 117.39,
+      "total_ms": 168.99,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "player": {
+      "call_ms": 768.69,
+      "total_ms": 809.21,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "playlist": {
+      "call_ms": 173.99,
+      "total_ms": 237.09,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "podcasts": {
+      "call_ms": 95.0,
+      "total_ms": 1067.6,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "recently_played": {
+      "call_ms": 395.65,
+      "total_ms": 706.76,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "search": {
+      "call_ms": 5.35,
+      "total_ms": 33.17,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "settings": {
+      "call_ms": 1722.35,
+      "total_ms": 1979.31,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "splash": {
+      "call_ms": 1.54,
+      "total_ms": 45.43,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "wrapped": {
+      "call_ms": 48.15,
+      "total_ms": 93.66,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    }
+  },
+  "nav_warm_revisit": {
+    "album": {
+      "call_ms": 3.07,
+      "total_ms": 40.49,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "analytics": {
+      "call_ms": 29.44,
+      "total_ms": 57.88,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "artist": {
+      "call_ms": 1.1,
+      "total_ms": 41.64,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "auth": {
+      "call_ms": 2.07,
+      "total_ms": 38.14,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "browse": {
+      "call_ms": 0.82,
+      "total_ms": 54.93,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "equalizer": {
+      "call_ms": 1.79,
+      "total_ms": 24.12,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "favorites": {
+      "call_ms": 0.82,
+      "total_ms": 42.06,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "library": {
+      "call_ms": 156.94,
+      "total_ms": 204.17,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "listen_together": {
+      "call_ms": 0.88,
+      "total_ms": 43.95,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "mood": {
+      "call_ms": 0.65,
+      "total_ms": 93.52,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "notifications": {
+      "call_ms": 1.02,
+      "total_ms": 122.29,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "player": {
+      "call_ms": 2.95,
+      "total_ms": 48.1,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "playlist": {
+      "call_ms": 0.63,
+      "total_ms": 64.65,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "podcasts": {
+      "call_ms": 11.56,
+      "total_ms": 139.11,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "recently_played": {
+      "call_ms": 60.47,
+      "total_ms": 154.11,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "search": {
+      "call_ms": 20.32,
+      "total_ms": 88.14,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "settings": {
+      "call_ms": 6.96,
+      "total_ms": 52.45,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "splash": {
+      "call_ms": 3.36,
+      "total_ms": 32.67,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    },
+    "wrapped": {
+      "call_ms": 0.92,
+      "total_ms": 48.49,
+      "settled": true,
+      "data": {
+        "quick_picks_list": 15,
+        "listen_again_list": 15,
+        "trending_list": 15,
+        "featured_list": 15,
+        "search_results": 0
+      }
+    }
+  },
+  "transition_matrix": {
+    "note": "opt-in via BENCH_FULL_MATRIX=1; per-screen home->target and warm revisit measured above"
+  }
+}

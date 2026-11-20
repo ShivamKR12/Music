@@ -15,6 +15,7 @@ TEST_MODULES = [
     ("Player Queue & Audio Precision", "test_player_queue_and_offline.py"),
     ("Interactive Widgets Action Binding", "test_interactive_widgets_audit.py"),
     ("Settings & SQLite Persistence", "test_settings_and_persistence.py"),
+    ("Interface Style Switch", "test_ui_mode_switch.py"),
     ("Artwork Cleanliness & Geometry", "test_artwork_and_ui_geometry.py"),
     ("Artist & Album Dynamic Invariants", "test_artist_and_album_dynamic.py"),
     ("Podcasts & Trending Invariants", "test_podcasts_and_trending.py"),
@@ -32,6 +33,12 @@ def main():
     print("KIVYMUSICAPP MASTER HEADLESS TEST SUITE")
     print(f"Python: {sys.version.split()[0]} | Working Dir: {TEST_DIR}")
     print("=" * 70)
+    # Test output is decoded with errors="replace" and can contain U+FFFD; make stdout
+    # UTF-8-tolerant so console encodings (e.g. cp1252) never crash the runner mid-battery.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
     overall_start = time.time()
     suite_results = []

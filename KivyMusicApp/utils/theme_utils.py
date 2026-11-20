@@ -262,6 +262,14 @@ def apply_simpmusic_theme(app=None, palette: Optional[Dict[str, Any]] = None):
         app.theme_cls.onPrimaryColor = [1.0, 1.0, 1.0, 1.0]
         app.theme_cls.primary_palette = "Indigo"
 
+    # Refresh the Home header gradient texture (main-thread safe) so the header
+    # tint follows the active palette without rebuilding KV canvas instructions.
+    try:
+        if hasattr(app, "_refresh_home_header_texture"):
+            app._refresh_home_header_texture()
+    except Exception:
+        pass
+
 def update_theme_from_image(image_path: str):
     """
     Extracts dynamic colors asynchronously in a worker thread and applies
@@ -279,6 +287,10 @@ def update_theme_from_image(image_path: str):
             if not app:
                 return
             apply_simpmusic_theme(app, palette)
+            if hasattr(app, "_refresh_player_background_texture"):
+                app._refresh_player_background_texture()
+            if hasattr(app, "_refresh_home_header_texture"):
+                app._refresh_home_header_texture()
             if hasattr(app, "update_player_animated_bg"):
                 app.update_player_animated_bg()
         Clock.schedule_once(_apply_on_main, 0)

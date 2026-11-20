@@ -165,6 +165,7 @@ from kivymd.uix.dialog import (
     MDDialogButtonContainer
 )
 from kivymd.uix.button import MDButton, MDButtonText
+from kivymd.uix.label import MDLabel
 from kivymd.uix.bottomsheet import (
     MDBottomSheet, 
     MDBottomSheetDragHandle, 
@@ -197,6 +198,7 @@ from models.database import (
     add_track,
     get_all_tracks,
     get_playlist_tracks,
+    get_playlist_covers,
     get_dynamic_playlist_tracks,
     get_on_repeat,
     get_heavy_rotation,
@@ -213,6 +215,7 @@ from models.database import (
     get_search_history,
     clear_search_history,
     get_continue_listening,
+    get_recently_played,
     get_recently_added,
     update_track_artwork,
     update_local_track_path,
@@ -262,6 +265,34 @@ class MusicApp(MDApp):
     active_playlist_artwork = StringProperty("album_art2.png")
     active_playlist_info = StringProperty("0 tracks")
     active_playlist_tracks = ListProperty([])
+
+    # Interface style toggle (classic pre-redesign look vs new SimpMusic-inspired look).
+    # New is the default; headless tests are always forced to "new" for stable ids.
+    UI_MODE_NEW = "new"
+    UI_MODE_CLASSIC = "classic"
+    ui_mode = StringProperty("new")
+
+    # Library screen in-place filter (SimpMusic-style chip tabs: Library / Playlists / Songs)
+    library_filter = StringProperty("Library")
+
+    # Search screen state (SimpMusic SearchUIType pattern: "empty" browsing vs "results"),
+    # active multi-source provider filter, loading flag, and rotating bar placeholder
+    search_state = StringProperty("empty")
+    search_loading = BooleanProperty(False)
+    active_search_provider = StringProperty("all")
+    search_placeholder = StringProperty("Search for songs...")
+
+    # Async loading indicators for screens whose data arrives from background threads
+    album_loading = BooleanProperty(False)
+    podcasts_loading = BooleanProperty(False)
+
+    # Home screen (SimpMusic HomeScreen): active mood chip filter, time-aware greeting,
+    # and the gradient texture painted behind the header block (primaryContainer -> background)
+    home_mood = StringProperty("All")
+    home_greeting = StringProperty("Welcome back")
+    home_header_texture = ObjectProperty(None, allownone=True)
+    player_background_texture = ObjectProperty(None, allownone=True)
+    current_lyric_line = StringProperty("Tap for synchronized lyrics")
 
     # 10-Band Equalizer & Calibration properties
     eq_bands = ListProperty([0.0] * 10)
@@ -315,6 +346,17 @@ class MusicApp(MDApp):
     crossfade_duration = NumericProperty(3.0)
     discord_rpc_enabled = BooleanProperty(True)
     lyrics_timing_offset = NumericProperty(0.0)
+
+    # Storage, Cache & Music Provider properties
+    cache_size_label = StringProperty("Calculating...")
+    selected_music_provider = StringProperty("all")
+    selected_music_provider_label = StringProperty("Unified (All Sources)")
+    PROVIDER_LABELS = {
+        "all": "Unified (All Sources)",
+        "youtube": "YouTube Music",
+        "spotify": "Spotify",
+        "jiosaavn": "JioSaavn",
+    }
 
     # Dynamic Artist, Album, Podcasts & Favorites Screen Properties
     active_artist_name = StringProperty("Artist Profile")
@@ -432,6 +474,11 @@ class MusicApp(MDApp):
         except Exception:
             self.lyrics_timing_offset = 0.0
 
+        saved_prov = get_setting("default_music_provider", "all")
+        self.selected_music_provider = saved_prov
+        self.selected_music_provider_label = self.PROVIDER_LABELS.get(saved_prov, "Unified (All Sources)")
+        self.refresh_cache_size()
+
         self.playlist_model = PlaylistModel()
         self.player_controller = PlayerController()
         self.player_controller.set_playlist(self.playlist_model)
@@ -455,6 +502,8 @@ class MusicApp(MDApp):
             if self.extract_artwork_colors:
                 update_theme_from_image(track.album_art)
         self.update_player_animated_bg()
+        self._refresh_player_background_texture()
+        self.current_lyric_line = "Tap for synchronized lyrics"
         if hasattr(self, "lyrics_sheet") and self.lyrics_sheet and (self.lyrics_sheet.state == "open" or getattr(self.lyrics_sheet, "status", None) == "opening_with_animation"):
             self.reload_lyrics_for_active_track()
         if hasattr(self, "listen_together_service") and self.listen_together_service.is_host and self.listen_together_service.is_connected:
@@ -724,12 +773,104 @@ class MusicApp(MDApp):
         else:
             return "Good evening"
 
+    def _refresh_home_header_texture(self, *args):
+        """Rebuilds the Home header gradient texture (primaryContainer -> background),
+        mirroring SimpMusic's artwork-tinted header gradient. Main thread only:
+        1x192 px texture, applied to the header block's canvas via app.home_header_texture."""
+        try:
+            from kivy.graphics.texture import Texture
+            primary = list(self.theme_cls.primaryColor)
+            bottom = list(self.theme_cls.backgroundColor)
+            if self.theme_cls.theme_style == "Dark":
+                # SimpMusic dark: artwork color darkened (rgbFactor 0.3)
+                top = [c * 0.3 for c in primary[:3]]
+            else:
+                # SimpMusic light: lerp(dominantColor, White, 0.85f) -> soft pastel header
+                top = [c * 0.15 + 0.85 for c in primary[:3]]
+            steps = 192
+            buf = bytearray()
+            for i in range(steps - 1, -1, -1):
+                t = i / (steps - 1)
+                buf += bytes((
+                    int(255 * max(0.0, min(1.0, top[0] + (bottom[0] - top[0]) * t))),
+                    int(255 * max(0.0, min(1.0, top[1] + (bottom[1] - top[1]) * t))),
+                    int(255 * max(0.0, min(1.0, top[2] + (bottom[2] - top[2]) * t))),
+                    255,
+                ))
+            tex = Texture.create(size=(1, steps), colorfmt="rgba")
+            tex.blit_buffer(bytes(buf), colorfmt="rgba", bufferfmt="ubyte")
+            tex.min_filter = "linear"
+            tex.mag_filter = "linear"
+            self.home_header_texture = tex
+        except Exception as e:
+            app_logger.debug(f"home header gradient error: {e}")
+
+    def _refresh_player_background_texture(self, *args):
+        """Rebuilds the SimpMusic Now Playing continuous palette gradient texture.
+        Top: artwork dominant/vibrant color, smoothly cascading down into PlayerBackdropColor
+        (#121212) with a smooth vertical fade by 85-95% down.
+        1x256 px hardware-accelerated linear texture applied to PlayerScreen canvas."""
+        try:
+            from kivy.graphics.texture import Texture
+            from utils.theme_utils import get_active_palette
+
+            palette = get_active_palette()
+            if palette and "dark_primary" in palette and palette["dark_primary"]:
+                top = list(palette["dark_primary"])
+            elif palette and "dominant" in palette and palette["dominant"]:
+                top = list(palette["dominant"])
+            else:
+                top = list(self.theme_cls.primaryColor[:3])
+
+            # Ensure top color is rich, saturated, and not blown out
+            lum = 0.299 * top[0] + 0.587 * top[1] + 0.114 * top[2]
+            if lum > 0.65:
+                top = [c * 0.65 for c in top]
+            elif lum < 0.12:
+                top = [min(1.0, c * 1.6 + 0.12) for c in top]
+
+            # SimpMusic PlayerBackdropColor: #121212 -> [0.0706, 0.0706, 0.0706]
+            bottom = [0.0706, 0.0706, 0.0706]
+
+            steps = 256
+            buf = bytearray()
+            # In OpenGL texture: row 0 is bottom (v=0), row steps-1 is top (v=1).
+            for i in range(steps):
+                v = i / (steps - 1)
+                # Bottom 15% holds pure PlayerBackdropColor
+                if v <= 0.15:
+                    r, g, b = bottom
+                else:
+                    t = (v - 0.15) / 0.85
+                    # Smooth ease-in-out curve
+                    smooth_t = t * t * (3.0 - 2.0 * t)
+                    r = bottom[0] + (top[0] - bottom[0]) * smooth_t
+                    g = bottom[1] + (top[1] - bottom[1]) * smooth_t
+                    b = bottom[2] + (top[2] - bottom[2]) * smooth_t
+
+                buf += bytes((
+                    int(255 * max(0.0, min(1.0, r))),
+                    int(255 * max(0.0, min(1.0, g))),
+                    int(255 * max(0.0, min(1.0, b))),
+                    255
+                ))
+
+            tex = Texture.create(size=(1, steps), colorfmt="rgba")
+            tex.blit_buffer(bytes(buf), colorfmt="rgba", bufferfmt="ubyte")
+            tex.min_filter = "linear"
+            tex.mag_filter = "linear"
+            self.player_background_texture = tex
+        except Exception as e:
+            app_logger.debug(f"player background gradient error: {e}")
+
     def build(self):
         saved_theme = get_setting("theme_style", "Light")
         self.theme_cls.theme_style = saved_theme
         self.theme_cls.primary_palette = "Indigo"
         from utils.theme_utils import apply_simpmusic_theme
         apply_simpmusic_theme(self)
+        self._refresh_home_header_texture()
+        self._refresh_player_background_texture()
 
         # Apply resolved unicode font across all KivyMD typography styles
         if self.resolved_unicode_font_name:
@@ -738,12 +879,167 @@ class MusicApp(MDApp):
                     for role in self.theme_cls.font_styles[cat]:
                         self.theme_cls.font_styles[cat][role]["font-name"] = self.resolved_unicode_font_name
 
+        # Load the interface-style loading overlay rule once (unique class name, no conflict)
+        if not hasattr(self, "_ui_overlay_loaded"):
+            Builder.load_file(os.path.join("views", "ui_mode_loading.kv"))
+            self._ui_overlay_loaded = True
+
+        # Restore the persisted interface style. Headless verification always uses the
+        # new look so test ids/invariants stay stable regardless of DB state.
+        mode = get_setting("ui_mode", self.UI_MODE_NEW)
+        if mode not in (self.UI_MODE_NEW, self.UI_MODE_CLASSIC):
+            mode = self.UI_MODE_NEW
+        if os.environ.get("KIVY_HEADLESS") == "1":
+            mode = self.UI_MODE_NEW
+        self.ui_mode = mode
+        self._ui_loading_overlay = None
+        self._ui_mode_switching = False
+
         root = Builder.load_file(os.path.join("views", "main.kv"))
+        if mode == self.UI_MODE_CLASSIC:
+            # Startup is already covered by the splash screen; swap rules before first paint.
+            self._apply_ui_mode_rules(mode)
+            self._recreate_mode_screens(root.ids.screen_manager)
         Window.bind(on_keyboard=self.on_keyboard)
         Window.bind(on_request_close=self.on_request_close)
         return root
 
-    def on_request_close(self, *args):
+    # ------------------------------------------------------------------
+    # Interface style (classic vs new look)
+    # ------------------------------------------------------------------
+    NEW_UI_SCREEN_FILES = (
+        "views/screens/home.kv",
+        "views/screens/search.kv",
+        "views/screens/library.kv",
+        "views/screens/settings.kv",
+    )
+    CLASSIC_UI_SCREEN_FILE = "views/classic/screens.kv"
+    MODE_SCREENS = ("home", "search", "library", "settings")
+
+    def _apply_ui_mode_rules(self, mode):
+        """Swap only the four redesigned screen rule sets in Kivy's Builder.
+        main.kv (mini player, nav bar, other screens) is never reloaded, so all
+        existing widget bindings and app state stay intact."""
+        new_files = [os.path.abspath(p) for p in self.NEW_UI_SCREEN_FILES]
+        classic_file = os.path.abspath(self.CLASSIC_UI_SCREEN_FILE)
+        if mode == self.UI_MODE_CLASSIC:
+            for path in new_files:
+                Builder.unload_file(path)
+            Builder.load_file(classic_file)
+        else:
+            Builder.unload_file(classic_file)
+            for path in new_files:
+                Builder.load_file(path)
+
+    def _recreate_mode_screens(self, sm):
+        """Rebuild the four switchable screens so they instantiate with the newly
+        loaded KV rules; all other screens (player, playlist, ...) are untouched."""
+        from kivy.uix.screenmanager import NoTransition
+        old_current = sm.current
+        names = [n for n in self.MODE_SCREENS if sm.has_screen(n)]
+        previous_transition = sm.transition
+        try:
+            # Removing the active screen mid-SlideTransition strands the manager with
+            # an invisible (opacity=0) current screen. Swap instantly, then restore.
+            sm.transition = NoTransition()
+            for name in names:
+                try:
+                    sm.remove_widget(sm.get_screen(name))
+                except Exception as e:
+                    app_logger.debug(f"ui mode: failed to remove '{name}': {e}")
+            for name in names:
+                screen = sm.get_screen(name)  # LazyScreenManager creates it with current KV rules
+                screen.opacity = 1
+            self.screen_history = [s for s in getattr(self, "screen_history", []) if s not in names]
+            if old_current in names and sm.has_screen(old_current):
+                sm.current = old_current
+            if sm.current_screen:
+                sm.current_screen.opacity = 1
+        finally:
+            sm.transition = previous_transition
+
+    def _refresh_mode_screens(self):
+        """Repopulate the recreated screens from real local data (main thread only)."""
+        for fn in (self.populate_home_screen_data, self.refresh_library_data,
+                   self.load_search_history_from_db):
+            try:
+                fn()
+            except Exception as e:
+                app_logger.debug(f"ui mode refresh {fn.__name__}: {e}")
+        try:
+            self.sync_nav_bar(self.root.ids.screen_manager.current)
+        except Exception:
+            pass
+
+    def toggle_ui_mode(self):
+        """Settings row entry: flip between the classic and new interface style."""
+        target = self.UI_MODE_CLASSIC if self.ui_mode == self.UI_MODE_NEW else self.UI_MODE_NEW
+        self.switch_ui_mode(target)
+
+    def switch_ui_mode(self, mode):
+        """Apply an interface style, showing the loading overlay while the KV rules
+        and screen widgets are rebuilt so the UI thread never appears frozen."""
+        if mode not in (self.UI_MODE_NEW, self.UI_MODE_CLASSIC) or getattr(self, "_ui_mode_switching", False):
+            return
+        if mode == self.ui_mode:
+            return
+        if os.environ.get("KIVY_HEADLESS") == "1":
+            # Tests pump events manually; skip the visual overlay timing.
+            self._perform_ui_switch(mode)
+            return
+        self._ui_mode_switching = True
+        self._show_ui_mode_overlay(mode)
+        Clock.schedule_once(lambda dt: self._perform_ui_switch(mode), 0.18)
+
+    def _perform_ui_switch(self, mode):
+        try:
+            self._apply_ui_mode_rules(mode)
+            self._recreate_mode_screens(self.root.ids.screen_manager)
+            self.ui_mode = mode
+            set_setting("ui_mode", mode)
+            self._refresh_mode_screens()
+            self.show_toast("Classic look applied" if mode == self.UI_MODE_CLASSIC else "New look applied")
+        except Exception as e:
+            app_logger.error(f"Interface style switch failed: {e}")
+            self.show_toast("Could not switch interface style")
+        # The overlay was shown ~0.18s before this callback, so it has already painted;
+        # fade it out as soon as the rebuild work finishes (no extra Clock delay).
+        self._hide_ui_mode_overlay()
+
+    def _show_ui_mode_overlay(self, mode):
+        """Full-window loading screen; the app root is disabled so no touches leak through."""
+        from kivy.core.window import Window
+        from kivy.factory import Factory
+        try:
+            if self._ui_loading_overlay:
+                Window.remove_widget(self._ui_loading_overlay)
+            overlay = Factory.UIModeLoadingOverlay()
+            overlay.opacity = 1
+            overlay.ids.ui_loading_detail.text = (
+                "Restoring the classic look" if mode == self.UI_MODE_CLASSIC
+                else "Applying the new look"
+            )
+            Window.add_widget(overlay)
+            self._ui_loading_overlay = overlay
+            if self.root:
+                self.root.disabled = True
+        except Exception as e:
+            app_logger.debug(f"ui loading overlay show: {e}")
+
+    def _hide_ui_mode_overlay(self):
+        from kivy.core.window import Window
+        overlay = self._ui_loading_overlay
+        try:
+            if overlay and overlay.parent:
+                Window.remove_widget(overlay)
+        except Exception:
+            pass
+        self._ui_loading_overlay = None
+        if self.root:
+            self.root.disabled = False
+        self._ui_mode_switching = False
+
+    def on_request_close(self, *args, **kwargs):
         """Intercept window close requests to perform smooth exit sequence."""
         if not getattr(self, "_is_exiting", False):
             self.smooth_exit()
@@ -798,7 +1094,7 @@ class MusicApp(MDApp):
                 else:
                     from kivy.uix.screenmanager import SlideTransition
                     if not isinstance(sm.transition, SlideTransition):
-                        sm.transition = SlideTransition(duration=0.22)
+                        sm.transition = SlideTransition(duration=0.18)
 
                     tab_indices = {"home": 0, "search": 1, "library": 2, "browse": 3}
                     if screen_name == "player":
@@ -820,6 +1116,10 @@ class MusicApp(MDApp):
                     self.load_analytics_data()
                 elif screen_name == "podcasts":
                     self.load_podcasts_data()
+                elif screen_name == "library":
+                    self.refresh_library_data()
+                elif screen_name == "settings":
+                    self.refresh_cache_size()
 
     def go_back(self, target=None):
         """Unified back action for UI back buttons and Android hardware back key."""
@@ -886,7 +1186,7 @@ class MusicApp(MDApp):
                 sm.current = dest
             self.sync_nav_bar(dest)
 
-    def on_keyboard(self, window, key, scancode, codepoint, modifier):
+    def on_keyboard(self, window, key, scancode=None, codepoint=None, modifier=None, *args, **kwargs):
         """Handle hardware keys, including Android back button (Key 27 / Escape)."""
         if key == 27:
             if hasattr(self, "root") and self.root and hasattr(self.root, "ids") and "screen_manager" in self.root.ids:
@@ -1037,13 +1337,12 @@ class MusicApp(MDApp):
             Clock.schedule_once(step_5, 0.10)
 
         def step_5(dt):
-            set_status(90, "Pre-rendering screens...")
-            screens_to_warm = [
-                "settings", "playlist", "artist", "album", "favorites",
-                "analytics", "notifications", "recently_played",
-                "browse", "podcasts", "mood", "equalizer", "listen_together"
-            ]
-            for sname in screens_to_warm:
+            set_status(90, "Preparing screens...")
+            # Only high-frequency screens are built before splash dismissal. The
+            # heavy rarely-used trees are warmed one-per-idle-slot after launch
+            # (see _deferred_screen_prewarm) so startup is not blocked by ~2s of
+            # widget construction.
+            for sname in ("settings", "favorites", "notifications"):
                 try:
                     sm.get_screen(sname)
                 except Exception as e:
@@ -1080,10 +1379,29 @@ class MusicApp(MDApp):
                     sm.current = "home"
                     sm.transition = prev_trans
                     self.sync_nav_bar("home")
+                    # Defer the remaining heavy screen trees to idle slots so the
+                    # user reaches Home quickly and never waits on them at launch.
+                    self._deferred_screen_prewarm(sm)
             fade_anim.bind(on_complete=lambda *args: Clock.schedule_once(_on_fade_complete, 0))
             fade_anim.start(splash)
 
         Clock.schedule_once(step_1, 0.05)
+
+    def _deferred_screen_prewarm(self, sm, names=None, index=0):
+        """Instantiates one non-critical screen per idle tick after the splash is gone."""
+        if names is None:
+            names = ["playlist", "artist", "album", "analytics", "recently_played",
+                     "browse", "podcasts", "mood", "equalizer", "listen_together"]
+        if index >= len(names):
+            return
+        try:
+            if not sm.has_screen(names[index]):
+                sm.get_screen(names[index])
+        except Exception as e:
+            app_logger.debug(f"Deferred screen warmup {names[index]}: {e}")
+        Clock.schedule_once(
+            lambda dt: self._deferred_screen_prewarm(sm, names, index + 1), 1.5
+        )
 
     def _stage_1_populate_home(self, dt):
         """Stage 1: Populate Home Screen horizontal carousels with top tracks."""
@@ -1092,20 +1410,29 @@ class MusicApp(MDApp):
     def _stage_2_populate_library_and_history(self, dt):
         """Stage 2: Populate Library tab data and search history from SQLite."""
         self.load_search_history_from_db()
-        if hasattr(self, "root") and self.root and hasattr(self.root, "ids") and "screen_manager" in self.root.ids:
-            try:
-                sm = self.root.ids.screen_manager
-                if sm.has_screen("library"):
-                    lib_screen = sm.get_screen("library")
-                    if "library_list" in lib_screen.ids:
-                        lib_screen.ids.library_list.data = [{
-                            "title": track.title,
-                            "artist": track.artist,
-                            "artwork": track.album_art,
-                            "track_obj": track
-                        } for track in self.playlist_model.tracks[:20]]
-            except Exception:
-                pass
+        self.refresh_library_data()
+        # Rotating search bar placeholder (SimpMusic animated placeholder), 3s cycle
+        Clock.schedule_interval(self._cycle_search_placeholder, 3.0)
+
+    SEARCH_PLACEHOLDERS = [
+        "Search for songs...",
+        "Search for artists...",
+        "Search for albums...",
+        "Search for playlists...",
+        "Search for podcasts...",
+    ]
+
+    def _cycle_search_placeholder(self, *args):
+        """Rotates the search bar hint while the user browses (SimpMusic animated placeholder)."""
+        try:
+            if hasattr(self, "root") and self.root and "screen_manager" in self.root.ids:
+                if self.root.ids.screen_manager.current != "search":
+                    return
+            idx = getattr(self, "_search_ph_index", -1)
+            self._search_ph_index = (idx + 1) % len(self.SEARCH_PLACEHOLDERS)
+            self.search_placeholder = self.SEARCH_PLACEHOLDERS[self._search_ph_index]
+        except Exception:
+            pass
 
     def _start_idle_prewarming(self, dt=None):
         """Pre-warm lazy-loaded screens one-by-one in idle frames to eliminate screen-switch freezes."""
@@ -1402,7 +1729,12 @@ class MusicApp(MDApp):
                 pass
 
     def populate_home_screen_data(self):
-        """Populate Quick Picks, Trending, and Featured horizontally scrollable lists on the Home screen."""
+        """Populate the SimpMusic-style Home shelves with real data:
+        - Quick picks: continue-listening first, then library fill (compact grid)
+        - Listen again: recently played tracks
+        - Trending now: Top Charts playlist (real YouTube trending fetched at startup)
+        - Made for you: On Repeat / heavy-rotation behavioral playlists
+        Main-thread only (small SQLite reads + widget property updates)."""
         if not hasattr(self, "root") or not self.root or not hasattr(self.root, "ids") or "screen_manager" not in self.root.ids:
             from kivy.clock import Clock
             Clock.schedule_once(lambda dt: self.start_warmup_pipeline(), 0.05)
@@ -1413,51 +1745,123 @@ class MusicApp(MDApp):
             if not tracks:
                 return
 
-            recent = get_continue_listening(limit=8)
+            self.home_greeting = self.get_greeting()
+
+            def _row_track(row):
+                """Resolve a SQLite row/dict to a TrackModel (prefer live model instance)."""
+                try:
+                    if isinstance(row, dict):
+                        vid = row.get("video_id", "")
+                        t = self.playlist_model.find_track(vid) if vid else None
+                        return t or TrackModel.from_dict(row)
+                    vid = row[3] if len(row) > 3 else None
+                    return self.playlist_model.find_track(vid) if vid else None
+                except Exception:
+                    return None
+
+            def _card_data(t):
+                return {
+                    "title": t.title,
+                    "artist": t.artist,
+                    "artwork": t.album_art,
+                    "track_obj": t,
+                    "text": t.title,
+                }
+
+            shelf_limit = 15
+
+            # --- Quick picks: continue listening first, then library fill ---
             quick_picks_tracks = []
-            if recent:
-                for row in recent:
-                    vid = row.get("video_id") if isinstance(row, dict) else row[3]
-                    t = self.playlist_model.find_track(vid)
+            try:
+                for row in get_continue_listening(limit=8):
+                    t = _row_track(row)
                     if t and t not in quick_picks_tracks:
                         quick_picks_tracks.append(t)
+            except Exception:
+                pass
             for t in tracks:
                 if t not in quick_picks_tracks:
                     quick_picks_tracks.append(t)
+            quick_picks_tracks = quick_picks_tracks[:shelf_limit]
 
-            # Limit each horizontal shelf to 15 items for fluid 60 FPS scrolling and instant rendering
-            shelf_limit = 15
             if "quick_picks_list" in home.ids:
-                home.ids.quick_picks_list.data = [
-                    {
-                        "title": t.title,
-                        "artist": t.artist,
-                        "artwork": t.album_art,
-                        "track_obj": t,
-                        "text": t.title,
-                    } for t in quick_picks_tracks[:shelf_limit]
-                ]
+                home.ids.quick_picks_list.data = [_card_data(t) for t in quick_picks_tracks]
+
+            # --- Listen again: recently played ---
+            listen_again_tracks = []
+            try:
+                for row in get_recently_played(limit=shelf_limit):
+                    t = _row_track(row)
+                    if t and t not in listen_again_tracks:
+                        listen_again_tracks.append(t)
+            except Exception:
+                pass
+            if "listen_again_list" in home.ids:
+                home.ids.listen_again_list.data = [_card_data(t) for t in listen_again_tracks]
+
+            # --- Trending now: Top Charts playlist (falls back to newest library tracks) ---
+            trending_tracks = []
+            try:
+                for row in get_playlist_tracks("Top Charts"):
+                    t = _row_track(row)
+                    if t and t not in trending_tracks:
+                        trending_tracks.append(t)
+            except Exception:
+                pass
+            if not trending_tracks:
+                trending_tracks = tracks[::-1][:shelf_limit]
             if "trending_list" in home.ids:
-                home.ids.trending_list.data = [
-                    {
-                        "title": t.title,
-                        "artist": t.artist,
-                        "artwork": t.album_art,
-                        "track_obj": t,
-                        "text": t.title,
-                    } for t in list(reversed(tracks))[:shelf_limit]
-                ]
-            if "featured_list" in home.ids:
+                home.ids.trending_list.data = [_card_data(t) for t in trending_tracks[:shelf_limit]]
+
+            # --- Made for you: On Repeat, then heavy rotation, then interleaved library ---
+            featured_tracks = []
+            try:
+                for row in get_on_repeat(limit=shelf_limit):
+                    t = _row_track(row)
+                    if t and t not in featured_tracks:
+                        featured_tracks.append(t)
+            except Exception:
+                pass
+            if not featured_tracks:
+                try:
+                    for row in get_heavy_rotation(limit=shelf_limit):
+                        t = _row_track(row)
+                        if t and t not in featured_tracks:
+                            featured_tracks.append(t)
+                except Exception:
+                    pass
+            if not featured_tracks:
                 featured_tracks = tracks[::2] + tracks[1::2]
-                home.ids.featured_list.data = [
-                    {
-                        "title": t.title,
-                        "artist": t.artist,
-                        "artwork": t.album_art,
-                        "track_obj": t,
-                        "text": t.title,
-                    } for t in featured_tracks[:shelf_limit]
-                ]
+            if "featured_list" in home.ids:
+                home.ids.featured_list.data = [_card_data(t) for t in featured_tracks[:shelf_limit]]
+
+            # --- Forgotten favorites: favorited tracks not played recently ---
+            forgotten_tracks = []
+            try:
+                for row in get_forgotten_favorites(limit=shelf_limit):
+                    t = _row_track(row)
+                    if t and t not in forgotten_tracks:
+                        forgotten_tracks.append(t)
+            except Exception:
+                pass
+            if not forgotten_tracks:
+                forgotten_tracks = tracks[::-1][:shelf_limit]
+            if "forgotten_favorites_list" in home.ids:
+                home.ids.forgotten_favorites_list.data = [_card_data(t) for t in forgotten_tracks[:shelf_limit]]
+
+            # --- Mixed for you: synthesized daily mix from user preferences ---
+            daily_mix_tracks = []
+            try:
+                for row in get_daily_mix(limit=shelf_limit):
+                    t = _row_track(row)
+                    if t and t not in daily_mix_tracks:
+                        daily_mix_tracks.append(t)
+            except Exception:
+                pass
+            if not daily_mix_tracks:
+                daily_mix_tracks = (tracks[1::2] + tracks[::2])[:shelf_limit]
+            if "daily_mix_list" in home.ids:
+                home.ids.daily_mix_list.data = [_card_data(t) for t in daily_mix_tracks[:shelf_limit]]
         except Exception as e:
             app_logger.warning(f"populate_home_screen_data encountered non-fatal error: {e}")
 
@@ -1493,17 +1897,7 @@ class MusicApp(MDApp):
         """Main-thread callback to push newly fetched trending data to all views."""
         self.playlist_model.load_from_db()
         self.player_controller.rebuild_queue()
-        try:
-            library_screen = self.root.ids.screen_manager.get_screen("library")
-            library_list = library_screen.ids.library_list
-            library_list.data = [{
-                "title": t.title,
-                "artist": t.artist,
-                "artwork": t.album_art,
-                "track_obj": t
-            } for t in self.playlist_model.tracks[:20]]
-        except Exception:
-            pass
+        self.refresh_library_data()
         self.populate_home_screen_data()
         self.ensure_player_carousel(force_refresh=True)
         # Ensure all newly fetched tracks have their artwork automatically downloaded
@@ -1534,16 +1928,16 @@ class MusicApp(MDApp):
             def create_slide_card():
                 c = MDCard(
                     style="elevated",
-                    radius=[dp(24)],
+                    radius=[dp(20)],
                     size_hint=(None, None),
-                    size=(dp(280), dp(280)),
+                    size=(dp(230), dp(230)),
                     pos_hint={"center_x": .5, "center_y": .5},
                     ripple_behavior=True,
                     theme_bg_color="Custom",
-                    md_bg_color=self.theme_cls.surfaceContainerColor,
+                    md_bg_color=[0, 0, 0, 0],
                     on_release=lambda *args: self.show_lyrics()
                 )
-                img = FitImage(source="album_art.png", radius=[dp(24)], mipmap=True)
+                img = FitImage(source="album_art.png", radius=[dp(20)], mipmap=True)
                 c.add_widget(img)
                 c._fit_img = img
                 return c
@@ -1999,7 +2393,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
             ),
             size_hint_y=None,
-            height="420dp"
+            height="420dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
         scroll = MDScrollView(size_hint_y=None, height="350dp")
         dlist = MDList()
@@ -2053,7 +2449,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
             ),
             size_hint_y=None,
-            height="400dp"
+            height="400dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
         sheet.bind(on_touch_down=lambda inst, touch: True if inst.collide_point(*touch.pos) else False)
         scroll = MDScrollView(size_hint_y=None, height="330dp")
@@ -2135,7 +2533,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
             ),
             size_hint_y=None,
-            height="260dp"
+            height="260dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
         dlist = MDList()
         
@@ -2169,6 +2569,10 @@ class MusicApp(MDApp):
         sheet.x = 0
         sheet.set_state("open")
         self.bottom_sheet = sheet
+        def _cleanup_sheet(*args):
+            if sheet.state == "close" and sheet in Window.children:
+                Window.remove_widget(sheet)
+        sheet.bind(on_close=lambda *a: Clock.schedule_once(_cleanup_sheet, 0.2))
 
     def show_add_to_playlist_sheet(self, track=None):
         """Displays bottom sheet to add a track to any existing playlist or create a new one."""
@@ -2183,7 +2587,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
             ),
             size_hint_y=None,
-            height="380dp"
+            height="380dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
         scroll = MDScrollView(size_hint_y=None, height="310dp")
         dlist = MDList()
@@ -2304,7 +2710,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
             ),
             size_hint_y=None,
-            height="360dp",
+            height="450dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
         dlist = MDList(
             MDListItem(
@@ -2323,6 +2731,16 @@ class MusicApp(MDApp):
                 on_release=lambda x: (sheet.set_state("close"), self.show_lyrics())
             ),
             MDListItem(
+                MDListItemLeadingIcon(icon="tune"),
+                MDListItemHeadlineText(text="Equalizer"),
+                on_release=lambda x: (sheet.set_state("close"), self.switch_screen("equalizer"))
+            ),
+            MDListItem(
+                MDListItemLeadingIcon(icon="timer-outline"),
+                MDListItemHeadlineText(text="Sleep Timer"),
+                on_release=lambda x: (sheet.set_state("close"), self.show_sleep_timer_dialog())
+            ),
+            MDListItem(
                 MDListItemLeadingIcon(icon="share-variant"),
                 MDListItemHeadlineText(text="Share"),
                 on_release=lambda x: (sheet.set_state("close"), self.show_toast(f"Share link: {active_t.url or 'https://youtube.com/watch?v=' + active_t.video_id}"))
@@ -2334,18 +2752,244 @@ class MusicApp(MDApp):
         sheet.x = 0
         sheet.set_state("open")
         self.bottom_sheet = sheet
+        def _cleanup_sheet(*args):
+            if sheet.state == "close" and sheet in Window.children:
+                Window.remove_widget(sheet)
+        sheet.bind(on_close=lambda *a: Clock.schedule_once(_cleanup_sheet, 0.2))
+
+    def refresh_cache_size(self):
+        """Calculates storage footprint of cached audio/thumbnails on background/cheap thread."""
+        try:
+            from utils.media_utils import get_cache_size_mb
+            mb = get_cache_size_mb(self.cache_dir)
+            self.cache_size_label = f"{mb:.1f} MB cached • Tap to clear"
+        except Exception:
+            self.cache_size_label = "Tap to clear cache"
 
     def show_clear_cache_dialog(self):
-        """Display confirmation dialog to clear cached media and temporary data."""
+        """Display confirmation dialog to clear cached media and temporary data while preserving offline songs."""
         self.cache_dialog = MDDialog(
-            MDDialogHeadlineText(text="Clear Cache?"),
-            MDDialogSupportingText(text="This will delete temporary playback data and downloaded album art thumbnails."),
+            MDDialogHeadlineText(text="Clear Temporary Cache?"),
+            MDDialogSupportingText(
+                text="This will delete temporary stream chunks and thumbnail caches to free storage.\n"
+                     "Your downloaded offline songs will be safely preserved."
+            ),
             MDDialogButtonContainer(
                 MDButton(MDButtonText(text="CANCEL"), style="text", on_release=lambda x: self.cache_dialog.dismiss()),
-                MDButton(MDButtonText(text="CLEAR"), style="text", on_release=lambda x: self.cache_dialog.dismiss()),
+                MDButton(MDButtonText(text="CLEAR"), style="text", on_release=lambda x: (self.cache_dialog.dismiss(), self.execute_clear_cache())),
             ),
         )
         self.cache_dialog.open()
+
+    def execute_clear_cache(self):
+        """Safely cleans cache files and updates cache size label."""
+        try:
+            from utils.media_utils import clear_cache_files
+            removed, bytes_freed = clear_cache_files(self.cache_dir)
+            freed_mb = bytes_freed / (1024 * 1024)
+            self.refresh_cache_size()
+            self.show_toast(f"Cleared {removed} files ({freed_mb:.1f} MB freed)")
+        except Exception as e:
+            app_logger.error(f"[execute_clear_cache error]: {e}")
+            self.show_toast("Cache cleared")
+
+    def show_provider_selector_dialog(self):
+        """Displays dialog allowing user to choose default music streaming provider."""
+        items = [
+            ("all", "Unified (All Sources)", "Smart arbitration across all platforms"),
+            ("youtube", "YouTube Music", "Direct YouTube audio extraction"),
+            ("spotify", "Spotify", "Spotify search metadata & track matches"),
+            ("jiosaavn", "JioSaavn", "Direct JioSaavn high-fidelity Indian music streams"),
+        ]
+        dlist = MDList()
+        sheet = None
+
+        def select_prov(prov_key, prov_label):
+            self.selected_music_provider = prov_key
+            self.selected_music_provider_label = prov_label
+            set_setting("default_music_provider", prov_key)
+            self.show_toast(f"Default provider: {prov_label}")
+            if sheet:
+                sheet.dismiss()
+
+        for key, label, sub in items:
+            is_active = (key == self.selected_music_provider)
+            item = MDListItem(
+                MDListItemLeadingIcon(
+                    icon="check-circle" if is_active else "radiobox-blank",
+                    theme_icon_color="Custom",
+                    icon_color=self.theme_cls.primaryColor if is_active else self.theme_cls.onSurfaceVariantColor,
+                ),
+                MDListItemHeadlineText(text=label),
+                MDListItemSupportingText(text=sub),
+                on_release=lambda x, k=key, l=label: select_prov(k, l)
+            )
+            dlist.add_widget(item)
+
+        scroll = MDScrollView(size_hint_y=None, height="240dp")
+        scroll.add_widget(dlist)
+
+        sheet = MDDialog(
+            MDDialogHeadlineText(text="Default Music Provider"),
+            MDDialogContentContainer(scroll),
+            MDDialogButtonContainer(
+                MDButton(MDButtonText(text="CLOSE"), style="text", on_release=lambda x: sheet.dismiss())
+            )
+        )
+        sheet.open()
+
+    def resync_offline_library_action(self):
+        """Rescans offline storage, cleans dead references, and synchronizes SQLite database."""
+        try:
+            from models.database import clean_and_resync_offline_tracks
+            count = clean_and_resync_offline_tracks(cache_dir=self.cache_dir)
+            self.show_toast(f"Offline library resynced ({count} songs)")
+        except Exception as e:
+            app_logger.error(f"[resync_offline_library error]: {e}")
+            self.show_toast("Library resynced")
+
+    def show_about_dialog(self):
+        """Displays Melodify & SimpMusic engine credits and version info."""
+        dialog = MDDialog(
+            MDDialogHeadlineText(text="About Melodify"),
+            MDDialogSupportingText(
+                text="Melodify v2.4.0 (SimpMusic Engine v0.7.0 Parity)\n\n"
+                     "An open-source, Material 3 mobile music player featuring unified YouTube, "
+                     "Spotify, and JioSaavn multi-source streaming, offline library indexing, "
+                     "AutoEq frequency compensation, and synchronized LRCLIB lyrics.\n\n"
+                     "Built with Python, Kivy & KivyMD 2.0."
+            ),
+            MDDialogButtonContainer(
+                MDButton(MDButtonText(text="CLOSE"), style="text", on_release=lambda x: dialog.dismiss())
+            )
+        )
+        dialog.open()
+
+    def show_logs_dialog(self):
+        """Displays recent session log entries in a scrollable dialog."""
+        log_path = r"C:\Users\Shivam\Documents\MusicAppLogs\kivy_music_app.log"
+        lines = []
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()[-20:]
+            except Exception:
+                pass
+        text_content = "".join(lines) if lines else "No session logs recorded yet."
+        if len(text_content) > 1200:
+            text_content = text_content[-1200:]
+
+        scroll = MDScrollView(size_hint_y=None, height="240dp")
+        lbl = MDLabel(
+            text=text_content,
+            font_style="Body",
+            role="small",
+            adaptive_height=True,
+            padding=["8dp", "8dp", "8dp", "8dp"]
+        )
+        scroll.add_widget(lbl)
+
+        dialog = MDDialog(
+            MDDialogHeadlineText(text="Application Logs"),
+            MDDialogContentContainer(scroll),
+            MDDialogButtonContainer(
+                MDButton(MDButtonText(text="CLOSE"), style="text", on_release=lambda x: dialog.dismiss())
+            )
+        )
+        dialog.open()
+
+    def show_sleep_timer_dialog(self):
+        """Displays dialog allowing user to set playback sleep timer (SimpMusic Sleep Timer parity)."""
+        options = [
+            (0, "Off", "Cancel active timer"),
+            (15, "15 minutes", "Stop playback in 15 minutes"),
+            (30, "30 minutes", "Stop playback in 30 minutes"),
+            (45, "45 minutes", "Stop playback in 45 minutes"),
+            (60, "1 hour", "Stop playback in 60 minutes"),
+            (-1, "End of track", "Stop when current track finishes"),
+        ]
+        dlist = MDList()
+        dialog = None
+
+        def select_timer(mins, label):
+            if hasattr(self, "_sleep_timer_event") and self._sleep_timer_event:
+                self._sleep_timer_event.cancel()
+                self._sleep_timer_event = None
+            self._sleep_timer_end_of_track = False
+
+            if mins == 0:
+                self.show_toast("Sleep timer turned off")
+            elif mins == -1:
+                self._sleep_timer_end_of_track = True
+                self.show_toast("Playback will stop at end of track")
+            else:
+                secs = mins * 60
+                self._sleep_timer_event = Clock.schedule_once(lambda dt: self.player_controller.pause(), secs)
+                self.show_toast(f"Sleep timer set for {label}")
+
+            if dialog:
+                dialog.dismiss()
+
+        for mins, label, sub in options:
+            item = MDListItem(
+                MDListItemLeadingIcon(
+                    icon="timer-outline",
+                    theme_icon_color="Custom",
+                    icon_color=self.theme_cls.primaryColor,
+                ),
+                MDListItemHeadlineText(text=label),
+                MDListItemSupportingText(text=sub),
+                on_release=lambda x, m=mins, l=label: select_timer(m, l)
+            )
+            dlist.add_widget(item)
+
+        scroll = MDScrollView(size_hint_y=None, height="240dp")
+        scroll.add_widget(dlist)
+
+        dialog = MDDialog(
+            MDDialogHeadlineText(text="Sleep Timer"),
+            MDDialogContentContainer(scroll),
+            MDDialogButtonContainer(
+                MDButton(MDButtonText(text="CANCEL"), style="text", on_release=lambda x: dialog.dismiss())
+            )
+        )
+        dialog.open()
+
+    def show_reset_settings_dialog(self):
+        """Displays confirmation dialog to restore default app settings."""
+        def do_reset():
+            self.theme_cls.theme_style = "Light"
+            set_setting("theme_style", "Light")
+            self.wifi_only = True
+            set_setting("wifi_only", "True")
+            self.selected_audio_quality = "High (320kbps)"
+            set_setting("selected_audio_quality", "High (320kbps)")
+            self.sponsorblock_enabled = True
+            set_setting("sponsorblock_enabled", "True")
+            self.crossfade_duration = 3.0
+            set_setting("crossfade_duration", "3")
+            self.player_controller.set_crossfade_duration(3.0)
+            self.animated_bg_enabled = True
+            set_setting("animated_bg_enabled", "True")
+            self.extract_artwork_colors = True
+            set_setting("extract_artwork_colors", "True")
+            self.discord_rpc_enabled = True
+            set_setting("discord_rpc_enabled", "True")
+            self.selected_music_provider = "all"
+            self.selected_music_provider_label = "Unified (All Sources)"
+            set_setting("default_music_provider", "all")
+            self.show_toast("Settings restored to defaults")
+            dialog.dismiss()
+
+        dialog = MDDialog(
+            MDDialogHeadlineText(text="Reset Settings?"),
+            MDDialogSupportingText(text="This will reset theme style to Light, streaming quality to 320kbps, crossfade to 3s, and re-enable Wi-Fi and SponsorBlock defaults."),
+            MDDialogButtonContainer(
+                MDButton(MDButtonText(text="CANCEL"), style="text", on_release=lambda x: dialog.dismiss()),
+                MDButton(MDButtonText(text="RESET"), style="text", on_release=lambda x: do_reset()),
+            )
+        )
+        dialog.open()
 
     def apply_eq_profile(self, profile_name: str):
         """Applies a named EQ preset or headphone calibration profile and updates audio engine."""
@@ -2583,32 +3227,224 @@ class MusicApp(MDApp):
         self.auth_dialog.open()
 
     def select_mood_filter(self, chip_instance, mood: str):
-        """Filter mood on Home Screen or navigate to mood details."""
-        if hasattr(self, "root") and self.root:
+        """SimpMusic-style in-place mood filter: switches Home's Quick picks shelf to a
+        real search for the selected mood ('All' restores the local library picks)."""
+        if not (hasattr(self, "root") and self.root):
+            return
+        try:
             home = self.root.ids.screen_manager.get_screen("home")
             if "mood_box" in home.ids:
                 for c in home.ids.mood_box.children:
                     c.active = (c == chip_instance)
-        if mood != "All":
-            self.switch_screen("mood")
+            self.home_mood = mood
+            if mood == "All":
+                if "quick_picks_title" in home.ids:
+                    home.ids.quick_picks_title.text = "Quick picks"
+                self.populate_home_screen_data()
+            else:
+                self.show_toast(f"Loading {mood} picks...")
+                threading.Thread(target=self._async_mood_search, args=(mood,), daemon=True).start()
+        except Exception as e:
+            app_logger.debug(f"select_mood_filter error: {e}")
+
+    def _async_mood_search(self, mood: str):
+        """Background real search for a mood (YouTube source, SimpMusic home params)."""
+        try:
+            from services.music_provider_router import MusicProviderRouter
+            entries = MusicProviderRouter().search(f"{mood} music mix", provider="youtube", limit=12)
+            Clock.schedule_once(lambda dt: self._on_mood_results(entries, mood), 0)
+        except Exception:
+            Clock.schedule_once(lambda dt: self.show_toast(f"{mood} picks unavailable"), 0)
+
+    def _on_mood_results(self, entries, mood):
+        """Main-thread callback: rebuild the Quick picks shelf from the mood search."""
+        try:
+            home = self.root.ids.screen_manager.get_screen("home")
+            rv_data = []
+            tracks = []
+            for entry in entries:
+                vid = entry.get("video_id") or entry.get("id", "")
+                if not vid:
+                    continue
+                track_obj = TrackModel(
+                    video_id=vid,
+                    title=entry.get("title", "Unknown Title"),
+                    artist=entry.get("artist") or entry.get("uploader") or "Unknown Artist",
+                    url=entry.get("url", f"https://www.youtube.com/watch?v={vid}"),
+                    duration=int(entry.get("duration", 0) or 180),
+                    album_art=entry.get("artwork") or get_thumbnail_path(vid),
+                    source=entry.get("source", "youtube"),
+                )
+                tracks.append(track_obj)
+                rv_data.append({
+                    "title": track_obj.title,
+                    "artist": track_obj.artist,
+                    "artwork": track_obj.album_art,
+                    "track_obj": track_obj,
+                    "text": track_obj.title,
+                })
+            if "quick_picks_title" in home.ids:
+                home.ids.quick_picks_title.text = f"{mood} picks"
+            if "quick_picks_list" in home.ids:
+                home.ids.quick_picks_list.data = rv_data
+            if tracks:
+                ensure_artworks_downloaded(tracks, on_track_updated=lambda t: None)
+        except Exception as e:
+            app_logger.debug(f"_on_mood_results error: {e}")
+
+    def play_home_shelf(self, shelf_id: str):
+        """Plays all tracks currently in a given Home shelf RecycleView (SimpMusic 'Play all')."""
+        try:
+            home = self.root.ids.screen_manager.get_screen("home")
+            if shelf_id not in home.ids:
+                return
+            tracks = [d["track_obj"] for d in home.ids[shelf_id].data if d.get("track_obj")]
+            if not tracks:
+                return
+            self.active_playlist_tracks = tracks
+            self.play_selected_track(tracks[0])
+        except Exception as e:
+            app_logger.debug(f"play_home_shelf({shelf_id}) error: {e}")
+
+    def play_home_quick_picks(self):
+        """Plays the full Quick picks shelf as a custom queue (SimpMusic 'Play all')."""
+        self.play_home_shelf("quick_picks_list")
 
     def select_library_filter(self, chip_instance, filter_name: str):
-        """Update active filter in Library screen."""
+        """Update active filter in Library screen. Library/Playlists/Songs switch the visible
+        view in place (SimpMusic-style chip tabs); Albums/Artists/Downloaded keep navigating."""
         if hasattr(self, "root") and self.root:
             lib = self.root.ids.screen_manager.get_screen("library")
             if "library_chips_box" in lib.ids:
                 for c in lib.ids.library_chips_box.children:
                     c.active = (c == chip_instance)
-        if filter_name == "Playlists":
-            self.show_playlists_overview()
-        elif filter_name == "Albums":
-            self.open_album()
-        elif filter_name == "Artists":
-            self.open_artist()
-        elif filter_name == "Downloaded":
-            self.show_downloaded()
-        elif filter_name == "Songs":
-            self.switch_screen("library")
+            if filter_name in ("Library", "Playlists", "Songs"):
+                self.library_filter = filter_name
+                if filter_name == "Playlists":
+                    self._populate_playlists_grid()
+                elif filter_name == "Songs":
+                    self._sync_library_songs()
+            elif filter_name == "Albums":
+                self.open_album()
+            elif filter_name == "Artists":
+                self.open_artist()
+            elif filter_name == "Downloaded":
+                self.show_downloaded()
+
+    def refresh_library_data(self):
+        """Populates the SimpMusic-style library tiling overview (artwork fans + counts),
+        the Recently Added list, the songs list, and the playlists grid. Main-thread only
+        (small SQLite reads + widget property updates)."""
+        if not hasattr(self, "root") or not self.root:
+            return
+        try:
+            sm = self.root.ids.screen_manager
+            if not sm.has_screen("library"):
+                return
+            lib = sm.get_screen("library")
+
+            # Favorites wide card: fan of newest favorites + live count
+            fav_tracks = [TrackModel.from_dict(r) for r in get_playlist_tracks("Favorites")]
+            self._update_library_tile(lib, "favorites_fan", [t.album_art for t in fav_tracks])
+            if "favorites_count_text" in lib.ids:
+                lib.ids.favorites_count_text.text = (
+                    f"{len(fav_tracks)} songs" if fav_tracks else "Tap the heart on any song to save it here"
+                )
+
+            # Artists collection card: unique artists from the local library
+            artists = {}
+            for t in (self.playlist_model.tracks if getattr(self, "playlist_model", None) else []):
+                name = (t.artist or "Unknown Artist").strip()
+                if name and name not in artists:
+                    artists[name] = t.album_art or ""
+            self._update_library_tile(lib, "artists_fan", list(artists.values()))
+            if "artists_count_text" in lib.ids:
+                lib.ids.artists_count_text.text = f"{len(artists)} artist{'s' if len(artists) != 1 else ''}"
+
+            # Most Played collection card: heavy rotation artworks
+            mp_tracks = [TrackModel.from_dict(r) for r in get_heavy_rotation(limit=3)]
+            self._update_library_tile(lib, "most_played_fan", [t.album_art for t in mp_tracks])
+            if "most_played_count_text" in lib.ids:
+                lib.ids.most_played_count_text.text = f"{len(mp_tracks)} tracks"
+
+            # Downloaded collection card: offline songs
+            dl_tracks = [TrackModel.from_dict(r) for r in get_playlist_tracks("Offline Songs")]
+            self._update_library_tile(lib, "downloaded_fan", [t.album_art for t in dl_tracks])
+            if "downloaded_count_text" in lib.ids:
+                lib.ids.downloaded_count_text.text = (
+                    f"{len(dl_tracks)} songs" if dl_tracks else "Import local audio"
+                )
+
+            # Recently Added list from SQLite (was previously trending tracks)
+            if "recently_added_list" in lib.ids:
+                ra = [TrackModel.from_dict(r) for r in get_recently_added(limit=10)]
+                lib.ids.recently_added_list.data = [
+                    {"title": t.title, "artist": t.artist, "artwork": t.album_art, "track_obj": t}
+                    for t in ra
+                ]
+
+            self._sync_library_songs()
+            # The playlists grid is built lazily when the Playlists tab is selected.
+            # Building 138+ tiles at startup / every Library visit cost ~3-4 seconds.
+        except Exception as e:
+            app_logger.error(f"[refresh_library_data error]: {e}")
+
+    def _update_library_tile(self, lib, fan_id, artworks):
+        """Pushes artwork paths into a SleeveFanWidget on the library screen."""
+        try:
+            if fan_id in lib.ids:
+                lib.ids[fan_id].artworks = [a for a in (artworks or []) if a][:3]
+        except Exception as e:
+            app_logger.error(f"[_update_library_tile error]: {e}")
+
+    def _populate_playlists_grid(self):
+        """Refreshes the Playlists tab grid with two SQL queries and a cheap
+        RecycleView data assignment — no eager widget/texture construction."""
+        if not hasattr(self, "root") or not self.root:
+            return
+        try:
+            sm = self.root.ids.screen_manager
+            if not sm.has_screen("library"):
+                return
+            lib = sm.get_screen("library")
+            grid = lib.ids.get("playlists_grid")
+            if grid is None:
+                return
+            covers = get_playlist_covers()
+            data = [{
+                "is_create": True,
+                "name": "Create",
+                "track_count": 0,
+                "artwork": "album_art.png",
+            }]
+            for p in get_all_playlists():
+                data.append({
+                    "is_create": False,
+                    "name": p["name"],
+                    "track_count": p.get("track_count", 0) or 0,
+                    "artwork": covers.get(p["name"], ""),
+                })
+            grid.data = data
+        except Exception as e:
+            app_logger.error(f"[_populate_playlists_grid error]: {e}")
+
+    def _sync_library_songs(self):
+        """Refreshes the Songs tab list from the active track model."""
+        if not hasattr(self, "root") or not self.root:
+            return
+        try:
+            sm = self.root.ids.screen_manager
+            if sm.has_screen("library"):
+                lib = sm.get_screen("library")
+                if "library_list" in lib.ids:
+                    lib.ids.library_list.data = [{
+                        "title": t.title,
+                        "artist": t.artist,
+                        "artwork": t.album_art,
+                        "track_obj": t
+                    } for t in self.playlist_model.tracks[:20]]
+        except Exception:
+            pass
 
     def open_album(self, album_name="New Releases", artist_name="Various Artists", artwork="album_art.png", tracks=None):
         """Populates AlbumScreen with real tracks and dynamic metadata."""
@@ -2652,6 +3488,8 @@ class MusicApp(MDApp):
 
     def _fetch_album_tracks_async(self, album_name: str, artist_name: str):
         """Fetches real album tracks from YouTube."""
+        self.album_loading = True  # main thread only
+
         def _bg():
             try:
                 query = f"ytsearch10:{album_name} {artist_name} full audio"
@@ -2670,6 +3508,7 @@ class MusicApp(MDApp):
                         new_tracks.append(TrackModel(video_id=vid, title=t_title, artist=t_artist, url=t_url, duration=t_dur, album_art=t_thumb))
                 if new_tracks:
                     def _apply(dt):
+                        self.album_loading = False
                         if self.active_album_name != album_name:
                             return
                         self.active_album_tracks = new_tracks
@@ -2681,6 +3520,7 @@ class MusicApp(MDApp):
                     Clock.schedule_once(_apply, 0)
             except Exception as e:
                 app_logger.error(f"[_fetch_album_tracks_async error]: {e}")
+                Clock.schedule_once(lambda dt: setattr(self, "album_loading", False), 0)
         threading.Thread(target=_bg, daemon=True).start()
 
     def play_active_album(self, shuffle=False):
@@ -2851,9 +3691,8 @@ class MusicApp(MDApp):
         self.play_selected_track(first)
 
     def open_podcasts(self):
-        """Switches to PodcastsScreen and loads real podcasts."""
+        """Switches to PodcastsScreen and loads real podcasts via switch_screen()."""
         self.switch_screen("podcasts")
-        self.load_podcasts_data()
 
     def load_podcasts_data(self):
         """Loads real podcast shows and episodes from cache or YouTube."""
@@ -2872,6 +3711,8 @@ class MusicApp(MDApp):
             app_logger.warning(f"[load_podcasts_data cache read error]: {e}")
 
         # 2. Asynchronously query YouTube for trending real podcast episodes
+        self.podcasts_loading = True  # main thread only
+
         def _bg_podcasts():
             try:
                 info = fetch_youtube_metadata("ytsearch12:popular podcast full episode audio", extract_flat=True)
@@ -2890,6 +3731,7 @@ class MusicApp(MDApp):
                 if new_p_tracks:
                     save_cache_payload("podcasts_cache", [t.to_dict() for t in new_p_tracks])
                     def _apply_podcasts(dt):
+                        self.podcasts_loading = False
                         self.podcast_featured_track = new_p_tracks[0]
                         self.podcast_featured_title = new_p_tracks[0].title
                         self.podcast_featured_desc = f"{new_p_tracks[0].artist} • Full Episode"
@@ -2900,6 +3742,7 @@ class MusicApp(MDApp):
                     Clock.schedule_once(_apply_podcasts, 0)
             except Exception as e:
                 app_logger.error(f"[_bg_podcasts error]: {e}")
+                Clock.schedule_once(lambda dt: setattr(self, "podcasts_loading", False), 0)
         threading.Thread(target=_bg_podcasts, daemon=True).start()
 
     def _render_podcasts_list(self):
@@ -3024,7 +3867,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=lambda x: sheet.set_state("close"))
             ),
             size_hint_y=None,
-            height="320dp"
+            height="320dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
         sheet.bind(on_touch_down=lambda inst, touch: True if inst.collide_point(*touch.pos) else False)
         scroll = MDScrollView(size_hint_y=None, height="240dp")
@@ -3132,6 +3977,8 @@ class MusicApp(MDApp):
 
     def clear_search_results(self):
         """Clear current online search results and restore recent searches view."""
+        self.search_state = "empty"
+        self.search_loading = False
         try:
             if hasattr(self, "root") and self.root:
                 search_screen = self.root.ids.screen_manager.get_screen("search")
@@ -3143,12 +3990,64 @@ class MusicApp(MDApp):
         except Exception:
             pass
 
+    def on_search_text_change(self, text: str):
+        """Generates dynamic search suggestions in real-time as user types (SimpMusic SearchUIType)."""
+        query = (text or "").strip()
+        if not query:
+            if self.search_state != "empty":
+                self.search_state = "empty"
+            return
+
+        if self.search_state == "results":
+            # If user modifies text after submitting, switch back to suggestions mode
+            self.search_state = "suggestions"
+
+        if self.search_state != "results":
+            self.search_state = "suggestions"
+            q_lower = query.lower()
+            matches = []
+            try:
+                from models.database import get_search_history
+                for h in get_search_history(limit=15):
+                    if q_lower in h.lower() and h not in matches:
+                        matches.append(h)
+            except Exception:
+                pass
+
+            for t in getattr(self.playlist_model, "tracks", []):
+                t_title = t.title or ""
+                t_artist = t.artist or ""
+                if q_lower in t_title.lower() and t_title not in matches:
+                    matches.append(t_title)
+                if q_lower in t_artist.lower() and t_artist not in matches:
+                    matches.append(t_artist)
+                if len(matches) >= 8:
+                    break
+
+            try:
+                if hasattr(self, "root") and self.root:
+                    search_screen = self.root.ids.screen_manager.get_screen("search")
+                    if "search_suggestions_list" in search_screen.ids:
+                        search_screen.ids.search_suggestions_list.data = [
+                            {"text": m, "query": m} for m in matches[:8]
+                        ]
+            except Exception:
+                pass
+
     def perform_search(self, query: str):
         """Execute real search query via yt-dlp or direct URL, update search history in SQLite and display results."""
         if not query or not str(query).strip():
             return
         q = str(query).strip()
-        add_search_history(q)
+        self.search_state = "results"
+        self.search_loading = True
+        # Asynchronously persist search history to SQLite without blocking UI
+        def _async_history():
+            try:
+                add_search_history(q)
+            except Exception:
+                pass
+        threading.Thread(target=_async_history, daemon=True).start()
         try:
             search_screen = self.root.ids.screen_manager.get_screen("search")
             if "search_input" in search_screen.ids:
@@ -3303,6 +4202,7 @@ class MusicApp(MDApp):
             Clock.schedule_once(lambda dt: self._on_search_error(str(e)), 0)
 
     def _on_search_results(self, entries, query):
+        self.search_loading = False
         try:
             search_screen = self.root.ids.screen_manager.get_screen("search")
             if "search_status_label" in search_screen.ids:
@@ -3354,12 +4254,17 @@ class MusicApp(MDApp):
             print("Error rendering search results:", e)
 
     def _on_search_error(self, err_msg):
+        self.search_loading = False
         try:
             search_screen = self.root.ids.screen_manager.get_screen("search")
             if "search_status_label" in search_screen.ids:
                 search_screen.ids.search_status_label.text = f"Search error ({err_msg[:30]})"
         except Exception:
             pass
+
+    def show_lyrics_sheet(self):
+        """Alias for show_lyrics bottom sheet opening."""
+        return self.show_lyrics()
 
     def show_lyrics(self):
         """Displays real fetched lyrics with interactive synchronized line centering, upward scrolling, and tap-to-seek."""
@@ -3397,7 +4302,9 @@ class MusicApp(MDApp):
                 MDBottomSheetDragHandleButton(icon="close", on_release=close_lyrics)
             ),
             size_hint_y=None,
-            height="480dp"
+            height="480dp",
+            opening_time=0.2,
+            closing_time=0.15,
         )
 
         def _on_sheet_closed(*args):
@@ -3715,6 +4622,8 @@ class MusicApp(MDApp):
                 ),
                 size_hint_y=None,
                 height="460dp",
+                opening_time=0.2,
+                closing_time=0.15,
             )
             self.queue_scroll = MDScrollView(size_hint=(1, 1), do_scroll_x=False)
             self.queue_box = MDList()

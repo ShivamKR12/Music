@@ -2,70 +2,174 @@
     name: "home"
     md_bg_color: app.theme_cls.backgroundColor
     MDFloatLayout:
+        # Main vertical scroll (must stay the first child: tests walk() to it)
         MDScrollView:
+            id: home_scroll
             size_hint: 1, 1
             pos_hint: {"x": 0, "y": 0}
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["16dp", "72dp", "16dp", "32dp"]
-                spacing: "24dp"
+                padding: ["0dp", "0dp", "0dp", "88dp"]
+                spacing: "8dp"
 
-                # Mood Chips
-                DirectionalHorizontalScrollView:
-                    size_hint_y: None
-                    height: "48dp"
-                    do_scroll_y: False
-                    do_scroll_x: True
-                    bar_width: "2dp"
-                    MDBoxLayout:
-                        id: mood_box
-                        adaptive_size: True
-                        height: "48dp"
-                        padding: ["8dp", "8dp", "8dp", "8dp"]
-                        spacing: "8dp"
-                        MDChip:
-                            type: "filter"
-                            active: True
-                            md_bg_color: app.theme_cls.primaryColor
-                            on_release: app.select_mood_filter(self, "All")
-                            MDChipText:
-                                text: "All"
-                                text_color: app.theme_cls.onPrimaryColor
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_mood_filter(self, "Relax")
-                            MDChipText:
-                                text: "Relax"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_mood_filter(self, "Workout")
-                            MDChipText:
-                                text: "Workout"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_mood_filter(self, "Focus")
-                            MDChipText:
-                                text: "Focus"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_mood_filter(self, "Energize")
-                            MDChipText:
-                                text: "Energize"
-                        MDChip:
-                            type: "filter"
-                            on_release: app.select_mood_filter(self, "Commute")
-                            MDChipText:
-                                text: "Commute"
-
-                MDLabel:
-                    text: "Quick picks"
-                    font_style: "Title"
-                    role: "large"
+                # ===== Header block: artwork-tinted gradient (SimpMusic angled gradient) =====
+                MDBoxLayout:
+                    id: home_header
+                    orientation: "vertical"
                     adaptive_height: True
+                    padding: ["16dp", "68dp", "16dp", "12dp"]
+                    spacing: "10dp"
+                    canvas.before:
+                        Color:
+                            rgba: 1, 1, 1, 1
+                        Rectangle:
+                            texture: app.home_header_texture
+                            pos: self.pos
+                            size: self.size
+
+                    MDLabel:
+                        text: "Welcome back"
+                        font_style: "Body"
+                        role: "medium"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDLabel:
+                        id: home_greeting_label
+                        text: app.home_greeting
+                        font_style: "Headline"
+                        role: "medium"
+                        bold: True
+                        adaptive_height: True
+
+                    # Mood chips (SimpMusic listOfHomeChip: All / Relax / Sleep / ...)
+                    DirectionalHorizontalScrollView:
+                        size_hint_y: None
+                        height: "48dp"
+                        do_scroll_y: False
+                        do_scroll_x: True
+                        bar_width: "2dp"
+                        MDBoxLayout:
+                            id: mood_box
+                            adaptive_size: True
+                            height: "48dp"
+                            padding: ["8dp", "8dp", "8dp", "8dp"]
+                            spacing: "8dp"
+                            HomeMoodChip:
+                                mood: "All"
+                                active: True
+                            HomeMoodChip:
+                                mood: "Relax"
+                            HomeMoodChip:
+                                mood: "Sleep"
+                            HomeMoodChip:
+                                mood: "Energize"
+                            HomeMoodChip:
+                                mood: "Sad"
+                            HomeMoodChip:
+                                mood: "Romance"
+                            HomeMoodChip:
+                                mood: "Feel Good"
+                            HomeMoodChip:
+                                mood: "Workout"
+                            HomeMoodChip:
+                                mood: "Party"
+                            HomeMoodChip:
+                                mood: "Commute"
+                            HomeMoodChip:
+                                mood: "Focus"
+
+                # ===== Quick picks (SimpMusic QuickPicks: kicker + title + Play all + grid) =====
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        text: "START RADIO FROM A SONG"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            id: quick_picks_title
+                            text: "Quick picks"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.play_home_shelf("quick_picks_list")
+                            MDButtonText:
+                                text: "Play all"
 
                 DirectionalHorizontalRecycleView:
                     id: quick_picks_list
+                    viewclass: "QuickPicksItem"
+                    size_hint_y: None
+                    height: "288dp"
+                    data: []
+                    RecycleGridLayout:
+                        rows: 4
+                        default_size: dp(176), dp(64)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: "tb-lr"
+                        spacing: dp(8)
+                        padding: [dp(8), dp(4), dp(8), dp(4)]
+
+                # ===== Listen again (recently played) =====
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        text: "PICK UP WHERE YOU LEFT OFF"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            text: "Listen again"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.play_home_shelf("listen_again_list")
+                            MDButtonText:
+                                text: "Play all"
+
+                DirectionalHorizontalRecycleView:
+                    id: listen_again_list
                     viewclass: "HomeCardItem"
                     size_hint_y: None
                     height: "238dp"
@@ -79,11 +183,40 @@
                         spacing: dp(16)
                         padding: [dp(16), dp(12)]
 
-                MDLabel:
-                    text: "Trending community playlists"
-                    font_style: "Title"
-                    role: "large"
+                # ===== Trending now (Top Charts) =====
+                MDBoxLayout:
+                    orientation: "vertical"
                     adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        text: "CHARTS & TRENDING"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            text: "Trending now"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.play_home_shelf("trending_list")
+                            MDButtonText:
+                                text: "Play all"
 
                 DirectionalHorizontalRecycleView:
                     id: trending_list
@@ -100,11 +233,40 @@
                         spacing: dp(16)
                         padding: [dp(16), dp(12)]
 
-                MDLabel:
-                    text: "Featured playlists for you"
-                    font_style: "Title"
-                    role: "large"
+                # ===== Made for you (On Repeat / heavy rotation) =====
+                MDBoxLayout:
+                    orientation: "vertical"
                     adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        text: "FROM YOUR LISTENING HISTORY"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            text: "Made for you"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.play_home_shelf("featured_list")
+                            MDButtonText:
+                                text: "Play all"
 
                 DirectionalHorizontalRecycleView:
                     id: featured_list
@@ -121,21 +283,147 @@
                         spacing: dp(16)
                         padding: [dp(16), dp(12)]
 
-        MDTopAppBar:
-            type: "small"
+                # ===== Forgotten favorites (rediscovering liked tracks) =====
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        text: "REDISCOVER OLD FAVORITES"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            text: "Forgotten favorites"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.play_home_shelf("forgotten_favorites_list")
+                            MDButtonText:
+                                text: "Play all"
+
+                DirectionalHorizontalRecycleView:
+                    id: forgotten_favorites_list
+                    viewclass: "HomeCardItem"
+                    size_hint_y: None
+                    height: "238dp"
+                    data: []
+                    RecycleBoxLayout:
+                        default_size: dp(140), dp(210)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: 'horizontal'
+                        spacing: dp(16)
+                        padding: [dp(16), dp(12)]
+
+                # ===== Mixed for you (Personalized daily mix) =====
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        text: "PERSONALIZED MIX"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            text: "Mixed for you"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.play_home_shelf("daily_mix_list")
+                            MDButtonText:
+                                text: "Play all"
+
+                DirectionalHorizontalRecycleView:
+                    id: daily_mix_list
+                    viewclass: "HomeCardItem"
+                    size_hint_y: None
+                    height: "238dp"
+                    data: []
+                    RecycleBoxLayout:
+                        default_size: dp(140), dp(210)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: 'horizontal'
+                        spacing: dp(16)
+                        padding: [dp(16), dp(12)]
+
+        # Floating top bar: transparent over the gradient, opaque once content scrolls under it
+        MDBoxLayout:
+            id: home_top_bar
+            orientation: "horizontal"
+            adaptive_height: True
             pos_hint: {"top": 1, "x": 0}
-            size_hint_y: None
-            height: "64dp"
-            md_bg_color: app.theme_cls.backgroundColor
-            MDTopAppBarTitle:
-                text: app.get_greeting()
-            MDTopAppBarTrailingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "bell-outline"
-                    on_release: app.switch_screen("notifications")
-                MDActionTopAppBarButton:
-                    icon: "history"
-                    on_release: app.switch_screen("recently_played")
-                MDActionTopAppBarButton:
-                    icon: "cog-outline"
-                    on_release: app.switch_screen("settings")
+            padding: ["12dp", "8dp", "4dp", "4dp"]
+            spacing: "4dp"
+            canvas.before:
+                Color:
+                    rgba: app.theme_cls.backgroundColor[:3] + [0 if home_scroll.scroll_y >= 0.995 else min(1.0, (0.995 - home_scroll.scroll_y) * 12.0)]
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            MDLabel:
+                text: "Melodify"
+                font_style: "Title"
+                role: "large"
+                bold: True
+                adaptive_height: True
+                size_hint_x: 1
+                pos_hint: {"center_y": .5}
+                valign: "center"
+
+            MDIconButton:
+                icon: "bell-outline"
+                pos_hint: {"center_y": .5}
+                on_release: app.switch_screen("notifications")
+
+            MDIconButton:
+                icon: "history"
+                pos_hint: {"center_y": .5}
+                on_release: app.switch_screen("recently_played")
+
+            MDIconButton:
+                icon: "account-group"
+                pos_hint: {"center_y": .5}
+                on_release: app.switch_screen("listen_together")
+
+            MDIconButton:
+                icon: "cog-outline"
+                pos_hint: {"center_y": .5}
+                on_release: app.switch_screen("settings")

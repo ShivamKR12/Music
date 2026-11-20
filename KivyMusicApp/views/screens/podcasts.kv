@@ -82,6 +82,16 @@
                     bold: True
                     adaptive_height: True
 
+                MDLabel:
+                    text: "Loading episodes from YouTube..." if app.podcasts_loading else ""
+                    font_style: "Body"
+                    role: "small"
+                    adaptive_height: True
+                    opacity: 1 if app.podcasts_loading else 0
+                    height: "20dp" if app.podcasts_loading else 0
+                    theme_text_color: "Custom"
+                    text_color: app.theme_cls.onSurfaceVariantColor
+
                 # Real Dynamic Trending Episodes
                 EmbeddedRecycleView:
                     id: podcasts_list

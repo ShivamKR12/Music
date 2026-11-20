@@ -85,6 +85,37 @@ def run_test(on_complete=None):
     
     results["all_actionable_widgets_bound"] = True
     print("  [PASS] 100% of actionable buttons, chips, and app bar buttons have active event bindings.")
+
+    # Verify all app.<method> calls in .kv files exist on MusicApp
+    if app_root not in sys.path:
+        sys.path.insert(0, app_root)
+    try:
+        from main import MusicApp
+        app_methods = set(dir(MusicApp))
+        broken_calls = []
+        for root, _, files in os.walk(kv_dir):
+            for f in files:
+                if f.endswith(".kv"):
+                    path = os.path.join(root, f)
+                    rel_path = os.path.relpath(path, kv_dir)
+                    with open(path, "r", encoding="utf-8") as file:
+                        text = file.read()
+                    calls = re.findall(r'app\.([a-zA-Z0-9_]+)\(', text)
+                    for c in calls:
+                        if c not in app_methods and not hasattr(MusicApp, c):
+                            broken_calls.append((rel_path, c))
+        if broken_calls:
+            print(f"  [FAIL] Found {len(broken_calls)} broken app method calls:")
+            for r in broken_calls:
+                print(f"    - [{r[0]}] app.{r[1]}() does not exist on MusicApp!")
+            assert len(broken_calls) == 0, f"Found {len(broken_calls)} broken app method calls"
+        print("  [PASS] 100% of app.<method>() bindings in .kv files exist on MusicApp.")
+        results["all_app_methods_resolved"] = True
+    except Exception as e:
+        if "broken app method calls" in str(e):
+            raise
+        print(f"  [WARN] Could not inspect MusicApp methods: {e}")
+
     print("  [ALL PASSED] Interactive Widgets Audit Suite Succeeded!")
     if on_complete:
         on_complete(True, results)

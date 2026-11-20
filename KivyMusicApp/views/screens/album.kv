@@ -105,6 +105,16 @@
                     bold: True
                     adaptive_height: True
 
+                MDLabel:
+                    text: "Loading tracks from YouTube..." if app.album_loading else ""
+                    font_style: "Body"
+                    role: "small"
+                    adaptive_height: True
+                    opacity: 1 if app.album_loading else 0
+                    height: "20dp" if app.album_loading else 0
+                    theme_text_color: "Custom"
+                    text_color: app.theme_cls.onSurfaceVariantColor
+
                 # Real Dynamic Tracklist
                 EmbeddedRecycleView:
                     id: album_tracks_list

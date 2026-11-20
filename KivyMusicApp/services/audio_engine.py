@@ -460,7 +460,7 @@ class AudioEngine:
             if self.on_track_loaded:
                 Clock.schedule_once(lambda dt: self.on_track_loaded(abs_path, info), 0)
 
-            Clock.schedule_interval(self._update, 0.1)
+            Clock.schedule_interval(self._update, 1.0 / 30.0)
         else:
             print(f"[AudioEngine] SoundLoader failed to load: {abs_path}")
             if self.on_error:

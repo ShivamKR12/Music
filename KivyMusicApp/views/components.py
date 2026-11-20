@@ -5,12 +5,14 @@ from kivy.lang import Builder
 from kivy.properties import StringProperty, ObjectProperty, BooleanProperty, ColorProperty, NumericProperty, ListProperty
 from kivymd.uix.list import MDListItem, MDListItemTrailingCheckbox
 from kivymd.uix.card import MDCard
+from kivymd.uix.chip import MDChip
 from kivymd.uix.label import MDLabel
 from kivymd.uix.slider import MDSlider
 from kivymd.uix.scrollview import MDScrollView
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
-from kivy.graphics import Color, Ellipse, Rectangle, Mesh
+from kivy.graphics import Color, Ellipse, Rectangle, Mesh, Line, RoundedRectangle, PushMatrix, PopMatrix, Rotate
+from kivy.core.image import Image as CoreImage
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.uix.recycleview import RecycleView
@@ -399,6 +401,58 @@ class SearchHistoryItem(MDListItem):
             except Exception:
                 pass
 
+class SearchSuggestionItem(MDListItem):
+    text = StringProperty("")
+    query = StringProperty("")
+
+    def on_release(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        q = self.query or self.text
+        if hasattr(app, "perform_search"):
+            app.perform_search(q)
+        elif hasattr(app, "root") and app.root and hasattr(app.root, "ids") and "screen_manager" in app.root.ids:
+            try:
+                search_screen = app.root.ids.screen_manager.get_screen("search")
+                if "search_input" in search_screen.ids:
+                    search_screen.ids.search_input.text = q
+            except Exception:
+                pass
+
+Factory.register('SearchSuggestionItem', cls=SearchSuggestionItem)
+
+class HomeMoodChip(MDChip):
+    """Home mood filter chip (SimpMusic listOfHomeChip): selected chip takes the
+    primary fill; taps filter Home's Quick picks shelf in place."""
+    mood = StringProperty("All")
+
+    def on_release(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if hasattr(app, "select_mood_filter"):
+            app.select_mood_filter(self, self.mood)
+
+Factory.register('HomeMoodChip', cls=HomeMoodChip)
+
+class PlaylistTileItem(MDCard):
+    """Recycled playlist tile for the Library Playlists grid (SimpMusic
+    GridLibraryPlaylist pattern). Replaces ~138 eagerly built MDCards with ~10
+    recycled cells; artwork/texture work is limited to visible cells."""
+    name = StringProperty("")
+    track_count = NumericProperty(0)
+    artwork = StringProperty("")
+    is_create = BooleanProperty(False)
+
+    def on_release(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if self.is_create:
+            app.show_add_playlist_dialog()
+        else:
+            app.open_playlist(self.name)
+
+Factory.register('PlaylistTileItem', cls=PlaylistTileItem)
+
 class HomeCardItem(MDCard):
     title = StringProperty("Unknown Title")
     artist = StringProperty("Unknown Artist")
@@ -415,6 +469,25 @@ class HomeCardItem(MDCard):
             downloaded = [t for t in app.playlist_model.tracks if t.is_downloaded]
             track = downloaded[0] if downloaded else random.choice(app.playlist_model.tracks)
             app.play_selected_track(track)
+
+Factory.register('HomeCardItem', cls=HomeCardItem)
+
+class QuickPicksItem(MDCard):
+    """Compact song row card for Home's Quick picks shelf (SimpMusic QuickPicksItem:
+    rounded artwork + one-line marquee title + one-line artist)."""
+    title = StringProperty("Unknown Title")
+    artist = StringProperty("Unknown Artist")
+    artwork = StringProperty("album_art.png")
+    text = StringProperty("")
+    track_obj = ObjectProperty(None, allownone=True)
+
+    def on_release(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if getattr(self, "track_obj", None):
+            app.play_selected_track(self.track_obj)
+
+Factory.register('QuickPicksItem', cls=QuickPicksItem)
 
 class ArtistAlbumCard(MDCard):
     title = StringProperty("Unknown Album")
@@ -453,10 +526,81 @@ Builder.load_string('''
     MDListItemTrailingIcon:
         icon: "arrow-top-right"
 
+<SearchSuggestionItem>:
+    MDListItemLeadingIcon:
+        icon: "magnify"
+        theme_icon_color: "Custom"
+        icon_color: app.theme_cls.primaryColor
+    MDListItemHeadlineText:
+        text: root.text
+    MDListItemTrailingIcon:
+        icon: "arrow-top-right"
+
+<HomeMoodChip>:
+    type: "filter"
+    theme_bg_color: "Custom"
+    md_bg_color: app.theme_cls.primaryColor if root.active else app.theme_cls.surfaceContainerHighestColor
+    MDChipText:
+        theme_text_color: "Custom"
+        text: root.mood
+        text_color: app.theme_cls.onPrimaryColor if root.active else app.theme_cls.onSurfaceColor
+
+<PlaylistTileItem>:
+    style: "elevated"
+    theme_bg_color: "Custom"
+    md_bg_color: app.theme_cls.primaryColor if root.is_create else app.theme_cls.surfaceContainerHighestColor
+    radius: [dp(16)]
+    ripple_behavior: True
+    orientation: "vertical"
+    size_hint: 1, 1
+    padding: ["4dp", "4dp", "4dp", "4dp"]
+
+    MDBoxLayout:
+        orientation: "vertical"
+        size_hint: 1, 1
+        spacing: "2dp"
+
+        MDBoxLayout:
+            size_hint: 1, 1
+            MDIcon:
+                icon: "plus"
+                icon_color: app.theme_cls.onPrimaryColor
+                theme_icon_color: "Custom"
+                font_size: "40sp"
+                pos_hint: {"center_x": .5, "center_y": .5}
+                opacity: 1 if root.is_create else 0
+                disabled: not root.is_create
+            FitImage:
+                source: root.artwork if root.artwork else "album_art.png"
+                size_hint: 1, 1
+                radius: [dp(12), dp(12), dp(12), dp(12)]
+                opacity: 0 if root.is_create else 1
+                mipmap: False
+
+        MDLabel:
+            text: "Create" if root.is_create else root.name
+            font_style: "Body"
+            role: "small"
+            bold: True
+            halign: "center"
+            adaptive_height: True
+            text_color: app.theme_cls.onPrimaryColor if root.is_create else app.theme_cls.onSurfaceColor
+            theme_text_color: "Custom"
+
+        MDLabel:
+            text: "" if root.is_create else f"{int(root.track_count)} tracks"
+            font_style: "Body"
+            role: "small"
+            halign: "center"
+            adaptive_height: True
+            theme_text_color: "Custom"
+            text_color: app.theme_cls.onPrimaryColor if root.is_create else app.theme_cls.onSurfaceVariantColor
+
 <HomeCardItem>:
     style: "elevated"
     size_hint: None, None
     size: "140dp", "210dp"
+    theme_bg_color: "Custom"
     md_bg_color: app.theme_cls.surfaceContainerColor
     radius: [dp(16)]
     ripple_behavior: True
@@ -497,6 +641,51 @@ Builder.load_string('''
                 max_lines: 1
                 shorten: True
                 shorten_from: "right"
+                theme_text_color: "Custom"
+                text_color: app.theme_cls.onSurfaceVariantColor
+
+<QuickPicksItem>:
+    style: "filled"
+    theme_bg_color: "Custom"
+    size_hint: None, None
+    size: "176dp", "64dp"
+    md_bg_color: app.theme_cls.surfaceContainerLowColor
+    radius: [dp(12)]
+    ripple_behavior: True
+    padding: ["8dp", "8dp", "8dp", "8dp"]
+    MDBoxLayout:
+        orientation: "horizontal"
+        spacing: "10dp"
+        size_hint: 1, 1
+
+        FitImage:
+            source: root.artwork if root.artwork else "album_art.png"
+            size_hint: None, None
+            size: "48dp", "48dp"
+            radius: [dp(10), dp(10), dp(10), dp(10)]
+            pos_hint: {"center_y": .5}
+
+        MDBoxLayout:
+            orientation: "vertical"
+            spacing: "2dp"
+            size_hint_x: 1
+            height: "48dp"
+            pos_hint: {"center_y": .5}
+
+            MarqueeLabel:
+                text: root.title if root.title else root.text
+                font_style: "Label"
+                role: "large"
+                bold: True
+                height: "22dp"
+                halign: "left"
+
+            MarqueeLabel:
+                text: root.artist
+                font_style: "Body"
+                role: "small"
+                height: "18dp"
+                halign: "left"
                 theme_text_color: "Custom"
                 text_color: app.theme_cls.onSurfaceVariantColor
 
@@ -551,6 +740,8 @@ class PlayerTimelineSlider(MDSlider):
         kwargs.setdefault('height', dp(44))
         kwargs.setdefault('track_active_width', dp(4))
         kwargs.setdefault('track_inactive_width', dp(4))
+        kwargs.setdefault('handle_anim_duration', 0)
+        kwargs.setdefault('handle_anim_transition', 'linear')
         super().__init__(**kwargs)
 
     def on_value(self, instance, value):
@@ -609,7 +800,7 @@ class PlayerTimelineSlider(MDSlider):
             app = MDApp.get_running_app()
             if app and hasattr(app, "player_controller") and app.player_controller:
                 app.player_controller.seek(float(self.value))
-                Clock.schedule_once(lambda dt: setattr(app.player_controller, "is_seeking", False), 0.2)
+                Clock.schedule_once(lambda dt: setattr(app.player_controller, "is_seeking", False), 0.05)
         return res
 
 Factory.register('PlayerTimelineSlider', cls=PlayerTimelineSlider)
@@ -809,4 +1000,96 @@ class AnimatedBackground(Widget):
         self.mesh.vertices = vertices
 
 Factory.register('AnimatedBackground', cls=AnimatedBackground)
+
+
+class SleeveFanWidget(Widget):
+    """SimpMusic-style fanned artwork preview: up to `slots` covers fanned out from the widget
+    center, each tilted `tilt` degrees and spaced `spread_dp` further out, the newest artwork on
+    top. With no artwork it draws dashed empty sleeves so a fresh library still shows the shapes
+    waiting to be filled (ports SimpMusic's LibraryTilingBox SleeveFan to Kivy canvas drawing).
+    Canvas-only drawing means the whole fan never intercepts touches.
+    """
+    artworks = ListProperty([])
+    slots = NumericProperty(3)
+    sleeve_dp = NumericProperty(62)
+    spread_dp = NumericProperty(32)
+    tilt = NumericProperty(11)
+    round_covers = BooleanProperty(False)
+    ring_color = ColorProperty(None, allownone=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._textures = []
+        self._rebuild_retries = 0
+        for prop in ("artworks", "ring_color", "round_covers"):
+            self.bind(**{prop: self._schedule_rebuild})
+        self.bind(size=self._schedule_rebuild)
+        Clock.schedule_once(self._rebuild, 0)
+
+    def _schedule_rebuild(self, *args):
+        Clock.schedule_once(lambda dt: self._rebuild(), 0)
+
+    def _load_textures(self):
+        """Loads textures for existing artwork files only; newest first (DB rows come newest first)."""
+        covers = []
+        for path in (self.artworks or [])[:self.slots]:
+            try:
+                if path and os.path.exists(path):
+                    covers.append(CoreImage(path).texture)
+            except Exception:
+                pass
+        return covers
+
+    def _rebuild(self, *args):
+        if self.width <= 0 or self.height <= 0:
+            self._rebuild_retries += 1
+            if self._rebuild_retries <= 20:
+                Clock.schedule_once(lambda dt: self._rebuild(), 0.05)
+            return
+        self._rebuild_retries = 0
+        self.canvas.clear()
+        covers = self._load_textures()
+        ring = self.ring_color or [0, 0, 0, 0]
+        sleeve = dp(self.sleeve_dp)
+        spread = dp(self.spread_dp)
+        radius = [sleeve / 2.0] if self.round_covers else [dp(8)]
+        if covers:
+            count = min(len(covers), self.slots)
+            ordered = list(reversed(covers[:count]))  # Oldest first, so the newest is drawn last and lands on top.
+        else:
+            count = self.slots
+            ordered = [None] * count
+        n = len(ordered)
+        with self.canvas:
+            for i in range(n):
+                step = i - (n - 1) / 2.0
+                cx = self.center_x + spread * step
+                cy = self.center_y
+                half = sleeve / 2.0
+                PushMatrix()
+                Rotate(angle=self.tilt * step, origin=(cx, cy))
+                tex = ordered[i]
+                if tex is not None:
+                    # Ring border under the cover so stacked artwork reads as separated sleeves.
+                    inset = dp(2)
+                    Color(r=ring[0], g=ring[1], b=ring[2], a=ring[3])
+                    RoundedRectangle(
+                        pos=(cx - half - inset, cy - half - inset),
+                        size=(sleeve + 2 * inset, sleeve + 2 * inset),
+                        radius=[r + inset for r in radius],
+                    )
+                    Color(1, 1, 1, 1)
+                    RoundedRectangle(texture=tex, pos=(cx - half, cy - half), size=(sleeve, sleeve), radius=radius)
+                else:
+                    Color(0.5, 0.5, 0.5, 0.06)
+                    RoundedRectangle(pos=(cx - half, cy - half), size=(sleeve, sleeve), radius=radius)
+                    Color(0.6, 0.6, 0.6, 0.35)
+                    Line(
+                        rounded_rectangle=(cx - half, cy - half, sleeve, sleeve, radius[0]),
+                        width=dp(1.5),
+                        dash_length=dp(4),
+                        dash_offset=dp(3.5),
+                    )
+                PopMatrix()
+
 

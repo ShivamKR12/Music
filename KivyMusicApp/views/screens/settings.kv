@@ -1,3 +1,29 @@
+<SettingHeader@MDLabel>:
+    text: ""
+    font_style: "Label"
+    role: "large"
+    bold: True
+    theme_text_color: "Custom"
+    text_color: app.theme_cls.primaryColor
+    adaptive_height: True
+    padding: ["16dp", "16dp", "16dp", "8dp"]
+
+<SettingDivider@MDBoxLayout>:
+    size_hint_y: None
+    height: "0.7dp"
+    padding: ["56dp", "0dp", "16dp", "0dp"]
+    MDBoxLayout:
+        md_bg_color: app.theme_cls.outlineVariantColor
+
+<SettingFooter@MDLabel>:
+    text: ""
+    font_style: "Body"
+    role: "small"
+    theme_text_color: "Custom"
+    text_color: app.theme_cls.onSurfaceVariantColor
+    adaptive_height: True
+    padding: ["16dp", "6dp", "16dp", "14dp"]
+
 <SettingsScreen>:
     name: "settings"
     md_bg_color: app.theme_cls.backgroundColor
@@ -12,46 +38,62 @@
                     on_release: app.go_back()
             MDTopAppBarTitle:
                 text: "Settings"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "restore"
+                    on_release: app.show_reset_settings_dialog()
                 
         MDScrollView:
+            id: settings_scroll
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: ["24dp", "24dp", "24dp", "48dp"]
-                spacing: "24dp"
+                padding: ["16dp", "8dp", "16dp", "88dp"]
+                spacing: "0dp"
 
-                MDList:
+                # ================= APPEARANCE & THEME =================
+                SettingHeader:
+                    text: "APPEARANCE & THEME"
+                MDCard:
+                    style: "filled"
+                    theme_bg_color: "Custom"
+                    radius: [dp(20)]
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
                     MDListItem:
-                        on_release: app.show_audio_quality_dialog()
+                        on_release: app.toggle_ui_mode()
+                        MDListItemLeadingIcon:
+                            icon: "theme-light-dark"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
-                            text: "Audio Quality"
+                            text: "Interface Style"
                         MDListItemSupportingText:
-                            text: app.selected_audio_quality
-                        MDListItemTrailingIcon:
-                            icon: "chevron-right"
-                            
-                    MDListItem:
-                        on_release: app.toggle_wifi_only()
-                        MDListItemHeadlineText:
-                            text: "Download over Wi-Fi only"
-                        MDListItemSupportingText:
-                            text: "Save mobile data"
+                            text: "New SimpMusic look" if app.ui_mode == "new" else "Classic look"
                         PassiveTrailingCheckbox:
-                            id: wifi_checkbox
-                            active: app.wifi_only
-
+                            active: app.ui_mode == "new"
+                    SettingDivider:
                     MDListItem:
                         on_release: app.toggle_dark_mode()
+                        MDListItemLeadingIcon:
+                            icon: "weather-night"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
                             text: "Dark Mode"
                         MDListItemSupportingText:
-                            text: "Toggle app theme"
+                            text: "Toggle AMOLED dark theme"
                         PassiveTrailingCheckbox:
                             id: dark_checkbox
                             active: app.theme_cls.theme_style == "Dark"
-
+                    SettingDivider:
                     MDListItem:
                         on_release: app.toggle_extract_artwork_colors()
+                        MDListItemLeadingIcon:
+                            icon: "palette-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
                             text: "Dynamic Artwork Theming"
                         MDListItemSupportingText:
@@ -59,9 +101,13 @@
                         PassiveTrailingCheckbox:
                             id: color_extract_checkbox
                             active: app.extract_artwork_colors
-
+                    SettingDivider:
                     MDListItem:
                         on_release: app.toggle_animated_bg()
+                        MDListItemLeadingIcon:
+                            icon: "motion-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
                             text: "Animated Background"
                         MDListItemSupportingText:
@@ -69,57 +115,221 @@
                         PassiveTrailingCheckbox:
                             id: anim_bg_checkbox
                             active: app.animated_bg_enabled
-
+                    SettingDivider:
                     MDListItem:
                         on_release: app.show_animated_bg_style_dialog()
                         disabled: not app.animated_bg_enabled
+                        MDListItemLeadingIcon:
+                            icon: "brush-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor if app.animated_bg_enabled else app.theme_cls.outlineColor
                         MDListItemHeadlineText:
                             text: "Animation Style"
                         MDListItemSupportingText:
                             text: app.animated_bg_variation_label
                         MDListItemTrailingIcon:
-                            icon: "palette-outline"
-
+                            icon: "chevron-right"
+                    SettingDivider:
                     MDListItem:
                         on_release: app.cycle_animated_bg_speed()
                         disabled: not app.animated_bg_enabled
+                        MDListItemLeadingIcon:
+                            icon: "speedometer"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor if app.animated_bg_enabled else app.theme_cls.outlineColor
                         MDListItemHeadlineText:
                             text: "Animation Speed"
                         MDListItemSupportingText:
                             text: app.animated_bg_speed_label
                         MDListItemTrailingIcon:
-                            icon: "speedometer"
-                            
+                            icon: "chevron-right"
+                SettingFooter:
+                    text: "Material You dynamic theming harmonizes surfaces and ambient glowing gradients with album art."
+
+                # ================= PLAYBACK & AUDIO =================
+                SettingHeader:
+                    text: "PLAYBACK & AUDIO"
+                MDCard:
+                    style: "filled"
+                    theme_bg_color: "Custom"
+                    radius: [dp(20)]
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
                     MDListItem:
-                        on_release: app.toggle_sponsorblock()
+                        on_release: app.show_audio_quality_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "music-note-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
-                            text: "SponsorBlock"
+                            text: "Audio Quality"
                         MDListItemSupportingText:
-                            text: "Skip non-music segments"
-                        PassiveTrailingCheckbox:
-                            id: sponsor_checkbox
-                            active: app.sponsorblock_enabled
-                            
-                    MDListItem:
-                        on_release: app.switch_screen("equalizer")
-                        MDListItemHeadlineText:
-                            text: "Equalizer"
-                        MDListItemSupportingText:
-                            text: "Adjust audio frequencies"
+                            text: app.selected_audio_quality
                         MDListItemTrailingIcon:
                             icon: "chevron-right"
-                            
+                    SettingDivider:
                     MDListItem:
                         on_release: app.show_crossfade_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "swap-horizontal"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
                             text: "Audio Crossfade"
                         MDListItemSupportingText:
                             text: f"{int(app.crossfade_duration)}s transition" if app.crossfade_duration > 0 else "Off (Gapless)"
                         MDListItemTrailingIcon:
-                            icon: "swap-horizontal"
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.switch_screen("equalizer")
+                        MDListItemLeadingIcon:
+                            icon: "tune-vertical"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Equalizer"
+                        MDListItemSupportingText:
+                            text: app.selected_eq_profile
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.toggle_sponsorblock()
+                        MDListItemLeadingIcon:
+                            icon: "shield-check-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "SponsorBlock"
+                        MDListItemSupportingText:
+                            text: "Auto-skip non-music segments, intros & outros"
+                        PassiveTrailingCheckbox:
+                            id: sponsor_checkbox
+                            active: app.sponsorblock_enabled
+                SettingFooter:
+                    text: "Equalizer features 10-band parametric tuning and AutoEq headphone compensation profiles."
 
+                # ================= CONTENT & PROVIDERS =================
+                SettingHeader:
+                    text: "CONTENT & PROVIDERS"
+                MDCard:
+                    style: "filled"
+                    theme_bg_color: "Custom"
+                    radius: [dp(20)]
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+                    MDListItem:
+                        on_release: app.show_provider_selector_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "source-branch"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Default Music Provider"
+                        MDListItemSupportingText:
+                            text: app.selected_music_provider_label
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.show_import_spotify_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "spotify"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Import Spotify Playlist"
+                        MDListItemSupportingText:
+                            text: "Paste public Spotify playlist link to import"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.toggle_wifi_only()
+                        MDListItemLeadingIcon:
+                            icon: "wifi"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Download over Wi-Fi only"
+                        MDListItemSupportingText:
+                            text: "Preserve mobile data when downloading"
+                        PassiveTrailingCheckbox:
+                            id: wifi_checkbox
+                            active: app.wifi_only
+                SettingFooter:
+                    text: "Multi-source router unifies YouTube streaming, Spotify metadata, and JioSaavn high-fidelity audio."
+
+                # ================= STORAGE & LOCAL AUDIO =================
+                SettingHeader:
+                    text: "STORAGE & LOCAL AUDIO"
+                MDCard:
+                    style: "filled"
+                    theme_bg_color: "Custom"
+                    radius: [dp(20)]
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+                    MDListItem:
+                        on_release: app.show_clear_cache_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "database-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Clear Cache"
+                        MDListItemSupportingText:
+                            text: app.cache_size_label
+                        MDListItemTrailingIcon:
+                            icon: "delete-outline"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.show_local_audio_options()
+                        MDListItemLeadingIcon:
+                            icon: "folder-search-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Scan Local Audio Files"
+                        MDListItemSupportingText:
+                            text: "Index MP3, FLAC, M4A from device storage"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.resync_offline_library_action()
+                        MDListItemLeadingIcon:
+                            icon: "sync"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Resync Offline Library"
+                        MDListItemSupportingText:
+                            text: "Clean dead paths and reload offline songs"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                SettingFooter:
+                    text: "Offline songs and extracted album artwork are cached locally in app storage."
+
+                # ================= INTEGRATIONS =================
+                SettingHeader:
+                    text: "INTEGRATIONS"
+                MDCard:
+                    style: "filled"
+                    theme_bg_color: "Custom"
+                    radius: [dp(20)]
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
                     MDListItem:
                         on_release: app.toggle_discord_rpc()
+                        MDListItemLeadingIcon:
+                            icon: "discord"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
                             text: "Discord Rich Presence"
                         MDListItemSupportingText:
@@ -127,22 +337,82 @@
                         PassiveTrailingCheckbox:
                             id: discord_checkbox
                             active: app.discord_rpc_enabled
-
+                    SettingDivider:
                     MDListItem:
-                        on_release: app.show_clear_cache_dialog()
+                        on_release: app.switch_screen("listen_together")
+                        MDListItemLeadingIcon:
+                            icon: "account-group-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
-                            text: "Clear Cache"
+                            text: "Listen Together"
                         MDListItemSupportingText:
-                            text: "Free up storage space"
+                            text: "Synchronized listening room with friends"
                         MDListItemTrailingIcon:
-                            icon: "delete-outline"
+                            icon: "chevron-right"
+                SettingFooter:
+                    text: "Discord RPC updates activity status when the Discord desktop client is running."
 
+                # ================= ABOUT & SYSTEM =================
+                SettingHeader:
+                    text: "ABOUT & SYSTEM"
+                MDCard:
+                    style: "filled"
+                    theme_bg_color: "Custom"
+                    radius: [dp(20)]
+                    orientation: "vertical"
+                    adaptive_height: True
+                    md_bg_color: app.theme_cls.surfaceContainerLowColor
+                    MDListItem:
+                        on_release: app.show_about_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "information-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "About Melodify"
+                        MDListItemSupportingText:
+                            text: "v2.4.0 • SimpMusic Engine v0.7.0 Parity"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.show_logs_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "text-box-search-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Diagnostics & Logs"
+                        MDListItemSupportingText:
+                            text: "View recent session events and debug logs"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.show_reset_settings_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "restore"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Reset Settings to Default"
+                        MDListItemSupportingText:
+                            text: "Restore theme, playback, and network defaults"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
                     MDListItem:
                         on_release: app.smooth_exit()
+                        MDListItemLeadingIcon:
+                            icon: "power"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
                         MDListItemHeadlineText:
                             text: "Exit Application"
                         MDListItemSupportingText:
                             text: "Smoothly close Melodify"
                         MDListItemTrailingIcon:
                             icon: "power"
-
+                SettingFooter:
+                    text: "Melodify is open-source software built with Python, Kivy & KivyMD 2.0."

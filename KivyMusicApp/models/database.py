@@ -392,6 +392,24 @@ def get_all_playlists():
         ''')
         return [dict(row) for row in cursor.fetchall()]
 
+def get_playlist_covers():
+    """Fetches one artwork path per playlist in a SINGLE query (avoids the N+1
+    get_playlist_tracks() calls the old library grid used for covers)."""
+    with DB_LOCK:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT name, artwork FROM (
+                SELECT p.name AS name,
+                       t.artwork AS artwork,
+                       ROW_NUMBER() OVER (PARTITION BY p.id ORDER BY pt.added_at DESC) AS rn
+                FROM playlists p
+                LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+                LEFT JOIN tracks t ON t.video_id = pt.video_id
+            ) WHERE rn = 1
+        ''')
+        return {row["name"]: row["artwork"] or "" for row in cursor.fetchall()}
+
 def add_playlist(name):
     """Creates a new playlist."""
     clean_name = sanitize_text(name)

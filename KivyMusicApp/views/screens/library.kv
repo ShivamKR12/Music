@@ -26,12 +26,13 @@
                 do_scroll_x: False
                 do_scroll_y: True
                 MDBoxLayout:
+                    id: library_content
                     orientation: "vertical"
                     padding: ["16dp", "16dp", "16dp", "88dp"]
-                    spacing: "24dp"
+                    spacing: "16dp"
                     adaptive_height: True
 
-                    # Library Filter Chips
+                    # Library Filter Chips (in-place view switching, SimpMusic-style tabs)
                     DirectionalHorizontalScrollView:
                         size_hint_y: None
                         height: "48dp"
@@ -45,131 +46,319 @@
                             padding: ["8dp", "8dp", "8dp", "8dp"]
                             spacing: "8dp"
                             MDChip:
+                                id: chip_library
                                 type: "filter"
+                                theme_bg_color: "Custom"
                                 active: True
-                                md_bg_color: app.theme_cls.primaryColor
+                                md_bg_color: app.theme_cls.primaryColor if chip_library.active else app.theme_cls.surfaceContainerHighestColor
+                                on_release: app.select_library_filter(self, "Library")
+                                MDChipText:
+                                    theme_text_color: "Custom"
+                                    text: "Library"
+                                    text_color: app.theme_cls.onPrimaryColor if chip_library.active else app.theme_cls.onSurfaceColor
+                            MDChip:
+                                id: chip_playlists
+                                type: "filter"
+                                theme_bg_color: "Custom"
+                                md_bg_color: app.theme_cls.primaryColor if chip_playlists.active else app.theme_cls.surfaceContainerHighestColor
                                 on_release: app.select_library_filter(self, "Playlists")
                                 MDChipText:
+                                    theme_text_color: "Custom"
                                     text: "Playlists"
-                                    text_color: app.theme_cls.onPrimaryColor
+                                    text_color: app.theme_cls.onPrimaryColor if chip_playlists.active else app.theme_cls.onSurfaceColor
                             MDChip:
+                                id: chip_songs
                                 type: "filter"
+                                theme_bg_color: "Custom"
+                                md_bg_color: app.theme_cls.primaryColor if chip_songs.active else app.theme_cls.surfaceContainerHighestColor
                                 on_release: app.select_library_filter(self, "Songs")
                                 MDChipText:
+                                    theme_text_color: "Custom"
                                     text: "Songs"
+                                    text_color: app.theme_cls.onPrimaryColor if chip_songs.active else app.theme_cls.onSurfaceColor
                             MDChip:
+                                id: chip_albums
                                 type: "filter"
+                                theme_bg_color: "Custom"
+                                md_bg_color: app.theme_cls.primaryColor if chip_albums.active else app.theme_cls.surfaceContainerHighestColor
                                 on_release: app.select_library_filter(self, "Albums")
                                 MDChipText:
+                                    theme_text_color: "Custom"
                                     text: "Albums"
+                                    text_color: app.theme_cls.onPrimaryColor if chip_albums.active else app.theme_cls.onSurfaceColor
                             MDChip:
+                                id: chip_artists
                                 type: "filter"
+                                theme_bg_color: "Custom"
+                                md_bg_color: app.theme_cls.primaryColor if chip_artists.active else app.theme_cls.surfaceContainerHighestColor
                                 on_release: app.select_library_filter(self, "Artists")
                                 MDChipText:
+                                    theme_text_color: "Custom"
                                     text: "Artists"
+                                    text_color: app.theme_cls.onPrimaryColor if chip_artists.active else app.theme_cls.onSurfaceColor
                             MDChip:
+                                id: chip_downloaded
                                 type: "filter"
+                                theme_bg_color: "Custom"
+                                md_bg_color: app.theme_cls.primaryColor if chip_downloaded.active else app.theme_cls.surfaceContainerHighestColor
                                 on_release: app.select_library_filter(self, "Downloaded")
                                 MDChipText:
+                                    theme_text_color: "Custom"
                                     text: "Downloaded"
+                                    text_color: app.theme_cls.onPrimaryColor if chip_downloaded.active else app.theme_cls.onSurfaceColor
 
-                    # 2x3 Custom Grid
-                    MDGridLayout:
-                        cols: 2
-                        adaptive_height: True
-                        spacing: "16dp"
-                        row_default_height: "80dp"
-                        row_force_default: True
-                        
-                        LibraryGridCard:
-                            icon: "heart"
-                            text: "Favorite"
-                            md_bg_color: get_color_from_hex("#ff5252")
-                            text_color: "white"
-                            icon_color: "white"
-                            on_release: app.show_favorites()
-                        LibraryGridCard:
-                            icon: "account-multiple"
-                            text: "Followed"
-                            md_bg_color: get_color_from_hex("#ffd740")
-                            on_release: app.switch_screen("artist")
-                        LibraryGridCard:
-                            icon: "play-circle-outline"
-                            text: "Most Played"
-                            md_bg_color: get_color_from_hex("#18ffff")
-                            on_release: app.switch_screen("recently_played")
-                        LibraryGridCard:
-                            icon: "download"
-                            text: "Downloaded"
-                            md_bg_color: get_color_from_hex("#69f0ae")
-                            on_release: app.show_downloaded()
-                        LibraryGridCard:
-                            icon: "chart-bar"
-                            text: "Analytics"
-                            md_bg_color: get_color_from_hex("#b388ff")
-                            on_release: app.switch_screen("analytics")
-                        LibraryGridCard:
-                            icon: "star-shooting"
-                            text: "Wrapped 2026"
-                            md_bg_color: get_color_from_hex("#ff4081")
-                            text_color: "white"
-                            icon_color: "white"
-                            on_release: app.switch_screen("wrapped")
-                        LibraryGridCard:
-                            icon: "account-music"
-                            text: "Artists"
-                            on_release: app.open_artist()
-                        LibraryGridCard:
-                            icon: "album"
-                            text: "Albums"
-                            on_release: app.open_album()
-                        LibraryGridCard:
-                            icon: "playlist-music"
-                            text: "Playlists"
-                            on_release: app.show_playlists_overview()
-                        LibraryGridCard:
-                            icon: "podcast"
-                            text: "Podcasts"
-                            on_release: app.open_podcasts()
-                        LibraryGridCard:
-                            icon: "compass"
-                            text: "Browse"
-                            on_release: app.switch_screen("browse")
-                        LibraryGridCard:
-                            icon: "emoticon-happy-outline"
-                            text: "Moods"
-                            on_release: app.switch_screen("mood")
-                        LibraryGridCard:
-                            icon: "equalizer"
-                            text: "Equalizer"
-                            on_release: app.switch_screen("equalizer")
-                        LibraryGridCard:
-                            icon: "account-group"
-                            text: "Listen Together"
-                            on_release: app.switch_screen("listen_together")
-                        LibraryGridCard:
-                            icon: "login"
-                            text: "Auth/Login"
-                            on_release: app.switch_screen("auth")
-
-                    MDLabel:
-                        text: "Recently Added"
-                        font_style: "Title"
-                        role: "large"
-                        adaptive_height: True
-
-                    EmbeddedRecycleView:
-                        id: library_list
-                        viewclass: "TrackListItem"
+                    # ===== VIEW 1: Library Overview (SimpMusic tiling box + Recently Added) =====
+                    MDBoxLayout:
+                        id: library_overview_view
+                        orientation: "vertical"
                         size_hint_y: None
-                        height: dp(72) * len(self.data) + dp(16) * len(self.data)
-                        RecycleBoxLayout:
-                            default_size: None, dp(72)
-                            default_size_hint: 1, None
-                            size_hint_y: None
-                            height: self.minimum_height
-                            orientation: 'vertical'
-                            spacing: dp(16)
+                        height: lib_overview_content.minimum_height if app.library_filter == "Library" else 0
+                        opacity: 1 if app.library_filter == "Library" else 0
+                        disabled: app.library_filter != "Library"
+
+                        MDBoxLayout:
+                            id: lib_overview_content
+                            orientation: "vertical"
+                            padding: ["0dp", "8dp", "0dp", "0dp"]
+                            spacing: "12dp"
+                            adaptive_height: True
+
+                            # Wide Favorites card with fanned artwork preview
+                            MDCard:
+                                style: "elevated"
+                                radius: [dp(20)]
+                                size_hint: 1, None
+                                height: "120dp"
+                                md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                ripple_behavior: True
+                                on_release: app.show_favorites()
+                                MDBoxLayout:
+                                    orientation: "horizontal"
+                                    size_hint: 1, 1
+                                    padding: ["16dp", "12dp", "10dp", "12dp"]
+                                    spacing: "8dp"
+                                    MDBoxLayout:
+                                        orientation: "vertical"
+                                        size_hint_x: 1
+                                        spacing: "4dp"
+                                        pos_hint: {"center_y": .5}
+                                        MDLabel:
+                                            text: "Favorites"
+                                            font_style: "Title"
+                                            role: "large"
+                                            bold: True
+                                            adaptive_height: True
+                                        MDLabel:
+                                            id: favorites_count_text
+                                            text: "Tap the heart on any song to save it here"
+                                            font_style: "Body"
+                                            role: "small"
+                                            text_color: app.theme_cls.onSurfaceVariantColor
+                                            adaptive_height: True
+                                    SleeveFanWidget:
+                                        id: favorites_fan
+                                        slots: 3
+                                        sleeve_dp: 62
+                                        spread_dp: 32
+                                        tilt: 11
+                                        size_hint: None, None
+                                        size: "132dp", "96dp"
+                                        pos_hint: {"center_y": .5, "right": .98}
+                                        ring_color: app.theme_cls.surfaceContainerHighestColor
+
+                            # Collection cards: Artists / Most Played / Downloaded
+                            MDGridLayout:
+                                cols: 3
+                                spacing: "12dp"
+                                adaptive_height: True
+
+                                MDCard:
+                                    style: "elevated"
+                                    radius: [dp(20)]
+                                    size_hint: 1, None
+                                    height: "112dp"
+                                    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                    ripple_behavior: True
+                                    on_release: app.open_artist()
+                                    MDFloatLayout:
+                                        SleeveFanWidget:
+                                            id: artists_fan
+                                            slots: 2
+                                            sleeve_dp: 30
+                                            spread_dp: 14
+                                            tilt: 9
+                                            round_covers: True
+                                            size_hint: None, None
+                                            size: "54dp", "42dp"
+                                            pos_hint: {"right": .94, "top": .88}
+                                            ring_color: app.theme_cls.surfaceContainerHighestColor
+                                        MDBoxLayout:
+                                            orientation: "vertical"
+                                            size_hint_x: .9
+                                            adaptive_height: True
+                                            pos_hint: {"x": .08, "y": .07}
+                                            MDLabel:
+                                                text: "Artists"
+                                                font_style: "Title"
+                                                role: "small"
+                                                bold: True
+                                                adaptive_height: True
+                                            MDLabel:
+                                                id: artists_count_text
+                                                text: "0 artists"
+                                                font_style: "Body"
+                                                role: "small"
+                                                text_color: app.theme_cls.onSurfaceVariantColor
+                                                adaptive_height: True
+
+                                MDCard:
+                                    style: "elevated"
+                                    radius: [dp(20)]
+                                    size_hint: 1, None
+                                    height: "112dp"
+                                    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                    ripple_behavior: True
+                                    on_release: app.switch_screen("recently_played")
+                                    MDFloatLayout:
+                                        SleeveFanWidget:
+                                            id: most_played_fan
+                                            slots: 2
+                                            sleeve_dp: 30
+                                            spread_dp: 14
+                                            tilt: 9
+                                            size_hint: None, None
+                                            size: "54dp", "42dp"
+                                            pos_hint: {"right": .94, "top": .88}
+                                            ring_color: app.theme_cls.surfaceContainerHighestColor
+                                        MDBoxLayout:
+                                            orientation: "vertical"
+                                            size_hint_x: .9
+                                            adaptive_height: True
+                                            pos_hint: {"x": .08, "y": .07}
+                                            MDLabel:
+                                                text: "Most Played"
+                                                font_style: "Title"
+                                                role: "small"
+                                                bold: True
+                                                adaptive_height: True
+                                            MDLabel:
+                                                id: most_played_count_text
+                                                text: "0 tracks"
+                                                font_style: "Body"
+                                                role: "small"
+                                                text_color: app.theme_cls.onSurfaceVariantColor
+                                                adaptive_height: True
+
+                                MDCard:
+                                    style: "elevated"
+                                    radius: [dp(20)]
+                                    size_hint: 1, None
+                                    height: "112dp"
+                                    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                    ripple_behavior: True
+                                    on_release: app.show_downloaded()
+                                    MDFloatLayout:
+                                        SleeveFanWidget:
+                                            id: downloaded_fan
+                                            slots: 2
+                                            sleeve_dp: 30
+                                            spread_dp: 14
+                                            tilt: 9
+                                            size_hint: None, None
+                                            size: "54dp", "42dp"
+                                            pos_hint: {"right": .94, "top": .88}
+                                            ring_color: app.theme_cls.surfaceContainerHighestColor
+                                        MDBoxLayout:
+                                            orientation: "vertical"
+                                            size_hint_x: .9
+                                            adaptive_height: True
+                                            pos_hint: {"x": .08, "y": .07}
+                                            MDLabel:
+                                                text: "Downloaded"
+                                                font_style: "Title"
+                                                role: "small"
+                                                bold: True
+                                                adaptive_height: True
+                                            MDLabel:
+                                                id: downloaded_count_text
+                                                text: "Import local audio"
+                                                font_style: "Body"
+                                                role: "small"
+                                                text_color: app.theme_cls.onSurfaceVariantColor
+                                                adaptive_height: True
+
+                            # Recently Added section
+                            MDLabel:
+                                text: "Recently Added"
+                                font_style: "Title"
+                                role: "large"
+                                adaptive_height: True
+
+                            EmbeddedRecycleView:
+                                id: recently_added_list
+                                viewclass: "TrackListItem"
+                                size_hint_y: None
+                                height: (dp(72) + dp(16)) * len(self.data)
+                                RecycleBoxLayout:
+                                    default_size: None, dp(72)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+                                    orientation: 'vertical'
+                                    spacing: dp(16)
+
+                    # ===== VIEW 2: Playlists grid (create tile + playlist tiles) =====
+                    MDBoxLayout:
+                        id: library_playlists_view
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: playlists_grid.height if app.library_filter == "Playlists" else 0
+                        opacity: 1 if app.library_filter == "Playlists" else 0
+                        disabled: app.library_filter != "Playlists"
+
+                        MDBoxLayout:
+                            id: lib_playlists_content
+                            padding: ["0dp", "8dp", "0dp", "0dp"]
+                            adaptive_height: True
+                            RecycleView:
+                                id: playlists_grid
+                                viewclass: "PlaylistTileItem"
+                                size_hint_y: None
+                                height: dp(148) * max(1, (len(self.data) + 2) // 3) + dp(12) * max(0, (len(self.data) + 2) // 3 - 1)
+                                data: []
+                                RecycleGridLayout:
+                                    cols: 3
+                                    spacing: "12dp"
+                                    default_size: None, dp(148)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+
+                    # ===== VIEW 3: Songs list =====
+                    MDBoxLayout:
+                        id: library_songs_view
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: library_list.height if app.library_filter == "Songs" else 0
+                        opacity: 1 if app.library_filter == "Songs" else 0
+                        disabled: app.library_filter != "Songs"
+
+                        MDBoxLayout:
+                            id: lib_songs_content
+                            padding: ["0dp", "8dp", "0dp", "0dp"]
+                            adaptive_height: True
+                            EmbeddedRecycleView:
+                                id: library_list
+                                viewclass: "TrackListItem"
+                                size_hint_y: None
+                                height: (dp(72) + dp(16)) * len(self.data)
+                                RecycleBoxLayout:
+                                    default_size: None, dp(72)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+                                    orientation: 'vertical'
+                                    spacing: dp(16)
 
         # Material 3 Floating Action Button to Import Local Audio Files
         MDFabButton:

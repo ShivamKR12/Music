@@ -3,7 +3,6 @@ import re
 import socket
 import threading
 import urllib.request
-from yt_dlp import YoutubeDL
 
 class SilentLogger:
     def debug(self, msg): pass
@@ -167,7 +166,9 @@ def fetch_youtube_metadata(query_or_url, extract_flat=False):
     """
     Fetches video metadata or search results via yt-dlp atomically without downloading audio.
     Employs robust multi-client fallbacks to avoid YouTube 'content not available' restrictions.
-    """
+    yt-dlp is imported lazily here: importing it at module scope added ~0.6-0.8s to
+    every startup (main.py imports media_utils at import time)."""
+    from yt_dlp import YoutubeDL  # lazy: only pay the import cost on first network use
     ydl_opts = {
         'quiet': True,
         'noplaylist': True,
@@ -221,3 +222,56 @@ def enforce_max_cache_size(cache_dir=None, max_size_mb=5000):
                 print(f"[CacheManager] Failed to evict {path}: {e}")
     except Exception as e:
         print(f"[CacheManager] General cache eviction check error: {e}")
+
+def get_cache_size_mb(cache_dir=None) -> float:
+    """Calculates total size of files in cache_dir in Megabytes."""
+    if cache_dir is None:
+        cache_dir = get_cache_dir()
+    if not os.path.exists(cache_dir):
+        return 0.0
+    total = 0
+    try:
+        for entry in os.scandir(cache_dir):
+            if entry.is_file():
+                total += entry.stat().st_size
+    except Exception:
+        pass
+    return total / (1024 * 1024)
+
+def clear_cache_files(cache_dir=None) -> tuple[int, int]:
+    """Cleans temporary playback and network cache files while keeping user offline library intact.
+    Returns (files_removed, bytes_freed)."""
+    if cache_dir is None:
+        cache_dir = get_cache_dir()
+    if not os.path.exists(cache_dir):
+        return (0, 0)
+    removed = 0
+    bytes_freed = 0
+    offline_paths = set()
+    try:
+        from models.database import get_playlist_tracks
+        for t in get_playlist_tracks("Offline Songs"):
+            lp = t.get("local_path")
+            if lp:
+                offline_paths.add(os.path.normcase(os.path.abspath(lp)))
+    except Exception:
+        pass
+
+    try:
+        for entry in os.scandir(cache_dir):
+            try:
+                if entry.is_file():
+                    abs_p = os.path.normcase(os.path.abspath(entry.path))
+                    # Protect user's downloaded offline tracks
+                    if abs_p in offline_paths:
+                        continue
+                    size = entry.stat().st_size
+                    os.remove(entry.path)
+                    removed += 1
+                    bytes_freed += size
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return (removed, bytes_freed)
+

@@ -155,6 +155,12 @@ class TestSimpMusicFeaturesAndDynamicPlaylists(unittest.TestCase):
         mark_track_played(test_vid)
         mark_track_played(test_vid)
 
+        # The shared dev DB accumulates real play counts from usage and older battery
+        # runs (top tracks can reach 25+); push the fixture track decisively above the
+        # crowd so the top-N ranking assertions below stay stable.
+        for _ in range(100):
+            mark_track_played(test_vid)
+
         # Check On Repeat
         on_repeat = get_on_repeat(limit=10)
         self.assertIsInstance(on_repeat, list)

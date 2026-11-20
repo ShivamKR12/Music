@@ -151,17 +151,34 @@ class PlayerController(EventDispatcher):
         self.set_volume(new_vol)
 
     def toggle_favorite(self):
-        """Toggle active track favorite status in SQLite database."""
+        """Toggle active track favorite status in SQLite database optimistically."""
         if not self.active_track:
             return
         vid = getattr(self.active_track, "video_id", "")
+        target_status = not self.is_favorite
+        # 1. Optimistic UI update in the current frame (<1ms latency)
+        self.is_favorite = target_status
+        self.active_track.is_favorite = target_status
+
         if vid:
-            new_status = toggle_favorite(vid)
-            self.is_favorite = new_status
-            self.active_track.is_favorite = new_status
-        else:
-            self.is_favorite = not self.is_favorite
-            self.active_track.is_favorite = self.is_favorite
+            # 2. Asynchronous disk persistence; safely reconciles or rolls back on error
+            def _async_db():
+                try:
+                    new_status = toggle_favorite(vid)
+                    if new_status != target_status:
+                        def _sync_back(dt):
+                            self.is_favorite = new_status
+                            if self.active_track:
+                                self.active_track.is_favorite = new_status
+                        Clock.schedule_once(_sync_back, 0)
+                except Exception:
+                    def _revert_err(dt):
+                        self.is_favorite = not target_status
+                        if self.active_track:
+                            self.active_track.is_favorite = not target_status
+                    Clock.schedule_once(_revert_err, 0)
+
+            threading.Thread(target=_async_db, daemon=True).start()
 
     def set_track(self, track: TrackModel):
         if self.active_track != track:
@@ -183,12 +200,23 @@ class PlayerController(EventDispatcher):
             self.user_ordered_queue.append(track)
             self.queue_index = len(self.queue) - 1
         vid = getattr(track, "video_id", "")
+        self.is_favorite = getattr(track, "is_favorite", False)
         if vid:
-            self.is_favorite = is_favorite(vid)
-            self.active_track.is_favorite = self.is_favorite
-            mark_track_played(vid)
+            # Asynchronously verify database favorite status & record play count without blocking the UI thread
+            def _async_track_init(t_vid, target_track):
+                try:
+                    db_fav = is_favorite(t_vid)
+                    mark_track_played(t_vid)
+                    if db_fav != getattr(target_track, "is_favorite", False):
+                        def _sync_fav(dt):
+                            if self.active_track == target_track:
+                                self.is_favorite = db_fav
+                            target_track.is_favorite = db_fav
+                        Clock.schedule_once(_sync_fav, 0)
+                except Exception:
+                    pass
+            threading.Thread(target=_async_track_init, args=(vid, track), daemon=True).start()
         else:
-            self.is_favorite = getattr(track, "is_favorite", False)
             self.active_track.is_favorite = self.is_favorite
 
     def play(self):
@@ -199,13 +227,8 @@ class PlayerController(EventDispatcher):
             self.audio_engine.unpause()
             self.is_playing = True
             if self.discord_rpc and self.active_track:
-                self.discord_rpc.update_track(
-                    self.active_track.title,
-                    self.active_track.artist,
-                    self.current_time,
-                    self.duration,
-                    True
-                )
+                t_title, t_artist, t_cur, t_dur = self.active_track.title, self.active_track.artist, self.current_time, self.duration
+                Clock.schedule_once(lambda dt: self.discord_rpc.update_track(t_title, t_artist, t_cur, t_dur, True), 0)
         else:
             target_src = getattr(self.active_track, "local_path", "")
             if not target_src or not os.path.exists(target_src):
@@ -232,13 +255,8 @@ class PlayerController(EventDispatcher):
             started = self.audio_engine.start_play(target_src, track_meta)
             self.is_playing = bool(started)
             if self.discord_rpc and self.active_track:
-                self.discord_rpc.update_track(
-                    self.active_track.title,
-                    self.active_track.artist,
-                    0.0,
-                    self.duration,
-                    True
-                )
+                t_title, t_artist, t_dur = self.active_track.title, self.active_track.artist, self.duration
+                Clock.schedule_once(lambda dt: self.discord_rpc.update_track(t_title, t_artist, 0.0, t_dur, True), 0)
 
     def toggle_play(self):
         if not self.active_track:
@@ -248,13 +266,8 @@ class PlayerController(EventDispatcher):
             self.audio_engine.pause()
             self.is_playing = False
             if self.discord_rpc and self.active_track:
-                self.discord_rpc.update_track(
-                    self.active_track.title,
-                    self.active_track.artist,
-                    self.current_time,
-                    self.duration,
-                    False
-                )
+                t_title, t_artist, t_cur, t_dur = self.active_track.title, self.active_track.artist, self.current_time, self.duration
+                Clock.schedule_once(lambda dt: self.discord_rpc.update_track(t_title, t_artist, t_cur, t_dur, False), 0)
         else:
             self.play()
 
