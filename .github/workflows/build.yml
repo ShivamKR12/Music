@@ -43,26 +43,20 @@ jobs:
         python -m pip install --upgrade "pip<25.0" setuptools wheel
         python -m pip install "cython<3.0" buildozer
 
-    - name: Verify buildozer.spec
+    - name: Verify buildozer.spec and Recipes
       run: |
         ls -la buildozer.spec
         cat buildozer.spec
+        ls -la recipes/kivymd
+        ls -la recipes/materialshapes
 
-    - name: Cache Buildozer Global Directory
+    - name: Cache Buildozer Global Directory (SDK / NDK)
       uses: actions/cache@v4
       with:
         path: ~/.buildozer
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-v2-${{ hashFiles('buildozer.spec', 'recipes/**') }}
         restore-keys: |
-          ${{ runner.os }}-buildozer-
-
-    - name: Cache Local .buildozer Directory
-      uses: actions/cache@v4
-      with:
-        path: .buildozer
-        key: ${{ runner.os }}-build-dir-${{ hashFiles('buildozer.spec') }}
-        restore-keys: |
-          ${{ runner.os }}-build-dir-
+          ${{ runner.os }}-buildozer-v2-
 
     - name: Build with Buildozer
       run: |
