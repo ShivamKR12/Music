@@ -25,8 +25,8 @@ source.exclude_patterns = tests/*, cache/*, bin/*, *.db, *.db-journal, test_tone
 version = 0.1.0
 
 # (list) Application requirements
-# comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy==2.3.1,kivymd==2.0.0,pillow,requests,urllib3,certifi,chardet,idna,yt-dlp,mutagen,pyjnius,openssl,sqlite3,android
+# Pinned to exact system-validated versions to prevent PyPI dependency resolution conflicts
+requirements = python3,kivy==2.3.1,https://github.com/kivymd/KivyMD/archive/refs/tags/2.0.0.zip,materialyoucolor==3.0.4,materialshapes==0.3,asynckivy==0.6.4,pillow==11.2.1,requests==2.34.0,urllib3==2.7.0,certifi==2026.4.22,charset-normalizer==3.4.7,idna==3.15,yt-dlp==2025.7.21,pyjnius,openssl,sqlite3,android
 
 # (list) Supported orientations
 # Valid options are: landscape, portrait, portrait-reverse or landscape-reverse
@@ -48,7 +48,8 @@ android.minapi = 21
 android.ndk_api = 21
 
 # (list) The Android archs to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-android.archs = arm64-v8a
+android.archs = arm64-v8a, armeabi-v7a
+
 # (bool) Allow backup
 android.allow_backup = True
 
