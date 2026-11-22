@@ -22,12 +22,13 @@ source.exclude_dirs = tests, cache, bin, .buildozer, .git, __pycache__, .pytest_
 source.exclude_patterns = tests/*, cache/*, bin/*, *.db, *.db-journal, test_tone.wav
 
 # (str) Application versioning (method 1)
-version = 0.1.1
+version = 0.1.2
 
 # (list) Application requirements
 # Pinned to exact system-validated versions to prevent PyPI dependency resolution conflicts
 # kivymd is built via local recipe (without materialshapes/pycairo)
-requirements = python3,kivy==2.3.1,kivymd,materialyoucolor,asynckivy==0.6.4,pillow==11.2.1,requests==2.34.0,urllib3==2.7.0,certifi==2026.4.22,charset-normalizer==3.4.7,idna==3.15,yt-dlp==2025.7.21,pyjnius,openssl,sqlite3,android
+# requests pulls urllib3, certifi, idna, charset-normalizer without duplicate conflict
+requirements = python3,kivy==2.3.1,kivymd,materialyoucolor,asynckivy==0.6.4,pillow==11.2.1,requests==2.34.0,yt_dlp,pyjnius,openssl,sqlite3,android
 
 # (str) The directory in which python-for-android should look for your own build recipes
 p4a.local_recipes = ./recipes
