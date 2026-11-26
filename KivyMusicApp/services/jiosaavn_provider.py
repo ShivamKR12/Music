@@ -8,6 +8,7 @@ import os
 import re
 import html
 import base64
+import threading
 import requests
 from typing import List, Dict, Optional, Any
 from services.music_provider_base import BaseMusicProvider
@@ -31,7 +32,15 @@ class JioSaavnProvider(BaseMusicProvider):
         super().__init__(name="jiosaavn")
         self.session = requests.Session()
         self.session.headers.update(DEFAULT_HEADERS)
-        self._des_cipher = des(DES_CIPHER_KEY, ECB, padmode=PAD_PKCS5)
+        self._des_local = threading.local()
+
+    def _get_des_cipher(self):
+        """Return a thread-local DES-ECB cipher instance (pyDes mutates per-instance state)."""
+        cipher = getattr(self._des_local, "cipher", None)
+        if cipher is None:
+            cipher = des(DES_CIPHER_KEY, ECB, padmode=PAD_PKCS5)
+            self._des_local.cipher = cipher
+        return cipher
 
     def _decrypt_media_url(self, encrypted_url: str, quality: str = "320") -> Optional[str]:
         """Decrypts JioSaavn's DES-ECB encrypted media string to direct AAC/MP4 CDN stream."""
@@ -39,7 +48,7 @@ class JioSaavnProvider(BaseMusicProvider):
             return None
         try:
             raw_bytes = base64.b64decode(encrypted_url.strip())
-            decrypted = self._des_cipher.decrypt(raw_bytes, padmode=PAD_PKCS5).decode("utf-8")
+            decrypted = self._get_des_cipher().decrypt(raw_bytes, padmode=PAD_PKCS5).decode("utf-8")
             # Upgrade audio bitrate quality suffix if applicable
             target_suffix = f"_{quality}.mp4" if quality in ("320", "160", "96") else "_320.mp4"
             for sfx in ["_96.mp4", "_160.mp4", "_320.mp4", ".mp4"]:

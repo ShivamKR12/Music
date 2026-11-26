@@ -214,57 +214,38 @@ class AndroidMediaLifecycleCoordinator:
             PowerManager = autoclass("android.os.PowerManager")
 
             self._audio_manager = activity.getSystemService(Context.AUDIO_SERVICE)
-            pm = activity.getSystemService(Context.POWER_SERVICE)
-            if pm:
-                self._wakelock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "KivyMusicApp:PlaybackWakeLock")
+            try:
+                pm = activity.getSystemService(Context.POWER_SERVICE)
+                if pm:
+                    self._wakelock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "KivyMusicApp:PlaybackWakeLock")
+            except Exception as w_exc:
+                logger.warning("Android WakeLock setup skipped: %s", w_exc)
 
             coord = self
 
-            class _MediaSessionCb(PythonJavaClass):
-                __javainterfaces__ = ["android/media/session/MediaSession$Callback"]
-                __javacontext__ = "app"
+            # NOTE: android.media.session.MediaSession$Callback is an abstract Java class
+            # (not an interface), so PyJNIus PythonJavaClass cannot extend it directly.
+            # Transport callbacks are wired via ForegroundService notification Broadcasts.
+            try:
+                ms = MediaSession(activity, "KivyMusicSession")
+                ms.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
+                ms.setActive(True)
+                self._media_session = ms
+            except Exception as ms_exc:
+                logger.warning("Android MediaSession setup skipped: %s", ms_exc)
 
-                @java_method("()V")
-                def onPlay(self):
-                    coord.dispatch_transport_action("play")
+            try:
+                class _AudioFocusCb(PythonJavaClass):
+                    __javainterfaces__ = ["android/media/AudioManager$OnAudioFocusChangeListener"]
+                    __javacontext__ = "app"
 
-                @java_method("()V")
-                def onPause(self):
-                    coord.dispatch_transport_action("pause")
+                    @java_method("(I)V")
+                    def onAudioFocusChange(self, focus_change):
+                        coord.on_os_audio_focus_change(int(focus_change))
 
-                @java_method("()V")
-                def onSkipToNext(self):
-                    coord.dispatch_transport_action("next")
-
-                @java_method("()V")
-                def onSkipToPrevious(self):
-                    coord.dispatch_transport_action("previous")
-
-                @java_method("(J)V")
-                def onSeekTo(self, pos_ms):
-                    coord.dispatch_transport_action("seek", float(pos_ms) / 1000.0)
-
-                @java_method("()V")
-                def onStop(self):
-                    coord.dispatch_transport_action("stop")
-
-            ms = MediaSession(activity, "KivyMusicSession")
-            ms.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
-            cb = _MediaSessionCb()
-            ms.setCallback(cb)
-            ms.setActive(True)
-            self._media_session = ms
-            self._media_session_cb = cb
-
-            class _AudioFocusCb(PythonJavaClass):
-                __javainterfaces__ = ["android/media/AudioManager$OnAudioFocusChangeListener"]
-                __javacontext__ = "app"
-
-                @java_method("(I)V")
-                def onAudioFocusChange(self, focus_change):
-                    coord.on_os_audio_focus_change(int(focus_change))
-
-            self._focus_listener = _AudioFocusCb()
+                self._focus_listener = _AudioFocusCb()
+            except Exception as af_exc:
+                logger.warning("Android AudioFocus listener setup skipped: %s", af_exc)
 
             def _on_broadcast(context, intent):
                 try:
@@ -273,21 +254,24 @@ class AndroidMediaLifecycleCoordinator:
                 except Exception as be:
                     logger.warning("Android broadcast handler error: %s", be)
 
-            br = BroadcastReceiver(
-                _on_broadcast,
-                actions=[
-                    AudioManager.ACTION_AUDIO_BECOMING_NOISY,
-                    "android.intent.action.HEADSET_PLUG",
-                    "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED",
-                    "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED",
-                    ACTION_PLAY_PAUSE,
-                    ACTION_NEXT,
-                    ACTION_PREV,
-                    ACTION_STOP,
-                ],
-            )
-            br.start()
-            self._broadcast_receiver = br
+            try:
+                br = BroadcastReceiver(
+                    _on_broadcast,
+                    actions=[
+                        AudioManager.ACTION_AUDIO_BECOMING_NOISY,
+                        "android.intent.action.HEADSET_PLUG",
+                        "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED",
+                        "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED",
+                        ACTION_PLAY_PAUSE,
+                        ACTION_NEXT,
+                        ACTION_PREV,
+                        ACTION_STOP,
+                    ],
+                )
+                br.start()
+                self._broadcast_receiver = br
+            except Exception as br_exc:
+                logger.warning("Android BroadcastReceiver setup skipped: %s", br_exc)
 
             with self._lock:
                 self._session_initialized = True

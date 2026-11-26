@@ -56,8 +56,9 @@ class ServiceContainer:
         self._recommendation_engine = None
 
     def initialize_core_services(self) -> None:
-        """Initialize logging, SQLite DB worker, Listen Together, models, and PlayerController."""
+        """Initialize SQLite DB worker, logging, Listen Together, models, and PlayerController."""
         app = self.app
+        self.repository.init_storage()
         init_logging()
         app_logger.info("Initializing MusicApp components...")
 
@@ -67,8 +68,6 @@ class ServiceContainer:
         self.listen_together_service.on_members_updated = app.on_listen_together_members_updated
         self.listen_together_service.on_playback_sync_received = app.on_listen_together_playback_sync
         self.listen_together_service.on_toast_requested = app.show_toast
-
-        self.repository.init_storage()
 
     def wire_player_stack(self) -> None:
         """Instantiate PlaylistModel and PlayerController after state hydration, and bind UI hooks."""

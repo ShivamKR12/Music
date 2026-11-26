@@ -66,17 +66,43 @@ class LogLevel:
 # 2. LOG DIRECTORY & ROTATING FILE HANDLER RESOLUTION
 # ==============================================================================
 def get_public_log_dir() -> str:
-    """Resolves persistent, public log directory across Android and Desktop platforms."""
+    """Resolves a writable persistent log directory across Android and Desktop platforms."""
+    candidates = []
     if platform == 'android':
-        base_dir = "/storage/emulated/0/Download/MusicAppLogs"
+        android_priv = os.environ.get("ANDROID_PRIVATE")
+        if android_priv:
+            candidates.append(os.path.join(android_priv, "logs"))
+        try:
+            from jnius import autoclass
+            act = autoclass("org.kivy.android.PythonActivity").mActivity
+            if act:
+                ext_dir = act.getExternalFilesDir(None)
+                if ext_dir:
+                    candidates.insert(0, os.path.join(str(ext_dir.getAbsolutePath()), "logs"))
+        except Exception:
+            pass
     else:
-        base_dir = os.path.join(os.path.expanduser("~"), "Documents", "MusicAppLogs")
+        candidates.append(os.path.join(os.path.expanduser("~"), "Documents", "MusicAppLogs"))
+
+    candidates.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs"))
+
+    for base_dir in candidates:
+        try:
+            os.makedirs(base_dir, exist_ok=True)
+            probe_path = os.path.join(base_dir, ".write_probe")
+            with open(probe_path, "w", encoding="utf-8") as f:
+                f.write("ok")
+            os.remove(probe_path)
+            return base_dir
+        except Exception:
+            continue
+
+    fallback = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
     try:
-        os.makedirs(base_dir, exist_ok=True)
+        os.makedirs(fallback, exist_ok=True)
     except Exception:
-        base_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
-        os.makedirs(base_dir, exist_ok=True)
-    return base_dir
+        pass
+    return fallback
 
 log_file = os.path.join(get_public_log_dir(), "kivy_music_app.log")
 
