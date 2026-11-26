@@ -1,6 +1,6 @@
 {
   "package_id": "org.shivam.music.kivymusicapp",
-  "timestamp_utc": "2026-11-26T20:00:15Z",
+  "timestamp_utc": "2026-11-26T20:39:34Z",
   "adb_devices": [
     "RZCY91AQGKW            device product:a17xins model:SM_A176B device:a17x transport_id:1"
   ],
@@ -34,34 +34,26 @@
   "device_verification_status": "VERIFIED_ON_DEVICE",
   "blockers": [],
   "runtime_metrics": {
-    "launch_probe_window_ms": 6245.57,
+    "launch_probe_window_ms": 6073.62,
     "gfx_total_frames": 5,
     "gfx_janky_frames": "2 (40.00%)",
-    "mem_total_pss_kb": 166229,
+    "mem_total_pss_kb": 201447,
     "foreground_service_active": false,
     "fatal_python_or_java_tracebacks": false,
     "logcat_tail": [
       "--------- beginning of main",
-      "11-27 01:30:27.961  5208  5273 I python  : [INFO   ] [GL          ] Using the \"OpenGL ES 2\" graphics system",
-      "11-27 01:30:27.962  5208  5273 I python  : [INFO   ] [GL          ] Backend used <sdl2>",
-      "11-27 01:30:27.962  5208  5273 I python  : [INFO   ] [GL          ] OpenGL version <b'OpenGL ES 3.2 v1.r38p1-01eac0-mbs2v41_0.8afb03e9a27ca831737e7b78bf21f6ee'>",
-      "11-27 01:30:27.962  5208  5273 I python  : [INFO   ] [GL          ] OpenGL vendor <b'ARM'>",
-      "11-27 01:30:27.962  5208  5273 I python  : [INFO   ] [GL          ] OpenGL renderer <b'Mali-G68'>",
-      "11-27 01:30:27.962  5208  5273 I python  : [INFO   ] [GL          ] OpenGL parsed version: 3, 2",
-      "11-27 01:30:27.963  5208  5273 I python  : [INFO   ] [GL          ] Texture max size <16383>",
-      "11-27 01:30:27.964  5208  5273 I python  : [INFO   ] [GL          ] Texture max units <64>",
-      "11-27 01:30:28.007  5208  5273 I python  : [INFO   ] [Window      ] auto add sdl2 input provider",
-      "11-27 01:30:28.008  5208  5273 I python  : [INFO   ] [Window      ] virtual keyboard not allowed, single mode, not docked",
-      "11-27 01:30:28.209  5208  5273 I python  : [INFO   ] [Audio       ] Providers: audio_sdl2 (audio_android, audio_ffpyplayer ignored)",
-      "11-27 01:30:28.489  5208  5273 I python  : [INFO   ] [AudioEngine ] Registered native SoundAndroidPlayer for Android",
-      "11-27 01:30:28.582  5208  5273 I python  : [INFO   ] [Clipboard   ] Provider: android",
-      "11-27 01:30:28.773  5208  5273 I python  : [Logger init fallback error]: [Errno 13] Permission denied: '/storage/emulated/0/Download/MusicAppLogs/kivy_music_app.log'",
-      "11-27 01:30:28.799  5208  5273 I python  : [WARNING] [Database    ] get_setting error for 'log_level': no such table: settings",
-      "11-27 01:30:28.799  5208  5273 I python  : [INFO   ] [MusicApp    ] --- Application Session Started ---",
-      "11-27 01:30:28.799  5208  5273 I python  : [INFO   ] [MusicApp    ] Logging initialized at: /storage/emulated/0/Download/MusicAppLogs/kivy_music_app.log",
-      "11-27 01:30:28.799  5208  5273 I python  : [INFO   ] [MusicApp    ] Active 5-level log threshold: INFO",
-      "11-27 01:30:28.799  5208  5273 I python  : [INFO   ] [MusicApp    ] Initializing MusicApp components...",
-      "11-27 01:30:29.155  5208  5273 I python  : [INFO   ] [GL          ] NPOT texture support is available"
+      "11-27 02:09:41.189 10603 10657 I python  : [INFO   ] [Window      ] auto add sdl2 input provider",
+      "11-27 02:09:41.190 10603 10657 I python  : [INFO   ] [Window      ] virtual keyboard not allowed, single mode, not docked",
+      "11-27 02:09:41.385 10603 10657 I python  : [INFO   ] [Audio       ] Providers: audio_sdl2 (audio_android, audio_ffpyplayer ignored)",
+      "11-27 02:09:41.625 10603 10657 I python  : [INFO   ] [AudioEngine ] Registered native SoundAndroidPlayer for Android",
+      "11-27 02:09:41.705 10603 10657 I python  : [INFO   ] [Clipboard   ] Provider: android",
+      "11-27 02:09:41.874 10603 10657 I python  : [INFO   ] [MusicApp    ] --- Application Session Started ---",
+      "11-27 02:09:41.874 10603 10657 I python  : [INFO   ] [MusicApp    ] Logging initialized at: /storage/emulated/0/Android/data/org.shivam.music.kivymusicapp/files/logs/kivy_music_app.log",
+      "11-27 02:09:41.874 10603 10657 I python  : [INFO   ] [MusicApp    ] Active 5-level log threshold: INFO",
+      "11-27 02:09:41.875 10603 10657 I python  : [INFO   ] [MusicApp    ] Initializing MusicApp components...",
+      "11-27 02:09:42.216 10603 10657 I python  : [INFO   ] [GL          ] NPOT texture support is available",
+      "11-27 02:09:43.579 10603 10657 I python  : [WARNING] [Base        ] Unknown <android> provider",
+      "11-27 02:09:43.580 10603 10657 I python  : [INFO   ] [Base        ] Start application main loop"
     ]
   }
 }

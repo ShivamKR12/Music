@@ -111,525 +111,533 @@
 
         # Content switches in place between the browsing state, suggestions state, and results state
         MDScrollView:
+            id: search_scroll
             do_scroll_x: False
             do_scroll_y: True
             MDBoxLayout:
                 orientation: "vertical"
-                adaptive_height: True
-                padding: ["0dp", "4dp", "0dp", "88dp"]
-                spacing: "12dp"
-
-                # ===== BROWSING STATE: intro + browse categories + recent searches =====
+                size_hint_y: None
+                height: max(search_scroll.height, search_scroll_content.minimum_height)
                 MDBoxLayout:
-                    id: search_browse_view
+                    id: search_scroll_content
                     orientation: "vertical"
                     adaptive_height: True
-                    opacity: 1 if app.search_state == "empty" else 0
-                    height: search_browse_content.minimum_height if app.search_state == "empty" else 0
-                    disabled: app.search_state != "empty"
+                    padding: ["0dp", "4dp", "0dp", "88dp"]
+                    spacing: "12dp"
 
+                    # ===== BROWSING STATE: intro + browse categories + recent searches =====
                     MDBoxLayout:
-                        id: search_browse_content
+                        id: search_browse_view
                         orientation: "vertical"
-                        adaptive_height: True
-                        padding: ["16dp", "4dp", "16dp", "0dp"]
-                        spacing: "16dp"
+                        size_hint_y: None
+                        opacity: 1 if app.search_state == "empty" else 0
+                        height: search_browse_content.minimum_height if app.search_state == "empty" else 0
+                        disabled: app.search_state != "empty"
 
-                        # SimpMusic "Explore & Discover" intro block
                         MDBoxLayout:
+                            id: search_browse_content
                             orientation: "vertical"
                             adaptive_height: True
-                            spacing: "4dp"
-                            MDLabel:
-                                text: "Explore & Discover"
-                                font_style: "Title"
-                                role: "large"
-                                bold: True
-                                halign: "left"
-                                adaptive_height: True
-                            MDLabel:
-                                text: "Search across YouTube, Spotify, and JioSaavn"
-                                font_style: "Body"
-                                role: "medium"
-                                text_color: app.theme_cls.onSurfaceVariantColor
-                                halign: "left"
-                                adaptive_height: True
+                            padding: ["16dp", "4dp", "16dp", "0dp"]
+                            spacing: "16dp"
 
-                        # Recent searches (SimpMusic search history rows)
-                        MDBoxLayout:
-                            id: history_header_box
-                            adaptive_height: True
-                            opacity: 1 if search_history_list.data else 0
-                            height: self.minimum_height if search_history_list.data else 0
-                            MDLabel:
-                                text: "Recent searches"
-                                font_style: "Title"
-                                role: "medium"
-                                bold: True
-                                adaptive_height: True
-                            MDButton:
-                                style: "text"
-                                on_release: app.clear_search_history()
-                                MDButtonText:
-                                    text: "Clear all"
-
-                        RecycleView:
-                            id: search_history_list
-                            viewclass: "SearchHistoryItem"
-                            data: []
-                            size_hint_y: None
-                            height: (dp(56) + dp(8)) * len(self.data)
-                            RecycleBoxLayout:
-                                default_size: None, dp(56)
-                                default_size_hint: 1, None
-                                size_hint_y: None
-                                height: self.minimum_height
-                                orientation: 'vertical'
-                                spacing: dp(8)
-
-                        # Browse Categories Header
-                        MDLabel:
-                            text: "Moods & Genres"
-                            font_style: "Title"
-                            role: "medium"
-                            bold: True
-                            adaptive_height: True
-                            padding: ["0dp", "8dp", "0dp", "0dp"]
-
-                        # Browse categories (SimpMusic mood grid as theme-tinted tiles)
-                        MDGridLayout:
-                            cols: 2
-                            spacing: "12dp"
-                            adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.primaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Trending Hits"; app.perform_search("Trending Hits")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "fire"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onPrimaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Trending"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onPrimaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.secondaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Bollywood"; app.perform_search("Bollywood")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "headphones"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onSecondaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Bollywood"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onSecondaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.tertiaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Punjabi"; app.perform_search("Punjabi")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "album"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onTertiaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Punjabi"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onTertiaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.surfaceContainerHighestColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Pop"; app.perform_search("Pop")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "music-note"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onSurfaceColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Pop & Hits"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onSurfaceColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.primaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Hip-Hop"; app.perform_search("Hip-Hop")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "microphone"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onPrimaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Hip-Hop"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onPrimaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.secondaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Chill"; app.perform_search("Chill")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "coffee"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onSecondaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Chill & Relax"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onSecondaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.tertiaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Workout"; app.perform_search("Workout")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "arm-flex"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onTertiaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Workout"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onTertiaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.surfaceContainerHighestColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Focus"; app.perform_search("Focus")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "brain"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onSurfaceColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Focus & Study"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onSurfaceColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.primaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Rock"; app.perform_search("Rock")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "guitar-pick"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onPrimaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Rock"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onPrimaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.secondaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Romance"; app.perform_search("Romance")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "heart"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onSecondaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Romance"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onSecondaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.tertiaryContainerColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Devotional"; app.perform_search("Devotional")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "candle"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onTertiaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Devotional"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onTertiaryContainerColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                            MDCard:
-                                style: "filled"
-                                theme_bg_color: "Custom"
-                                radius: [dp(16)]
-                                md_bg_color: app.theme_cls.surfaceContainerHighestColor
-                                size_hint: 1, None
-                                height: "56dp"
-                                ripple_behavior: True
-                                on_release: search_input.text = "Podcasts"; app.perform_search("Podcasts")
-                                MDBoxLayout:
-                                    padding: ["12dp", "0dp", "12dp", "0dp"]
-                                    spacing: "10dp"
-                                    MDIcon:
-                                        icon: "podcast"
-                                        font_size: "20sp"
-                                        text_color: app.theme_cls.onSurfaceColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-                                    MDLabel:
-                                        text: "Podcasts"
-                                        font_style: "Body"
-                                        role: "medium"
-                                        bold: True
-                                        text_color: app.theme_cls.onSurfaceColor
-                                        pos_hint: {"center_y": .5}
-                                        adaptive_height: True
-
-                # ===== SUGGESTIONS STATE: real-time suggestions as you type =====
-                MDBoxLayout:
-                    id: search_suggestions_view
-                    orientation: "vertical"
-                    adaptive_height: True
-                    opacity: 1 if app.search_state == "suggestions" else 0
-                    height: search_suggestions_content.minimum_height if app.search_state == "suggestions" else 0
-                    disabled: app.search_state != "suggestions"
-
-                    MDBoxLayout:
-                        id: search_suggestions_content
-                        orientation: "vertical"
-                        adaptive_height: True
-                        padding: ["16dp", "4dp", "16dp", "0dp"]
-                        spacing: "8dp"
-
-                        MDLabel:
-                            text: "Suggestions"
-                            font_style: "Title"
-                            role: "medium"
-                            bold: True
-                            adaptive_height: True
-
-                        RecycleView:
-                            id: search_suggestions_list
-                            viewclass: "SearchSuggestionItem"
-                            data: []
-                            size_hint_y: None
-                            height: (dp(56) + dp(4)) * len(self.data)
-                            RecycleBoxLayout:
-                                default_size: None, dp(56)
-                                default_size_hint: 1, None
-                                size_hint_y: None
-                                height: self.minimum_height
-                                orientation: 'vertical'
-                                spacing: dp(4)
-
-                # ===== RESULTS STATE: status + loading indicator + results list =====
-                MDBoxLayout:
-                    id: search_results_view
-                    orientation: "vertical"
-                    adaptive_height: True
-                    opacity: 1 if app.search_state == "results" else 0
-                    height: search_results_content.minimum_height if app.search_state == "results" else 0
-                    disabled: app.search_state != "results"
-
-                    MDBoxLayout:
-                        id: search_results_content
-                        orientation: "vertical"
-                        adaptive_height: True
-                        padding: ["12dp", "4dp", "12dp", "0dp"]
-                        spacing: "12dp"
-
-                        MDBoxLayout:
-                            id: results_header_box
-                            adaptive_height: True
-                            MDLabel:
-                                id: search_status_label
-                                text: "Search Results"
-                                font_style: "Title"
-                                role: "medium"
-                                bold: True
-                                adaptive_height: True
-
-                        # Loading banner when search is actively in flight
-                        MDCard:
-                            id: search_loading_card
-                            style: "filled"
-                            theme_bg_color: "Custom"
-                            md_bg_color: app.theme_cls.surfaceContainerLowColor
-                            radius: [dp(16)]
-                            size_hint_y: None
-                            height: "56dp" if app.search_loading else 0
-                            opacity: 1 if app.search_loading else 0
-                            disabled: not app.search_loading
-                            padding: ["16dp", "0dp", "16dp", "0dp"]
+                            # SimpMusic "Explore & Discover" intro block
                             MDBoxLayout:
-                                orientation: "horizontal"
-                                spacing: "12dp"
-                                YouTubeLoadingCircle:
-                                    size_hint: None, None
-                                    size: dp(26), dp(26)
-                                    pos_hint: {"center_y": .5}
-                                    active: bool(app.search_loading)
-                                    color: app.theme_cls.primaryColor
-                                    line_width: dp(2.8)
+                                orientation: "vertical"
+                                adaptive_height: True
+                                spacing: "4dp"
                                 MDLabel:
-                                    text: "Searching YouTube, Spotify & JioSaavn..."
+                                    text: "Explore & Discover"
+                                    font_style: "Title"
+                                    role: "large"
+                                    bold: True
+                                    halign: "left"
+                                    adaptive_height: True
+                                MDLabel:
+                                    text: "Search across YouTube, Spotify, and JioSaavn"
                                     font_style: "Body"
                                     role: "medium"
-                                    pos_hint: {"center_y": .5}
-                                    theme_text_color: "Custom"
-                                    text_color: app.theme_cls.onSurfaceColor
+                                    text_color: app.theme_cls.onSurfaceVariantColor
+                                    halign: "left"
+                                    adaptive_height: True
 
-                        MDLabel:
-                            id: search_no_results_label
-                            text: "No results found"
-                            font_style: "Title"
-                            role: "large"
-                            halign: "center"
-                            text_color: app.theme_cls.onSurfaceVariantColor
-                            adaptive_height: True
-                            opacity: 1 if not app.search_loading and not search_results_list.data else 0
-                            height: "48dp" if not app.search_loading and not search_results_list.data else 0
+                            # Recent searches (SimpMusic search history rows)
+                            MDBoxLayout:
+                                id: history_header_box
+                                adaptive_height: True
+                                opacity: 1 if search_history_list.data else 0
+                                height: self.minimum_height if search_history_list.data else 0
+                                MDLabel:
+                                    text: "Recent searches"
+                                    font_style: "Title"
+                                    role: "medium"
+                                    bold: True
+                                    adaptive_height: True
+                                MDButton:
+                                    style: "text"
+                                    on_release: app.clear_search_history()
+                                    MDButtonText:
+                                        text: "Clear all"
 
-                        RecycleView:
-                            id: search_results_list
-                            viewclass: "TrackListItem"
-                            data: []
-                            size_hint_y: None
-                            height: (dp(64) + dp(8)) * len(self.data)
-                            opacity: 1 if self.data else 0
-                            RecycleBoxLayout:
-                                default_size: None, dp(64)
-                                default_size_hint: 1, None
+                            RecycleView:
+                                id: search_history_list
+                                viewclass: "SearchHistoryItem"
+                                data: []
                                 size_hint_y: None
-                                height: self.minimum_height
-                                orientation: 'vertical'
-                                spacing: dp(8)
+                                height: (dp(56) + dp(8)) * len(self.data)
+                                RecycleBoxLayout:
+                                    default_size: None, dp(56)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+                                    orientation: 'vertical'
+                                    spacing: dp(8)
+
+                            # Browse Categories Header
+                            MDLabel:
+                                text: "Moods & Genres"
+                                font_style: "Title"
+                                role: "medium"
+                                bold: True
+                                adaptive_height: True
+                                padding: ["0dp", "8dp", "0dp", "0dp"]
+
+                            # Browse categories (SimpMusic mood grid as theme-tinted tiles)
+                            MDGridLayout:
+                                cols: 2
+                                spacing: "12dp"
+                                adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.primaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Trending Hits"; app.perform_search("Trending Hits")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "fire"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onPrimaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Trending"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onPrimaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.secondaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Bollywood"; app.perform_search("Bollywood")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "headphones"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onSecondaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Bollywood"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onSecondaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.tertiaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Punjabi"; app.perform_search("Punjabi")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "album"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onTertiaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Punjabi"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onTertiaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Pop"; app.perform_search("Pop")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "music-note"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onSurfaceColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Pop & Hits"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onSurfaceColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.primaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Hip-Hop"; app.perform_search("Hip-Hop")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "microphone"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onPrimaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Hip-Hop"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onPrimaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.secondaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Chill"; app.perform_search("Chill")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "coffee"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onSecondaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Chill & Relax"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onSecondaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.tertiaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Workout"; app.perform_search("Workout")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "arm-flex"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onTertiaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Workout"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onTertiaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Focus"; app.perform_search("Focus")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "brain"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onSurfaceColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Focus & Study"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onSurfaceColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.primaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Rock"; app.perform_search("Rock")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "guitar-pick"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onPrimaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Rock"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onPrimaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.secondaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Romance"; app.perform_search("Romance")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "heart"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onSecondaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Romance"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onSecondaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.tertiaryContainerColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Devotional"; app.perform_search("Devotional")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "candle"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onTertiaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Devotional"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onTertiaryContainerColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                MDCard:
+                                    style: "filled"
+                                    theme_bg_color: "Custom"
+                                    radius: [dp(16)]
+                                    md_bg_color: app.theme_cls.surfaceContainerHighestColor
+                                    size_hint: 1, None
+                                    height: "56dp"
+                                    ripple_behavior: True
+                                    on_release: search_input.text = "Podcasts"; app.perform_search("Podcasts")
+                                    MDBoxLayout:
+                                        padding: ["12dp", "0dp", "12dp", "0dp"]
+                                        spacing: "10dp"
+                                        MDIcon:
+                                            icon: "podcast"
+                                            font_size: "20sp"
+                                            text_color: app.theme_cls.onSurfaceColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+                                        MDLabel:
+                                            text: "Podcasts"
+                                            font_style: "Body"
+                                            role: "medium"
+                                            bold: True
+                                            text_color: app.theme_cls.onSurfaceColor
+                                            pos_hint: {"center_y": .5}
+                                            adaptive_height: True
+
+                    # ===== SUGGESTIONS STATE: real-time suggestions as you type =====
+                    MDBoxLayout:
+                        id: search_suggestions_view
+                        orientation: "vertical"
+                        size_hint_y: None
+                        opacity: 1 if app.search_state == "suggestions" else 0
+                        height: search_suggestions_content.minimum_height if app.search_state == "suggestions" else 0
+                        disabled: app.search_state != "suggestions"
+
+                        MDBoxLayout:
+                            id: search_suggestions_content
+                            orientation: "vertical"
+                            adaptive_height: True
+                            padding: ["16dp", "4dp", "16dp", "0dp"]
+                            spacing: "8dp"
+
+                            MDLabel:
+                                text: "Suggestions"
+                                font_style: "Title"
+                                role: "medium"
+                                bold: True
+                                adaptive_height: True
+
+                            RecycleView:
+                                id: search_suggestions_list
+                                viewclass: "SearchSuggestionItem"
+                                data: []
+                                size_hint_y: None
+                                height: (dp(56) + dp(4)) * len(self.data)
+                                RecycleBoxLayout:
+                                    default_size: None, dp(56)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+                                    orientation: 'vertical'
+                                    spacing: dp(4)
+
+                    # ===== RESULTS STATE: status + loading indicator + results list =====
+                    MDBoxLayout:
+                        id: search_results_view
+                        orientation: "vertical"
+                        size_hint_y: None
+                        opacity: 1 if app.search_state == "results" else 0
+                        height: search_results_content.minimum_height if app.search_state == "results" else 0
+                        disabled: app.search_state != "results"
+
+                        MDBoxLayout:
+                            id: search_results_content
+                            orientation: "vertical"
+                            adaptive_height: True
+                            padding: ["12dp", "4dp", "12dp", "0dp"]
+                            spacing: "12dp"
+
+                            MDBoxLayout:
+                                id: results_header_box
+                                adaptive_height: True
+                                MDLabel:
+                                    id: search_status_label
+                                    text: "Search Results"
+                                    font_style: "Title"
+                                    role: "medium"
+                                    bold: True
+                                    adaptive_height: True
+
+                            # Loading banner when search is actively in flight
+                            MDCard:
+                                id: search_loading_card
+                                style: "filled"
+                                theme_bg_color: "Custom"
+                                md_bg_color: app.theme_cls.surfaceContainerLowColor
+                                radius: [dp(16)]
+                                size_hint_y: None
+                                height: "56dp" if app.search_loading else 0
+                                opacity: 1 if app.search_loading else 0
+                                disabled: not app.search_loading
+                                padding: ["16dp", "0dp", "16dp", "0dp"]
+                                MDBoxLayout:
+                                    orientation: "horizontal"
+                                    spacing: "12dp"
+                                    YouTubeLoadingCircle:
+                                        size_hint: None, None
+                                        size: dp(26), dp(26)
+                                        pos_hint: {"center_y": .5}
+                                        active: bool(app.search_loading)
+                                        color: app.theme_cls.primaryColor
+                                        line_width: dp(2.8)
+                                    MDLabel:
+                                        text: "Searching YouTube, Spotify & JioSaavn..."
+                                        font_style: "Body"
+                                        role: "medium"
+                                        pos_hint: {"center_y": .5}
+                                        theme_text_color: "Custom"
+                                        text_color: app.theme_cls.onSurfaceColor
+
+                            MDLabel:
+                                id: search_no_results_label
+                                text: "No results found"
+                                font_style: "Title"
+                                role: "large"
+                                halign: "center"
+                                text_color: app.theme_cls.onSurfaceVariantColor
+                                adaptive_height: True
+                                opacity: 1 if not app.search_loading and not search_results_list.data else 0
+                                height: "48dp" if not app.search_loading and not search_results_list.data else 0
+
+                            RecycleView:
+                                id: search_results_list
+                                viewclass: "TrackListItem"
+                                data: []
+                                size_hint_y: None
+                                height: (dp(64) + dp(8)) * len(self.data)
+                                opacity: 1 if self.data else 0
+                                RecycleBoxLayout:
+                                    default_size: None, dp(64)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+                                    orientation: 'vertical'
+                                    spacing: dp(8)
+                Widget:
+                    size_hint_y: 1

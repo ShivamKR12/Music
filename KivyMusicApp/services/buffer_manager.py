@@ -206,6 +206,7 @@ class BufferManager:
         cancel_event: threading.Event,
         duration_hint: float = 0.0,
         bitrate_bps: int = 128000,
+        http_headers: Optional[Dict[str, str]] = None,
         on_ready_to_play: Optional[Callable[[str], None]] = None,
         on_completed: Optional[Callable[[str, BufferMetrics], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
@@ -219,6 +220,7 @@ class BufferManager:
         part_path = f"{final_path}.part"
         self.reset(duration=duration_hint, bitrate_bps=bitrate_bps)
         self.set_state(BufferState.PROBING)
+        base_headers: Dict[str, str] = dict(http_headers or {})
 
         # Probe content-length and byte-range support (with optional refresh on 403/410)
         total_len = 0
@@ -226,7 +228,7 @@ class BufferManager:
         refreshed_probe = False
         for _ in range(2):
             try:
-                head_resp = requests.head(stream_url, allow_redirects=True, timeout=10)
+                head_resp = requests.head(stream_url, headers=base_headers, allow_redirects=True, timeout=10)
                 if head_resp.status_code < 400:
                     total_len = int(head_resp.headers.get("content-length", 0) or 0)
                     supports_range = "bytes" in (head_resp.headers.get("accept-ranges", "").lower())
@@ -264,7 +266,7 @@ class BufferManager:
                 self.set_state(BufferState.CANCELLED)
                 return False
 
-            headers: Dict[str, str] = {}
+            headers: Dict[str, str] = dict(base_headers)
             mode = "wb"
             if dl_bytes > 0 and supports_range:
                 headers["Range"] = f"bytes={dl_bytes}-"

@@ -247,7 +247,15 @@ def is_stream_url_expired(url: str, expires_at: float = 0.0, leeway_sec: float =
     return time.time() >= (exp - max(0.0, float(leeway_sec)))
 
 
-def _score_audio_format(fmt: dict) -> Tuple[int, float, int]:
+def _is_android_runtime() -> bool:
+    try:
+        from kivy.utils import platform
+        return platform == "android"
+    except Exception:
+        return False
+
+
+def _score_audio_format(fmt: dict, prefer_mp4a: bool = False) -> Tuple[int, float, int]:
     """Score candidate yt-dlp format dicts: direct audio codecs preferred over manifest-only."""
     ext = (fmt.get("ext") or "").lower()
     acodec = (fmt.get("acodec") or "").lower()
@@ -255,13 +263,18 @@ def _score_audio_format(fmt: dict) -> Tuple[int, float, int]:
     protocol = (fmt.get("protocol") or "").lower()
 
     audio_only_bonus = 2 if vcodec in ("none", "", None) else 0
-    codec_rank = 3 if "opus" in acodec or ext == "webm" else (2 if "mp4a" in acodec or ext in ("m4a", "aac") else 1)
+    if prefer_mp4a:
+        # Android SoundAndroidPlayer natively supports mp4/m4a/aac/mp3/ogg/wav/flac, not webm
+        is_android_mp4 = "mp4a" in acodec or ext in ("m4a", "mp4", "aac")
+        codec_rank = 3 if is_android_mp4 else (2 if ext in ("mp3", "ogg", "flac", "wav") else 0)
+    else:
+        codec_rank = 3 if "opus" in acodec or ext == "webm" else (2 if "mp4a" in acodec or ext in ("m4a", "aac") else 1)
     direct_proto_bonus = 2 if protocol in ("https", "http", "") else 0
     abr = float(fmt.get("abr") or fmt.get("tbr") or 0.0)
     return (audio_only_bonus + direct_proto_bonus, codec_rank, int(abr))
 
 
-def validate_and_select_audio_format(info: Optional[dict]) -> Optional[dict]:
+def validate_and_select_audio_format(info: Optional[dict], prefer_mp4a: bool = False) -> Optional[dict]:
     """
     Validate extracted yt-dlp info_dict and pick a playable, non-DRM audio stream URL.
     Returns normalized stream descriptor dict or None when no valid audio stream exists.
@@ -292,7 +305,7 @@ def validate_and_select_audio_format(info: Optional[dict]) -> Optional[dict]:
     if not candidates:
         return None
 
-    best = max(candidates, key=_score_audio_format)
+    best = max(candidates, key=lambda f: _score_audio_format(f, prefer_mp4a=prefer_mp4a))
     stream_url = best.get("url") or ""
     if not stream_url.startswith(("http://", "https://")):
         return None
@@ -300,6 +313,7 @@ def validate_and_select_audio_format(info: Optional[dict]) -> Optional[dict]:
     expires_at = parse_stream_expiry(stream_url)
     ext = (best.get("ext") or info.get("ext") or "m4a").lower()
     abr = int(best.get("abr") or info.get("abr") or 128)
+    headers = dict(best.get("http_headers") or info.get("http_headers") or {})
     return {
         "url": stream_url,
         "ext": ext,
@@ -311,6 +325,7 @@ def validate_and_select_audio_format(info: Optional[dict]) -> Optional[dict]:
         "expires_at": expires_at,
         "protocol": best.get("protocol") or "https",
         "acodec": best.get("acodec") or "",
+        "http_headers": headers,
         "raw_info": info,
     }
 
@@ -499,8 +514,13 @@ class ClientTier:
 
 DEFAULT_CLIENT_TIERS: Tuple[ClientTier, ...] = (
     ClientTier(
-        name="mobile_embedded",
-        clients=("ios", "android_vr", "tv"),
+        name="android_direct",
+        clients=("android",),
+        allow_missing_pot_fallback=False,
+    ),
+    ClientTier(
+        name="ytdlp_default",
+        clients=(),
         allow_missing_pot_fallback=False,
     ),
     ClientTier(
@@ -509,8 +529,13 @@ DEFAULT_CLIENT_TIERS: Tuple[ClientTier, ...] = (
         allow_missing_pot_fallback=False,
     ),
     ClientTier(
+        name="mobile_embedded",
+        clients=("ios", "tv", "android_vr"),
+        allow_missing_pot_fallback=False,
+    ),
+    ClientTier(
         name="missing_pot_fallback",
-        clients=("ios", "android", "mweb", "web"),
+        clients=("android", "mweb", "web", "ios"),
         allow_missing_pot_fallback=True,
     ),
 )
@@ -606,11 +631,13 @@ class YouTubeExtractor:
         """Assemble consistent hardened YoutubeDL options with logging bridge and PO-token hooks."""
         active_tier = tier or self.client_tiers[0]
         bridge = log_bridge or YtdlpLogBridge(logger)
-        yt_args: Dict[str, Any] = {
-            "player_client": list(active_tier.clients),
-        }
+        yt_args: Dict[str, Any] = {}
+        if active_tier.clients:
+            yt_args["player_client"] = list(active_tier.clients)
 
-        po_tokens = self.po_token_manager.resolve_po_tokens(video_id, active_tier.clients, context="gvs")
+        po_tokens = self.po_token_manager.resolve_po_tokens(
+            video_id, active_tier.clients or ("web", "android"), context="gvs"
+        )
         if po_tokens:
             yt_args["po_token"] = po_tokens
         elif active_tier.allow_missing_pot_fallback:
@@ -624,8 +651,9 @@ class YouTubeExtractor:
             "socket_timeout": 12,
             "extractor_retries": 1,
             "nocheckcertificate": True,
-            "extractor_args": {"youtube": yt_args},
         }
+        if yt_args:
+            opts["extractor_args"] = {"youtube": yt_args}
         if extract_flat:
             opts["extract_flat"] = True
             opts["skip_download"] = True
@@ -658,6 +686,7 @@ class YouTubeExtractor:
         watch_url_or_id: str,
         force_refresh: bool = False,
         cancel_event: Optional[threading.Event] = None,
+        excluded_tiers: Optional[Iterable[str]] = None,
     ) -> Dict[str, Any]:
         """
         Execute the full YouTube stream extraction pipeline with client tiers, PO-token
@@ -684,7 +713,11 @@ class YouTubeExtractor:
             "Could not extract playable audio stream from YouTube",
         )
 
-        for tier in self.client_tiers:
+        excluded = set(excluded_tiers or [])
+        active_tiers = [t for t in self.client_tiers if t.name not in excluded] or list(self.client_tiers)
+        prefer_mp4a = _is_android_runtime()
+
+        for tier in active_tiers:
             for attempt in range(1, self.max_retries_per_tier + 1):
                 if cancel_event and cancel_event.is_set():
                     get_telemetry().record_provider_outcome(
@@ -722,7 +755,7 @@ class YouTubeExtractor:
                         continue
                     break  # Step to next client tier
 
-                validated = validate_and_select_audio_format(info)
+                validated = validate_and_select_audio_format(info, prefer_mp4a=prefer_mp4a)
                 if validated and validated.get("url"):
                     validated["video_id"] = vid
                     validated["client_tier"] = tier.name

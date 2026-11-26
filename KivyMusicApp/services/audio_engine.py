@@ -47,12 +47,15 @@ logger = get_logger("AudioEngine")
 _redact_url = redact_sensitive_text
 YtdlpEngineLogger = YtdlpLogBridge
 
-# Register native Android audio provider when running on Android
+# Register native Android audio provider ahead of SDL2 when running on Android
 if platform == "android":
     try:
         from kivy.core.audio.audio_android import SoundAndroidPlayer
         SoundLoader.register(SoundAndroidPlayer)
-        logger.info("Registered native SoundAndroidPlayer for Android")
+        SoundLoader._classes = [SoundAndroidPlayer] + [
+            cls for cls in SoundLoader._classes if cls is not SoundAndroidPlayer
+        ]
+        logger.info("Prioritized native SoundAndroidPlayer ahead of SDL2 for Android")
     except Exception as _e:
         logger.error("Failed to register SoundAndroidPlayer: %s", _e)
 
@@ -576,18 +579,31 @@ class AudioEngine:
                 return
 
             stream_url = extracted["url"]
+            stream_headers = dict(extracted.get("http_headers") or {})
+            used_tier = str(extracted.get("client_tier") or "")
+            failed_tiers = []
             ext = extracted.get("ext", "m4a")
             bitrate_bps = max(32000, int(extracted.get("abr", 128)) * 1000)
 
             def _refresh_yt_stream() -> Optional[str]:
+                nonlocal used_tier
                 if cancel_event.is_set():
                     return None
+                if used_tier and used_tier not in failed_tiers:
+                    failed_tiers.append(used_tier)
                 try:
-                    fresh = self._extract_youtube_direct_stream(
-                        full_url, force_refresh=True, cancel_event=cancel_event
+                    fresh = get_youtube_extractor().extract_stream(
+                        full_url,
+                        force_refresh=True,
+                        cancel_event=cancel_event or self.cancel_event,
+                        excluded_tiers=failed_tiers,
                     )
                     if fresh and fresh.get("url"):
+                        used_tier = str(fresh.get("client_tier") or "")
                         clean_info["expires_at"] = float(fresh.get("expires_at") or 0.0)
+                        if fresh.get("http_headers"):
+                            stream_headers.clear()
+                            stream_headers.update(fresh["http_headers"])
                         return fresh["url"]
                 except Exception as ref_err:
                     logger.warning("YouTube stream refresh failed (%s): %s", video_id, redact_sensitive_text(ref_err))
@@ -615,6 +631,7 @@ class AudioEngine:
                     cancel_event=cancel_event,
                     duration_hint=clean_info["duration"],
                     bitrate_bps=bitrate_bps,
+                    http_headers=stream_headers,
                     on_completed=_on_dl_done,
                     on_refresh_stream=_refresh_yt_stream,
                     on_error=lambda msg: logger.warning("Background cache failed (%s): %s", video_id, redact_sensitive_text(msg)),
@@ -645,6 +662,7 @@ class AudioEngine:
                     cancel_event=cancel_event,
                     duration_hint=clean_info["duration"],
                     bitrate_bps=bitrate_bps,
+                    http_headers=stream_headers,
                     on_completed=_on_done,
                     on_error=_on_err,
                     on_refresh_stream=_refresh_yt_stream,
@@ -832,7 +850,20 @@ class AudioEngine:
 
         # 2. Android / SoundLoader Fallback
         self._using_pcm_pipeline = False
-        self.player = SoundLoader.load(target_src) if is_local else None
+        self.player = None
+        if is_local:
+            try:
+                self.player = SoundLoader.load(target_src)
+            except Exception as load_exc:
+                logger.warning("Primary SoundLoader provider failed (%s): %s", os.path.basename(target_src), load_exc)
+                ext = target_src.rsplit(".", 1)[-1].lower() if "." in target_src else ""
+                for cls in list(SoundLoader._classes[1:]):
+                    try:
+                        if ext in cls.extensions():
+                            self.player = cls(source=target_src)
+                            break
+                    except Exception:
+                        continue
         if self.player:
             self.player.play()
             tok = self._active_play_token
@@ -1092,9 +1123,15 @@ class AudioEngine:
                     self._pcm_deck_a.length = dec_dur
                 self.buffer_manager.update_playhead(self.elapsed)
             else:
-                pos = getattr(self.player, "get_pos", lambda: None)()
+                try:
+                    pos = getattr(self.player, "get_pos", lambda: None)()
+                except Exception:
+                    pos = None
                 self.elapsed += dt_real
-                flen = getattr(self.player, "length", 0)
+                try:
+                    flen = getattr(self.player, "length", 0)
+                except Exception:
+                    flen = 0
                 if flen > 0 and abs(self.duration - flen) > 1.0:
                     self.duration = flen
                 if pos is not None and pos > 0:
@@ -1153,6 +1190,7 @@ class AudioEngine:
             if hasattr(self.player, "_mediaplayer") and self.player._mediaplayer:
                 try:
                     self.player._mediaplayer.pause()
+                    self.player.state = "stop"
                 except Exception:
                     self.player.stop()
             elif hasattr(self.player, "_ffplayer") and self.player._ffplayer:
@@ -1181,6 +1219,7 @@ class AudioEngine:
             if hasattr(self.player, "_mediaplayer") and self.player._mediaplayer:
                 try:
                     self.player._mediaplayer.start()
+                    self.player.state = "play"
                 except Exception:
                     self.player.play()
             elif hasattr(self.player, "_ffplayer") and self.player._ffplayer:
@@ -1247,6 +1286,12 @@ class AudioEngine:
             self._android_fx.apply(self.eq_bands, self.eq_reverb)
 
     def _safe_seek(self, pos: float) -> None:
+        if hasattr(self.player, "_mediaplayer") and self.player._mediaplayer:
+            try:
+                self.player._mediaplayer.seekTo(max(0, int(float(pos) * 1000)))
+                return
+            except Exception:
+                pass
         if hasattr(self.player, "seek") and not isinstance(self.player, _PCMDeckHandle):
             try:
                 self.player.seek(pos)

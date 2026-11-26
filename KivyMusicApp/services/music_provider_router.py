@@ -7,7 +7,7 @@ and 1-click Spotify playlist import into local SQLite storage.
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import List, Dict, Optional, Any, Union
 
 from services.music_provider_base import BaseMusicProvider
@@ -94,7 +94,13 @@ class MusicProviderRouter:
         js_results: List[Dict[str, Any]] = []
         yt_results: List[Dict[str, Any]] = []
 
-        for future in as_completed(futures):
+        done, not_done = wait(futures.keys(), timeout=12.0)
+        for future in not_done:
+            src = futures[future]
+            logger.warning("Search timed out after 12s for %s", src)
+            future.cancel()
+
+        for future in done:
             src = futures[future]
             try:
                 res = future.result()

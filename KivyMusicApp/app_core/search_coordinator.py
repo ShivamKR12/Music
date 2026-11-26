@@ -186,6 +186,8 @@ class SearchCoordinator:
                     ]
             elif "search_status_label" in search_screen.ids:
                 search_screen.ids.search_status_label.text = f"Searching online for '{q}'..."
+            if "search_scroll" in search_screen.ids:
+                search_screen.ids.search_scroll.scroll_y = 1.0
         except Exception:
             pass
 
@@ -311,8 +313,10 @@ class SearchCoordinator:
 
             provider_filter = getattr(app, "active_search_provider", "all")
             entries = MusicProviderRouter().search(query, provider=provider_filter, limit=16)
+            app_logger.info(f"[THREAD SUCCESS] MusicApp._async_yt_search for '{query}' -> {len(entries)} items")
             Clock.schedule_once(lambda dt: app._on_search_results(entries, query), 0)
         except Exception as e:
+            app_logger.error(f"[THREAD FAILED] MusicApp._async_yt_search error for '{query}': {e}")
             Clock.schedule_once(lambda dt: app._on_search_error(str(e)), 0)
 
     def on_search_results(self, entries: list, query: str) -> None:
