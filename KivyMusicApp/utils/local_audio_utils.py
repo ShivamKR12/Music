@@ -318,8 +318,43 @@ def parse_audio_duration(abs_path: str) -> int:
         except Exception:
             pass
 
-    # 3. MP3: Fast MPEG frame sync + Xing / Info header or CBR frame rate
-    if ext in ('.mp3', '.m4a', ''):
+    # 3. M4A / MP4 duration: timescale and duration from moov -> mvhd atom
+    if ext in ('.m4a', '.mp4', '.aac'):
+        try:
+            with open(abs_path, 'rb') as f:
+                while True:
+                    header = f.read(8)
+                    if len(header) < 8:
+                        break
+                    atom_size, atom_type = struct.unpack('>I4s', header)
+                    if atom_size == 1:
+                        atom_size = struct.unpack('>Q', f.read(8))[0]
+                        data_size = atom_size - 16
+                    elif atom_size == 0:
+                        break
+                    else:
+                        data_size = atom_size - 8
+
+                    if atom_type == b'moov':
+                        moov_data = f.read(min(data_size, 4 * 1024 * 1024))
+                        mvhd_idx = moov_data.find(b'mvhd')
+                        if mvhd_idx != -1:
+                            ver = moov_data[mvhd_idx + 4]
+                            if ver == 0:
+                                timescale, duration = struct.unpack('>II', moov_data[mvhd_idx + 16 : mvhd_idx + 24])
+                            else:
+                                timescale = struct.unpack('>I', moov_data[mvhd_idx + 24 : mvhd_idx + 28])[0]
+                                duration = struct.unpack('>Q', moov_data[mvhd_idx + 28 : mvhd_idx + 36])[0]
+                            if timescale > 0:
+                                return int(duration / timescale)
+                        break
+                    else:
+                        f.seek(data_size, 1)
+        except Exception:
+            pass
+
+    # 4. MP3: Fast MPEG frame sync + Xing / Info header or CBR frame rate
+    if ext in ('.mp3', ''):
         try:
             with open(abs_path, 'rb') as f:
                 data = f.read(min(size, 131072))
@@ -488,6 +523,52 @@ def extract_local_audio_metadata(file_path: str, cache_dir: str = None) -> dict:
         except Exception:
             pass
 
+    # 2b. Parse M4A/MP4 iTunes atoms if file is AAC/M4A/MP4
+    ext_lower = os.path.splitext(abs_path)[1].lower()
+    if ext_lower in ('.m4a', '.mp4', '.aac') and (not raw_title or not raw_artist or not artwork):
+        try:
+            with open(abs_path, 'rb') as f:
+                while True:
+                    hdr = f.read(8)
+                    if len(hdr) < 8:
+                        break
+                    atom_size, atom_type = struct.unpack('>I4s', hdr)
+                    if atom_size == 1:
+                        atom_size = struct.unpack('>Q', f.read(8))[0]
+                        d_size = atom_size - 16
+                    elif atom_size == 0:
+                        break
+                    else:
+                        d_size = atom_size - 8
+
+                    if atom_type == b'moov':
+                        moov_data = f.read(min(d_size, 8 * 1024 * 1024))
+                        ilst_idx = moov_data.find(b'ilst')
+                        if ilst_idx != -1:
+                            pos = ilst_idx + 4
+                            while pos < len(moov_data) - 8:
+                                sub_sz, sub_tp = struct.unpack('>I4s', moov_data[pos:pos+8])
+                                if sub_sz < 8 or pos + sub_sz > len(moov_data):
+                                    break
+                                it_data = moov_data[pos+8:pos+sub_sz]
+                                dt_idx = it_data.find(b'data')
+                                if dt_idx != -1:
+                                    v_bytes = it_data[dt_idx + 12:]
+                                    if sub_tp == b'\xa9nam' and not raw_title:
+                                        raw_title = v_bytes.decode('utf-8', 'ignore').strip('\x00 ')
+                                    elif sub_tp in (b'\xa9ART', b'aART') and not raw_artist:
+                                        raw_artist = v_bytes.decode('utf-8', 'ignore').strip('\x00 ')
+                                    elif sub_tp == b'\xa9alb' and album == "Offline Music":
+                                        album = v_bytes.decode('utf-8', 'ignore').strip('\x00 ')
+                                    elif sub_tp == b'covr' and not artwork:
+                                        artwork = extract_embedded_artwork(v_bytes, safe_id, cache_dir)
+                                pos += sub_sz
+                        break
+                    else:
+                        f.seek(d_size, 1)
+        except Exception:
+            pass
+
     # 3. Check Sidecar .json metadata
     sidecar_candidates = [
         os.path.join(os.path.dirname(abs_path), f"{base_name}.json"),
@@ -590,33 +671,170 @@ def extract_local_audio_metadata(file_path: str, cache_dir: str = None) -> dict:
 def get_standard_offline_music_dirs() -> list:
     """Returns candidate music directories across Windows, Android, and Linux."""
     dirs = []
-    # 1. User Music folder
-    u_music = os.path.expanduser("~/Music")
-    if os.path.exists(u_music) and os.path.isdir(u_music):
-        dirs.append(u_music)
+    seen = set()
+
+    def _add(p):
+        if not p:
+            return
+        try:
+            p_exp = os.path.realpath(os.path.abspath(os.path.expanduser(p)))
+            p_norm = os.path.normcase(p_exp)
+            if p_norm not in seen and os.path.exists(p_exp) and os.path.isdir(p_exp):
+                seen.add(p_norm)
+                dirs.append(p_exp)
+        except Exception:
+            pass
+
+    # 1. User Music & Downloads folders
+    _add("~/Music")
+    _add("~/Downloads")
 
     # 2. App Cache
-    app_cache = get_cache_dir()
-    if os.path.exists(app_cache) and os.path.isdir(app_cache):
-        dirs.append(app_cache)
+    _add(get_cache_dir())
 
-    # 3. User Downloads folder
-    u_down = os.path.expanduser("~/Downloads")
-    if os.path.exists(u_down) and os.path.isdir(u_down):
-        dirs.append(u_down)
+    # 3. Standard Android storage directories
+    sub_media_dirs = ["Music", "Download", "Downloads", "Podcasts", "Audiobooks", "Recordings"]
+    android_base_candidates = [
+        "/storage/emulated/0",
+        "/sdcard",
+        os.environ.get("EXTERNAL_STORAGE", "")
+    ]
 
-    # 4. Android storage paths
-    android_paths = ["/sdcard/Music", "/sdcard/Download", "/storage/emulated/0/Music"]
-    for ap in android_paths:
-        if os.path.exists(ap) and os.path.isdir(ap):
-            dirs.append(ap)
+    for base in android_base_candidates:
+        if not base or not os.path.exists(base):
+            continue
+        for sub in sub_media_dirs:
+            _add(os.path.join(base, sub))
+
+    # 4. Secondary external storage (e.g. MicroSD cards /storage/XXXX-XXXX)
+    if os.path.exists("/storage") and os.path.isdir("/storage"):
+        try:
+            for entry in os.listdir("/storage"):
+                if entry.lower() in ("emulated", "self", "knox-emulated"):
+                    continue
+                vol_path = os.path.join("/storage", entry)
+                if os.path.isdir(vol_path):
+                    for sub in sub_media_dirs:
+                        _add(os.path.join(vol_path, sub))
+                    _add(vol_path)
+        except Exception:
+            pass
 
     return dirs
 
-def scan_device_offline_songs(directories: list = None, cache_dir: str = None, limit: int = None) -> list:
+def query_android_mediastore_audio(cache_dir: str = None, limit: int = None, resolver=None) -> list:
     """
-    Scans device music directories for local audio files (.mp3, .m4a, .wav, .ogg, .flac).
-    Extracts rich metadata & artwork for every track and returns a list of track metadata dicts.
+    Query Android Scoped Storage via `MediaStore.Audio.Media.EXTERNAL_CONTENT_URI`.
+    Supports API 29+/33+ cleanly without relying on raw recursive filesystem traversal.
+    Accepts optional injectable `resolver` (ContentResolver mock) for headless unit tests.
+    """
+    try:
+        from kivy.utils import platform as _plat
+    except Exception:
+        _plat = "unknown"
+
+    if resolver is None and _plat != "android":
+        return []
+
+    results = []
+    seen_paths = set()
+    cursor = None
+    try:
+        if resolver is None:
+            from jnius import autoclass
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            activity = PythonActivity.mActivity
+            if not activity:
+                return []
+            resolver = activity.getContentResolver()
+            MediaStoreAudio = autoclass("android.provider.MediaStore$Audio$Media")
+            uri = MediaStoreAudio.EXTERNAL_CONTENT_URI
+        else:
+            uri = "content://media/external/audio/media"
+
+        projection = ["_id", "title", "artist", "album", "duration", "_data", "mime_type", "is_music"]
+        cursor = resolver.query(uri, projection, "is_music != 0", None, "date_added DESC")
+        if cursor is None:
+            return []
+
+        idx_id = cursor.getColumnIndex("_id")
+        idx_title = cursor.getColumnIndex("title")
+        idx_artist = cursor.getColumnIndex("artist")
+        idx_album = cursor.getColumnIndex("album")
+        idx_dur = cursor.getColumnIndex("duration")
+        idx_data = cursor.getColumnIndex("_data")
+
+        while cursor.moveToNext():
+            path_val = str(cursor.getString(idx_data) or "").strip() if idx_data >= 0 else ""
+            norm_p = os.path.normcase(os.path.realpath(path_val)) if path_val else ""
+            if norm_p and norm_p in seen_paths:
+                continue
+            if path_val and not os.path.exists(path_val):
+                # In strict Scoped Storage where legacy _data is unreachable, build content URI safely
+                ms_id = cursor.getLong(idx_id) if idx_id >= 0 else 0
+                path_val = path_val or f"content://media/external/audio/media/{ms_id}"
+            if norm_p:
+                seen_paths.add(norm_p)
+
+            ms_id = str(cursor.getLong(idx_id) if idx_id >= 0 else len(results))
+            title = str(cursor.getString(idx_title) or "").strip() if idx_title >= 0 else ""
+            artist = str(cursor.getString(idx_artist) or "").strip() if idx_artist >= 0 else ""
+            album = str(cursor.getString(idx_album) or "").strip() if idx_album >= 0 else ""
+            dur_ms = int(cursor.getLong(idx_dur) or 0) if idx_dur >= 0 else 0
+            dur_sec = max(0, dur_ms // 1000) if dur_ms > 0 else 0
+
+            if path_val and os.path.exists(path_val):
+                meta = extract_local_audio_metadata(path_val, cache_dir=cache_dir)
+                stem = os.path.splitext(os.path.basename(path_val))[0]
+                if title and (not meta.get("title") or meta["title"].lower() == stem.lower()):
+                    meta["title"] = title
+                if artist and artist != "<unknown>" and meta.get("artist") in ("Unknown Artist", "Local Artist", "Offline Music"):
+                    meta["artist"] = artist
+                if album and meta.get("album") in ("", "Offline Music"):
+                    meta["album"] = album
+                if dur_sec > 0 and int(meta.get("duration") or 0) <= 0:
+                    meta["duration"] = dur_sec
+                results.append(meta)
+            else:
+                safe_title = title or f"Track {ms_id}"
+                safe_artist = "Unknown Artist" if (not artist or artist == "<unknown>") else artist
+                results.append({
+                    "video_id": f"ms_{ms_id}",
+                    "title": safe_title,
+                    "artist": safe_artist,
+                    "album": album,
+                    "duration": dur_sec or 180,
+                    "artwork": "album_art.png",
+                    "local_path": path_val or f"content://media/external/audio/media/{ms_id}",
+                    "url": "",
+                    "is_downloaded": True,
+                })
+
+            if limit and len(results) >= limit:
+                break
+    except Exception as exc:
+        logger.debug("Android MediaStore query skipped: %s", exc)
+    finally:
+        if cursor is not None:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
+    return results
+
+
+def scan_device_offline_songs(
+    directories: list = None,
+    cache_dir: str = None,
+    limit: int = None,
+    max_depth: int = 5,
+    use_mediastore: bool = True,
+    mediastore_querier=None,
+) -> list:
+    """
+    Scans device music cleanly across Android Scoped Storage (MediaStore API 29+/33+)
+    and standard directories while deduplicating canonical normalized paths.
     """
     if directories is None:
         directories = get_standard_offline_music_dirs()
@@ -624,27 +842,82 @@ def scan_device_offline_songs(directories: list = None, cache_dir: str = None, l
         cache_dir = get_cache_dir()
 
     seen_paths = set()
-    audio_extensions = {".mp3", ".m4a", ".wav", ".ogg", ".flac", ".opus", ".aac"}
     tracks = []
 
+    try:
+        from kivy.utils import platform as _plat
+    except Exception:
+        _plat = "unknown"
+
+    if use_mediastore and (mediastore_querier is not None or _plat == "android"):
+        try:
+            ms_items = (
+                mediastore_querier(cache_dir=cache_dir, limit=limit)
+                if mediastore_querier is not None
+                else query_android_mediastore_audio(cache_dir=cache_dir, limit=limit)
+            )
+            for meta in (ms_items or []):
+                lp = meta.get("local_path") or ""
+                norm_p = os.path.normcase(os.path.realpath(lp)) if (lp and not lp.startswith("content://")) else lp
+                if norm_p and norm_p not in seen_paths:
+                    seen_paths.add(norm_p)
+                    tracks.append(meta)
+                    if limit and len(tracks) >= limit:
+                        return tracks
+        except Exception as ms_exc:
+            logger.debug("MediaStore scan fallback error: %s", ms_exc)
+
+    audio_extensions = {".mp3", ".m4a", ".wav", ".ogg", ".flac", ".opus", ".aac", ".wma", ".m4b"}
+    prune_dirs = {
+        "android", "lost.dir", "thumbnails", ".thumbnails",
+        ".trash", ".cache", ".git", "$recycle.bin", "system volume information"
+    }
+
     for d in directories:
-        if not os.path.exists(d):
+        if not os.path.exists(d) or not os.path.isdir(d):
             continue
         try:
-            with os.scandir(d) as it:
-                for entry in it:
-                    if entry.is_file():
-                        ext = os.path.splitext(entry.name)[1].lower()
-                        if ext in audio_extensions:
-                            abs_p = os.path.abspath(entry.path)
-                            norm_p = os.path.normcase(abs_p)
-                            if norm_p not in seen_paths:
-                                seen_paths.add(norm_p)
+            for root, subdirs, files in os.walk(d, followlinks=False):
+                # Calculate depth relative to directory root
+                try:
+                    rel = os.path.relpath(root, d)
+                    depth = 0 if rel == '.' else len(rel.replace('\\', '/').split('/'))
+                    if depth > max_depth:
+                        subdirs.clear()
+                        continue
+                except Exception:
+                    pass
+
+                # Prune hidden or system directories in-place
+                subdirs[:] = [
+                    sd for sd in subdirs
+                    if not sd.startswith('.') and sd.lower() not in prune_dirs
+                ]
+
+                # Skip protected Android system directories
+                norm_root = root.replace('\\', '/').lower()
+                if '/android/data' in norm_root or '/android/obb' in norm_root:
+                    subdirs.clear()
+                    continue
+
+                for f in files:
+                    if f.startswith('.'):
+                        continue
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in audio_extensions:
+                        abs_p = os.path.realpath(os.path.abspath(os.path.join(root, f)))
+                        norm_p = os.path.normcase(abs_p)
+                        if norm_p not in seen_paths:
+                            seen_paths.add(norm_p)
+                            try:
                                 meta = extract_local_audio_metadata(abs_p, cache_dir=cache_dir)
                                 tracks.append(meta)
                                 if limit and len(tracks) >= limit:
                                     return tracks
-        except Exception:
+                            except Exception as ex:
+                                logger.debug("Error extracting metadata for %s: %s", abs_p, ex)
+        except Exception as e:
+            logger.debug("Error scanning directory %s: %s", d, e)
             continue
 
     return tracks

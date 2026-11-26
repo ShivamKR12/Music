@@ -24,6 +24,18 @@ class TrackModel(EventDispatcher):
     source_id = StringProperty("")
     bitrate = NumericProperty(128)
     isrc = StringProperty("")
+    media_type = StringProperty("song")  # 'song' or 'podcast'
+    album = StringProperty("")
+    album_artist = StringProperty("")
+    genre = StringProperty("")
+    description = StringProperty("")
+    view_count = NumericProperty(0)
+    like_count = NumericProperty(0)
+    channel = StringProperty("")
+    channel_id = StringProperty("")
+    release_date = StringProperty("")
+    chapters = StringProperty("")
+    track_number = NumericProperty(0)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -74,6 +86,13 @@ class TrackModel(EventDispatcher):
         else:
             is_fav_val = is_favorite(vid) if vid else False
 
+        raw_mtype = data.get("media_type")
+        if not raw_mtype:
+            from utils.media_utils import is_podcast_item
+            mtype = "podcast" if is_podcast_item(data) else "song"
+        else:
+            mtype = str(raw_mtype).lower()
+
         return cls(
             video_id=vid,
             title=data.get("title", "Unknown Title"),
@@ -90,6 +109,18 @@ class TrackModel(EventDispatcher):
             source_id=data.get("source_id", "") or vid,
             bitrate=int(data.get("bitrate", 128) or 128),
             isrc=data.get("isrc", "") or "",
+            media_type=mtype,
+            album=data.get("album", "") or "",
+            album_artist=data.get("album_artist", "") or "",
+            genre=data.get("genre", "") or "",
+            description=data.get("description", "") or "",
+            view_count=int(data.get("view_count", 0) or 0),
+            like_count=int(data.get("like_count", 0) or 0),
+            channel=data.get("channel", "") or data.get("uploader", "") or "",
+            channel_id=data.get("channel_id", "") or data.get("uploader_id", "") or "",
+            release_date=str(data.get("release_date") or data.get("release_year") or ""),
+            chapters=str(data.get("chapters") or ""),
+            track_number=int(data.get("track_number", 0) or 0),
         )
 
     def to_dict(self):
@@ -111,6 +142,18 @@ class TrackModel(EventDispatcher):
             "source_id": self.source_id,
             "bitrate": int(self.bitrate),
             "isrc": self.isrc,
+            "media_type": self.media_type,
+            "album": self.album,
+            "album_artist": self.album_artist,
+            "genre": self.genre,
+            "description": self.description,
+            "view_count": int(self.view_count),
+            "like_count": int(self.like_count),
+            "channel": self.channel,
+            "channel_id": self.channel_id,
+            "release_date": self.release_date,
+            "chapters": self.chapters,
+            "track_number": int(self.track_number),
         }
 
 DEFAULT_TRACKS_SEED = [
@@ -147,9 +190,9 @@ class PlaylistModel(EventDispatcher):
         self.load_from_db()
 
     def load_from_db(self):
-        """Load tracks from SQLite database, ensuring default seed tracks exist."""
+        """Load songs from SQLite database, strictly filtering out podcasts."""
         init_db()
-        db_tracks = get_all_tracks()
+        db_tracks = get_all_tracks(media_type="song")
         existing_vids = {t["video_id"] for t in db_tracks} if db_tracks else set()
         seeded_any = False
         for item in DEFAULT_TRACKS_SEED:
@@ -160,14 +203,15 @@ class PlaylistModel(EventDispatcher):
                     artist=item["artist"],
                     url=item["url"],
                     duration=item["duration"],
-                    artwork=item["artwork"]
+                    artwork=item["artwork"],
+                    media_type="song"
                 )
                 seeded_any = True
 
         if seeded_any or not db_tracks:
-            db_tracks = get_all_tracks()
+            db_tracks = get_all_tracks(media_type="song")
 
-        self.tracks = [TrackModel.from_dict(t) for t in db_tracks]
+        self.tracks = [TrackModel.from_dict(t) for t in db_tracks if t.get("media_type") != "podcast"]
 
     def add_track(self, track: TrackModel):
         """Append track if not already in playlist."""

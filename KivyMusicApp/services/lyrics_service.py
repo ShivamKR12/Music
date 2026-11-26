@@ -5,6 +5,9 @@ import threading
 import urllib.parse
 import urllib.request
 from kivy.clock import Clock
+from services.logger import get_logger
+
+logger = get_logger("LyricsService")
 
 class LyricsResult(str):
     """
@@ -189,7 +192,7 @@ def save_cached_lyrics(video_id: str, lyrics_text: str, synced_text: str = None,
             with open(lpath, 'w', encoding='utf-8') as f:
                 f.write(lyrics_text)
         except Exception as e:
-            print(f"[LyricsService] Failed to cache plain lyrics: {e}")
+            logger.warning("Failed to cache plain lyrics: %s", e)
 
     if synced_text:
         spath = os.path.join(cache_dir, f"{video_id}_synced.lrc")
@@ -197,7 +200,7 @@ def save_cached_lyrics(video_id: str, lyrics_text: str, synced_text: str = None,
             with open(spath, 'w', encoding='utf-8') as f:
                 f.write(synced_text)
         except Exception as e:
-            print(f"[LyricsService] Failed to cache synced lyrics: {e}")
+            logger.warning("Failed to cache synced lyrics: %s", e)
 
 def fetch_lyrics_sync(title: str, artist: str = "", video_id: str = None, cache_dir: str = None, local_path: str = None):
     """

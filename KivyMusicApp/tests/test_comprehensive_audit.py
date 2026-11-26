@@ -39,11 +39,21 @@ class FakeTouch:
         self.button = 'left'
         self.device = 'mouse'
         self.profile = ['pos', 'button']
-        self.time_start = 0
-        self.time_update = 0
-        self.push = lambda: None
-        self.pop = lambda: None
-        self.apply_transform_2d = lambda p: p
+        self.time_start = Clock.get_time()
+        self.time_update = self.time_start
+        self._stack = []
+
+    def push(self, attrs=None):
+        self._stack.append((self.x, self.y))
+
+    def pop(self):
+        if self._stack:
+            self.x, self.y = self._stack.pop()
+            self.pos = (self.x, self.y)
+
+    def apply_transform_2d(self, transform):
+        self.x, self.y = transform(self.x, self.y)
+        self.pos = (self.x, self.y)
 
     def grab(self, widget):
         import weakref
@@ -51,6 +61,9 @@ class FakeTouch:
         self.grab_list.append(weakref.ref(widget))
 
     def ungrab(self, widget):
+        for ref in list(self.grab_list):
+            if ref() is widget or ref() is None:
+                self.grab_list.remove(ref)
         if self.grab_current == widget:
             self.grab_current = None
 
@@ -128,6 +141,9 @@ class ComprehensiveAuditRunner:
 
         print("\n=== TEST SUITE 2: CONTROLLER STATE & PLAYBACK ACTIONS ===")
         pc = self.app.player_controller
+        if not pc.active_track and self.app.playlist_model.tracks:
+            self.app.play_selected_track(self.app.playlist_model.tracks[0])
+            pump_events(self.app, 3)
         initial_shuffle = pc.is_shuffle
         pc.toggle_shuffle()
         sh_ok = (pc.is_shuffle != initial_shuffle)
@@ -302,7 +318,7 @@ class ComprehensiveAuditRunner:
         touch = FakeTouch(180, 48)
         root.dispatch('on_touch_down', touch)
         root.dispatch('on_touch_up', touch)
-        pump_events(self.app, 5)
+        pump_events(self.app, 25)
         
         queue_sheet_opened = (self.app.queue_sheet is not None and 
                               self.app.queue_sheet.status in ("opened", "opening_with_animation"))

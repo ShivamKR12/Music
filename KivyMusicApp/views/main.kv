@@ -59,11 +59,11 @@ MDBoxLayout:
     MDBoxLayout:
         id: mini_player
         size_hint_y: None
-        padding: ["12dp", "0dp", "12dp", "8dp"] if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else ["0dp", "0dp", "0dp", "0dp"]
-        opacity: 1 if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
-        height: dp(72) if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else 0
-        disabled: False if screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"] else True
-        MDCard:
+        padding: ["12dp", "0dp", "12dp", "8dp"] if (app.mini_player_visible and app.player_controller and app.player_controller.active_track and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else ["0dp", "0dp", "0dp", "0dp"]
+        opacity: 1 if (app.mini_player_visible and app.player_controller and app.player_controller.active_track and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
+        height: dp(72) if (app.mini_player_visible and app.player_controller and app.player_controller.active_track and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else 0
+        disabled: False if (app.mini_player_visible and app.player_controller and app.player_controller.active_track and screen_manager.current in ["home", "search", "library", "album", "artist", "playlist", "browse", "podcasts", "mood", "equalizer", "listen_together", "favorites"]) else True
+        MiniPlayerCard:
             style: "elevated"
             size_hint_y: None
             height: "64dp"
@@ -117,17 +117,34 @@ MDBoxLayout:
                         pos_hint: {"center_y": .5}
                         on_release: app.player_controller.toggle_favorite()
 
-                    MDIconButton:
-                        icon: "pause" if app.player_controller.is_playing else "play"
-                        style: "filled"
-                        theme_bg_color: "Custom"
-                        md_bg_color: app.theme_cls.primaryColor
-                        theme_icon_color: "Custom"
-                        icon_color: app.theme_cls.onPrimaryColor
+                    MDFloatLayout:
                         size_hint: None, None
                         size: "42dp", "42dp"
                         pos_hint: {"center_y": .5}
-                        on_release: app.player_controller.toggle_play()
+
+                        MDIconButton:
+                            id: mini_play_btn
+                            icon: "pause" if app.player_controller.is_playing else "play"
+                            style: "filled"
+                            theme_bg_color: "Custom"
+                            md_bg_color: app.theme_cls.primaryColor
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.onPrimaryColor
+                            size_hint: None, None
+                            size: "42dp", "42dp"
+                            pos_hint: {"center_x": .5, "center_y": .5}
+                            opacity: 0 if (app.player_controller and app.player_controller.is_loading) else 1
+                            disabled: bool(app.player_controller and app.player_controller.is_loading)
+                            on_release: app.player_controller.toggle_play()
+
+                        YouTubeLoadingCircle:
+                            size_hint: None, None
+                            size: "30dp", "30dp"
+                            pos_hint: {"center_x": .5, "center_y": .5}
+                            active: bool(app.player_controller and app.player_controller.is_loading)
+                            opacity: 1 if (app.player_controller and app.player_controller.is_loading) else 0
+                            color: app.theme_cls.primaryColor
+                            line_width: dp(2.8)
 
                 MDLinearProgressIndicator:
                     size_hint_y: None

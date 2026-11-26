@@ -47,6 +47,14 @@
             theme_text_color: "Custom"
             text_color: app.theme_cls.onSurfaceVariantColor
 
+        YouTubeLoadingCircle:
+            size_hint: None, None
+            size: dp(36), dp(36)
+            pos_hint: {"center_x": .5}
+            active: True
+            color: app.theme_cls.primaryColor
+            line_width: dp(3)
+
         MDLinearProgressIndicator:
             type: "indeterminate"
             size_hint_x: 1

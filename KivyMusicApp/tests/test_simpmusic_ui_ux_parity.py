@@ -109,6 +109,12 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
         sm.current = "home"
         mini = self.root.ids.mini_player
 
+        # Activate track so mini player is visible for geometry verification
+        if self.app.playlist_model.tracks:
+            self.app.player_controller.set_track(self.app.playlist_model.tracks[0])
+            self.app.mini_player_visible = True
+            Clock.tick()
+
         # Mini player container must have 72dp height when visible on home
         self.assertEqual(mini.height, 72.0)
         self.assertFalse(mini.disabled)
@@ -194,10 +200,12 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
         all_appbar_icons = leading_icons + trailing_icons
 
         self.assertIn("chevron-down", all_appbar_icons, f"PlayerScreen must have chevron-down exit button (found: {all_appbar_icons})")
-        self.assertTrue(any("heart" in icon for icon in all_appbar_icons), f"PlayerScreen must have favorite heart button (found: {all_appbar_icons})")
-        self.assertIn("text-box-outline", all_appbar_icons, f"PlayerScreen must have lyrics button (found: {all_appbar_icons})")
         self.assertIn("dots-vertical", all_appbar_icons, f"PlayerScreen must have options button (found: {all_appbar_icons})")
-        print("[PASS] Test 6: PlayerScreen top app bar controls verified")
+        # In SimpMusic M3 Expressive, heart is beside track title and lyrics is in action bar & below-the-fold card
+        all_screen_icons = [getattr(w, "icon", "") for w in player_screen.walk() if hasattr(w, "icon")]
+        self.assertTrue(any("heart" in icon for icon in all_screen_icons), f"PlayerScreen must have favorite heart button (found: {all_screen_icons})")
+        self.assertTrue(any(icon in ("format-quote-close", "text-box-outline", "microphone-variant") for icon in all_screen_icons), f"PlayerScreen must have lyrics trigger (found: {all_screen_icons})")
+        print("[PASS] Test 6: PlayerScreen top app bar and controls verified")
 
 if __name__ == "__main__":
     unittest.main()

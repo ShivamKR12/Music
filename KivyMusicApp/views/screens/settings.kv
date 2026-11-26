@@ -62,19 +62,6 @@
                     adaptive_height: True
                     md_bg_color: app.theme_cls.surfaceContainerLowColor
                     MDListItem:
-                        on_release: app.toggle_ui_mode()
-                        MDListItemLeadingIcon:
-                            icon: "theme-light-dark"
-                            theme_icon_color: "Custom"
-                            icon_color: app.theme_cls.primaryColor
-                        MDListItemHeadlineText:
-                            text: "Interface Style"
-                        MDListItemSupportingText:
-                            text: "New SimpMusic look" if app.ui_mode == "new" else "Classic look"
-                        PassiveTrailingCheckbox:
-                            active: app.ui_mode == "new"
-                    SettingDivider:
-                    MDListItem:
                         on_release: app.toggle_dark_mode()
                         MDListItemLeadingIcon:
                             icon: "weather-night"
@@ -386,6 +373,19 @@
                             text: "Diagnostics & Logs"
                         MDListItemSupportingText:
                             text: "View recent session events and debug logs"
+                        MDListItemTrailingIcon:
+                            icon: "chevron-right"
+                    SettingDivider:
+                    MDListItem:
+                        on_release: app.show_log_level_dialog()
+                        MDListItemLeadingIcon:
+                            icon: "tune-vertical"
+                            theme_icon_color: "Custom"
+                            icon_color: app.theme_cls.primaryColor
+                        MDListItemHeadlineText:
+                            text: "Logging Severity Level"
+                        MDListItemSupportingText:
+                            text: "Configure 5-level logging threshold (DEBUG, INFO, etc.)"
                         MDListItemTrailingIcon:
                             icon: "chevron-right"
                     SettingDivider:

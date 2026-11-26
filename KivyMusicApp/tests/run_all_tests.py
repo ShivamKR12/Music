@@ -13,8 +13,12 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_MODULES = [
     ("Lyrics Engine & Centering Math", "test_lyrics_engine_and_math.py"),
     ("Player Queue & Audio Precision", "test_player_queue_and_offline.py"),
+    ("Audio PCM DSP & Buffer State Machine", "test_audio_dsp_pipeline.py"),
     ("Interactive Widgets Action Binding", "test_interactive_widgets_audit.py"),
     ("Settings & SQLite Persistence", "test_settings_and_persistence.py"),
+    ("SQLite Database Worker, WAL, FK & Unicode", "test_db_worker_wal_fk_unicode.py"),
+    ("Android Media Lifecycle & MediaStore Bridges", "test_android_media_lifecycle_and_mediastore.py"),
+    ("5-Level Logging System & Kivy Wiring", "test_five_level_logger.py"),
     ("Interface Style Switch", "test_ui_mode_switch.py"),
     ("Artwork Cleanliness & Geometry", "test_artwork_and_ui_geometry.py"),
     ("Artist & Album Dynamic Invariants", "test_artist_and_album_dynamic.py"),
@@ -25,6 +29,12 @@ TEST_MODULES = [
     ("Multi-Source Providers (YouTube, Spotify, JioSaavn)", "test_multi_source_providers.py"),
     ("SimpMusic UI/UX Parity & Fluid Transitions", "test_simpmusic_ui_ux_parity.py"),
     ("SimpMusic Dynamic Palette & Theming", "test_simpmusic_color_palette.py"),
+    ("Mini Player Startup & Swipe Dismiss", "test_mini_player_startup_and_swipe_dismiss.py"),
+    ("YouTube Buffering & Progressive Streaming", "test_youtube_buffering_and_progressive_streaming.py"),
+    ("YouTube Extraction Resilience & PO-Token Hooks", "test_youtube_extraction_resilience.py"),
+    ("Dynamic Multi-Provider Recommendation Engine", "test_dynamic_recommendation_engine.py"),
+    ("Performance Telemetry & Runtime Counters", "test_telemetry_service.py"),
+    ("Modular App Coordinators & Delegation", "test_app_coordinators.py"),
     ("Comprehensive 13-Suite UI/UX Audit", "test_comprehensive_audit.py"),
 ]
 

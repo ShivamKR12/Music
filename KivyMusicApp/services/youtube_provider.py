@@ -2,16 +2,21 @@
 YouTube Music Provider.
 Stream extraction, caching, and catalog search via yt-dlp.
 """
-import os
 import re
 from typing import List, Dict, Optional, Any
 from services.music_provider_base import BaseMusicProvider
-from yt_dlp import YoutubeDL
+from services.logger import get_logger
+from services.youtube_extractor import (
+    YtdlpLogBridge,
+    SilentLogger,
+    YouTubeExtractionError,
+    get_youtube_extractor,
+    redact_sensitive_text,
+)
+from utils.media_utils import parse_complete_media_metadata
 
-class SilentLogger:
-    def debug(self, msg): pass
-    def warning(self, msg): pass
-    def error(self, msg): pass
+logger = get_logger("YouTubeProvider")
+
 
 class YouTubeProvider(BaseMusicProvider):
     """Concrete provider for YouTube / YouTube Music audio extraction via yt-dlp."""
@@ -34,50 +39,24 @@ class YouTubeProvider(BaseMusicProvider):
         return cleaned[:11] if cleaned else "unknown"
 
     def search(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Performs fast flat search on YouTube using yt-dlp."""
+        """Performs resilient flat search on YouTube via hardened YouTubeExtractor."""
         if not query:
             return []
-        
-        ydl_opts = {
-            'extract_flat': True,
-            'quiet': True,
-            'skip_download': True,
-            'noplaylist': True,
-            'logger': SilentLogger(),
-            'default_search': 'ytsearch',
-            'socket_timeout': 10,
-        }
+
         search_target = f"ytsearch{min(limit, 30)}:{query}"
         tracks: List[Dict[str, Any]] = []
 
         try:
-            with YoutubeDL(ydl_opts) as ydl:
-                result = ydl.extract_info(search_target, download=False)
-                entries = result.get('entries', []) if result else []
-                for entry in entries:
-                    if not entry:
-                        continue
-                    vid = entry.get('id')
-                    if not vid or len(vid) != 11:
-                        continue
-                    title = entry.get('title') or "Unknown Title"
-                    artist = entry.get('uploader') or entry.get('channel') or "YouTube Artist"
-                    duration = int(entry.get('duration', 0) or 0)
-                    thumb = entry.get('thumbnail') or ""
-                    tracks.append({
-                        "video_id": vid,
-                        "source_id": vid,
-                        "title": title,
-                        "artist": artist,
-                        "duration": duration,
-                        "artwork": thumb or "album_art.png",
-                        "url": f"https://www.youtube.com/watch?v={vid}",
-                        "source": "youtube",
-                        "bitrate": 128,
-                        "stream_url": "",
-                    })
+            result = get_youtube_extractor().extract_metadata(search_target, extract_flat=True)
+            entries = result.get("entries", []) if result else []
+            for entry in entries:
+                if not entry:
+                    continue
+                meta = parse_complete_media_metadata(entry)
+                if meta and meta.get("video_id"):
+                    tracks.append(meta)
         except Exception as e:
-            print(f"[YouTubeProvider] search error: {e}")
+            logger.error("Search error: %s", redact_sensitive_text(e))
 
         return tracks
 
@@ -87,94 +66,62 @@ class YouTubeProvider(BaseMusicProvider):
         if not vid:
             return None
         url = f"https://www.youtube.com/watch?v={vid}"
-        ydl_opts = {
-            'extract_flat': True,
-            'quiet': True,
-            'skip_download': True,
-            'logger': SilentLogger(),
-            'socket_timeout': 10,
-        }
         try:
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if info:
-                    return {
-                        "video_id": vid,
-                        "source_id": vid,
-                        "title": info.get('title', "Unknown"),
-                        "artist": info.get('uploader', "YouTube Artist"),
-                        "duration": int(info.get('duration', 0) or 0),
-                        "artwork": info.get('thumbnail', "album_art.png"),
-                        "url": url,
-                        "source": "youtube",
-                        "bitrate": 128,
-                    }
+            info = get_youtube_extractor().extract_metadata(url, extract_flat=True)
+            if info:
+                meta = parse_complete_media_metadata(info)
+                if meta and meta.get("video_id"):
+                    return meta
         except Exception as e:
-            print(f"[YouTubeProvider] get_track_details failed for {vid}: {e}")
+            logger.error("get_track_details failed for %s: %s", vid, redact_sensitive_text(e))
         return None
 
-    def get_stream_url(self, track_id_or_url: str, quality: str = "320") -> Optional[Dict[str, Any]]:
-        """Resolves raw direct audio stream URL via yt-dlp."""
+    def get_stream_url(
+        self,
+        track_id_or_url: str,
+        quality: str = "320",
+        force_refresh: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Resolves validated direct audio stream URL + expiry via YouTubeExtractor."""
         vid = self.extract_video_id(track_id_or_url)
         url = f"https://www.youtube.com/watch?v={vid}" if vid else track_id_or_url
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'quiet': True,
-            'skip_download': True,
-            'logger': SilentLogger(),
-            'socket_timeout': 10,
-        }
         try:
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if info and info.get('url'):
-                    return {
-                        "url": info['url'],
-                        "bitrate": int(info.get('abr', 128) or 128),
-                        "format": info.get('ext', 'm4a'),
-                        "source": "youtube"
-                    }
+            extracted = get_youtube_extractor().extract_stream(url, force_refresh=force_refresh)
+            if extracted and extracted.get("url"):
+                return {
+                    "url": extracted["url"],
+                    "bitrate": int(extracted.get("abr", 128) or 128),
+                    "format": extracted.get("ext", "m4a"),
+                    "source": "youtube",
+                    "expires_at": float(extracted.get("expires_at") or 0.0),
+                    "client_tier": extracted.get("client_tier", ""),
+                }
+        except YouTubeExtractionError as e:
+            logger.error("get_stream_url error (%s): %s", e.code, e.user_message)
         except Exception as e:
-            print(f"[YouTubeProvider] get_stream_url error: {e}")
+            logger.error("get_stream_url error: %s", redact_sensitive_text(e))
         return None
 
     def get_playlist(self, playlist_id_or_url: str) -> Optional[Dict[str, Any]]:
-        """Extracts playlist items from YouTube."""
-        ydl_opts = {
-            'extract_flat': True,
-            'quiet': True,
-            'skip_download': True,
-            'logger': SilentLogger(),
-            'socket_timeout': 12,
-        }
+        """Extracts playlist items from YouTube via hardened YouTubeExtractor."""
         try:
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(playlist_id_or_url, download=False)
-                if info:
-                    entries = info.get('entries', [])
-                    tracks = []
-                    for e in entries:
-                        if not e: continue
-                        vid = e.get('id')
-                        if not vid: continue
-                        tracks.append({
-                            "video_id": vid,
-                            "source_id": vid,
-                            "title": e.get('title', "Unknown"),
-                            "artist": e.get('uploader', "YouTube Artist"),
-                            "duration": int(e.get('duration', 0) or 0),
-                            "artwork": e.get('thumbnail', "album_art.png"),
-                            "url": f"https://www.youtube.com/watch?v={vid}",
-                            "source": "youtube",
-                            "bitrate": 128,
-                        })
-                    return {
-                        "id": info.get('id', 'yt_playlist'),
-                        "title": info.get('title', 'YouTube Playlist'),
-                        "artwork": info.get('thumbnail', 'album_art.png'),
-                        "tracks": tracks,
-                        "source": "youtube"
-                    }
+            info = get_youtube_extractor().extract_metadata(playlist_id_or_url, extract_flat=True)
+            if info:
+                entries = info.get("entries", [])
+                tracks = []
+                for e in entries:
+                    if not e:
+                        continue
+                    meta = parse_complete_media_metadata(e)
+                    if meta and meta.get("video_id"):
+                        tracks.append(meta)
+                return {
+                    "id": info.get("id", "yt_playlist"),
+                    "title": info.get("title", "YouTube Playlist"),
+                    "artwork": info.get("thumbnail", "album_art.png"),
+                    "tracks": tracks,
+                    "source": "youtube",
+                }
         except Exception as e:
-            print(f"[YouTubeProvider] get_playlist error: {e}")
+            logger.error("get_playlist error: %s", redact_sensitive_text(e))
         return None

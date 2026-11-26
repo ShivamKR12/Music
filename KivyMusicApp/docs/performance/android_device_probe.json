@@ -1,0 +1,40 @@
+{
+  "package_id": "org.shivam.music.kivymusicapp",
+  "timestamp_utc": "2026-11-26T19:08:04Z",
+  "adb_devices": [
+    "RZCY91AQGKW            device product:a17xins model:SM_A176B device:a17x transport_id:1"
+  ],
+  "device_info": {
+    "serial": "RZCY91AQGKW",
+    "manufacturer": "samsung",
+    "model": "SM-A176B",
+    "android_release": "17",
+    "sdk_int": 37,
+    "abi_list": "arm64-v8a,armeabi-v7a,armeabi",
+    "wm_size": "Physical size: 1080x2340",
+    "wm_density": "Physical density: 450\nOverride density: 454",
+    "audio_flinger_sample_rates": [
+      "48000"
+    ],
+    "audio_flinger_hal_frames": [
+      "192",
+      "480",
+      "960"
+    ],
+    "sdcard_music_file_count": 2
+  },
+  "host_build_capability": {
+    "platform": "win32",
+    "wsl_installed": false,
+    "wsl_detail": "The Windows Subsystem for Linux is not installed. You can install by running 'wsl.exe --install'.\n\n\nFor more information please visit https://aka.ms/wslinstall",
+    "buildozer_on_host": false,
+    "buildozer_version": ""
+  },
+  "apk_installed": false,
+  "device_verification_status": "BLOCKED_APK_NOT_INSTALLED",
+  "blockers": [
+    "Package 'org.shivam.music.kivymusicapp' is not installed on SM-A176B (RZCY91AQGKW).",
+    "Windows host cannot run `buildozer android debug` (WSL distro not installed)."
+  ],
+  "runtime_metrics": null
+}

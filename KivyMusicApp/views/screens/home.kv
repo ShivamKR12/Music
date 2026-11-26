@@ -89,6 +89,7 @@
                     spacing: "2dp"
 
                     MDLabel:
+                        id: quick_picks_kicker
                         text: "START RADIO FROM A SONG"
                         font_style: "Body"
                         role: "small"
@@ -141,6 +142,7 @@
                     spacing: "2dp"
 
                     MDLabel:
+                        id: listen_again_kicker
                         text: "PICK UP WHERE YOU LEFT OFF"
                         font_style: "Body"
                         role: "small"
@@ -154,6 +156,7 @@
                         spacing: "8dp"
 
                         MDLabel:
+                            id: listen_again_title
                             text: "Listen again"
                             font_style: "Title"
                             role: "large"
@@ -183,6 +186,58 @@
                         spacing: dp(16)
                         padding: [dp(16), dp(12)]
 
+                # ===== Mood & Curated Playlists (SimpMusic category shelves on Home) =====
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        id: mood_playlists_kicker
+                        text: "DISCOVER BY MOOD & VIBE"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            id: mood_playlists_title
+                            text: "Mood & Category Playlists"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.switch_screen("browse")
+                            MDButtonText:
+                                text: "Explore"
+
+                DirectionalHorizontalRecycleView:
+                    id: mood_playlists_list
+                    viewclass: "HomePlaylistItem"
+                    size_hint_y: None
+                    height: "238dp"
+                    data: []
+                    RecycleBoxLayout:
+                        default_size: dp(140), dp(210)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: 'horizontal'
+                        spacing: dp(16)
+                        padding: [dp(16), dp(12)]
+
                 # ===== Trending now (Top Charts) =====
                 MDBoxLayout:
                     orientation: "vertical"
@@ -191,6 +246,7 @@
                     spacing: "2dp"
 
                     MDLabel:
+                        id: trending_kicker
                         text: "CHARTS & TRENDING"
                         font_style: "Body"
                         role: "small"
@@ -204,6 +260,7 @@
                         spacing: "8dp"
 
                         MDLabel:
+                            id: trending_title
                             text: "Trending now"
                             font_style: "Title"
                             role: "large"
@@ -241,6 +298,7 @@
                     spacing: "2dp"
 
                     MDLabel:
+                        id: featured_kicker
                         text: "FROM YOUR LISTENING HISTORY"
                         font_style: "Body"
                         role: "small"
@@ -254,6 +312,7 @@
                         spacing: "8dp"
 
                         MDLabel:
+                            id: featured_title
                             text: "Made for you"
                             font_style: "Title"
                             role: "large"
@@ -283,6 +342,58 @@
                         spacing: dp(16)
                         padding: [dp(16), dp(12)]
 
+                # ===== Podcasts & Audio Shows (SimpMusic Podcasts shelf on Home) =====
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: ["16dp", "8dp", "16dp", "0dp"]
+                    spacing: "2dp"
+
+                    MDLabel:
+                        id: home_podcasts_kicker
+                        text: "PODCASTS & EPISODES"
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_height: True
+                        spacing: "8dp"
+
+                        MDLabel:
+                            id: home_podcasts_title
+                            text: "Trending Podcasts"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            adaptive_height: True
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+
+                        MDButton:
+                            style: "text"
+                            on_release: app.open_podcasts()
+                            MDButtonText:
+                                text: "See all"
+
+                DirectionalHorizontalRecycleView:
+                    id: home_podcasts_list
+                    viewclass: "HomeCardItem"
+                    size_hint_y: None
+                    height: "238dp"
+                    data: []
+                    RecycleBoxLayout:
+                        default_size: dp(140), dp(210)
+                        default_size_hint: None, None
+                        size_hint_x: None
+                        width: self.minimum_width
+                        orientation: 'horizontal'
+                        spacing: dp(16)
+                        padding: [dp(16), dp(12)]
+
                 # ===== Forgotten favorites (rediscovering liked tracks) =====
                 MDBoxLayout:
                     orientation: "vertical"
@@ -291,6 +402,7 @@
                     spacing: "2dp"
 
                     MDLabel:
+                        id: forgotten_favorites_kicker
                         text: "REDISCOVER OLD FAVORITES"
                         font_style: "Body"
                         role: "small"
@@ -304,6 +416,7 @@
                         spacing: "8dp"
 
                         MDLabel:
+                            id: forgotten_favorites_title
                             text: "Forgotten favorites"
                             font_style: "Title"
                             role: "large"
@@ -341,6 +454,7 @@
                     spacing: "2dp"
 
                     MDLabel:
+                        id: daily_mix_kicker
                         text: "PERSONALIZED MIX"
                         font_style: "Body"
                         role: "small"
@@ -354,6 +468,7 @@
                         spacing: "8dp"
 
                         MDLabel:
+                            id: daily_mix_title
                             text: "Mixed for you"
                             font_style: "Title"
                             role: "large"

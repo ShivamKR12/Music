@@ -10,6 +10,9 @@ import json
 import requests
 from typing import List, Dict, Optional, Any
 from services.music_provider_base import BaseMusicProvider
+from services.logger import get_logger
+
+logger = get_logger("SpotifyProvider")
 
 SPOTIFY_OEMBED_URL = "https://open.spotify.com/oembed"
 DEFAULT_HEADERS = {
@@ -51,7 +54,7 @@ class SpotifyProvider(BaseMusicProvider):
             if m:
                 return json.loads(m.group(1))
         except Exception as e:
-            print(f"[SpotifyProvider] JSON parse error: {e}")
+            logger.warning("JSON parse error: %s", e)
         return None
 
     def get_playlist(self, playlist_id_or_url: str) -> Optional[Dict[str, Any]]:
@@ -66,7 +69,7 @@ class SpotifyProvider(BaseMusicProvider):
         try:
             resp = self.session.get(embed_url, timeout=10)
             if resp.status_code != 200:
-                print(f"[SpotifyProvider] Embed returned status {resp.status_code} for {embed_url}")
+                logger.warning("Embed returned status %s for %s", resp.status_code, embed_url)
                 return None
 
             data = self._extract_next_data(resp.text)
@@ -118,7 +121,7 @@ class SpotifyProvider(BaseMusicProvider):
                 "kind": kind
             }
         except Exception as e:
-            print(f"[SpotifyProvider] get_playlist failed for {playlist_id_or_url}: {e}")
+            logger.error("get_playlist failed for %s: %s", playlist_id_or_url, e)
         return None
 
     def get_track_details(self, track_id: str) -> Optional[Dict[str, Any]]:
@@ -153,7 +156,7 @@ class SpotifyProvider(BaseMusicProvider):
                     "stream_url": "",
                 }
         except Exception as e:
-            print(f"[SpotifyProvider] get_track_details oEmbed error: {e}")
+            logger.warning("get_track_details oEmbed error: %s", e)
 
         # Fallback to embed page
         embed_url = f"https://open.spotify.com/embed/track/{clean_id}"
@@ -184,7 +187,7 @@ class SpotifyProvider(BaseMusicProvider):
                         "stream_url": "",
                     }
         except Exception as e:
-            print(f"[SpotifyProvider] get_track_details embed error: {e}")
+            logger.warning("get_track_details embed error: %s", e)
 
         return None
 

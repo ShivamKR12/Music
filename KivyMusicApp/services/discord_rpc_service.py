@@ -10,6 +10,9 @@ import time
 import threading
 from typing import Optional
 from kivy.utils import platform
+from services.logger import get_logger
+
+logger = get_logger("DiscordRPC")
 
 class DiscordRPCService:
     """Manages connection and presence updates to the local Discord client."""
@@ -37,11 +40,13 @@ class DiscordRPCService:
                 with self._lock:
                     self._rpc = rpc
                     self.connected = True
-            except Exception:
+                logger.info("Connected to Discord Rich Presence IPC socket")
+            except Exception as e:
                 # Discord client is not running or pypresence not installed
                 with self._lock:
                     self.connected = False
                     self._rpc = None
+                logger.debug("Discord RPC not connected: %s", e)
 
         threading.Thread(target=_connect, daemon=True).start()
 

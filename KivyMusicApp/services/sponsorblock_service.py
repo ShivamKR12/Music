@@ -12,6 +12,9 @@ import threading
 import urllib.parse
 import urllib.request
 from typing import Dict, List, Optional, Tuple
+from services.logger import get_logger
+
+logger = get_logger("SponsorBlock")
 
 class SponsorBlockService:
     """Manages SponsorBlock segment retrieval, memory caching, and skip evaluation."""

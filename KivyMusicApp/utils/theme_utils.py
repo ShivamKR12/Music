@@ -232,38 +232,22 @@ def apply_simpmusic_theme(app=None, palette: Optional[Dict[str, Any]] = None):
         app.theme_cls.outlineColor = [0.47, 0.47, 0.47, 1.0] # #777777
         app.theme_cls.outlineVariantColor = [0.78, 0.78, 0.78, 1.0] # #C7C7C7
 
-    # 2. Artwork Primary Accent (getColorFromPalette)
-    if palette and getattr(app, "extract_artwork_colors", True):
-        accent_rgb = palette["dark_primary"] if is_dark else palette["light_primary"]
-        if accent_rgb:
-            app.theme_cls.primaryColor = [accent_rgb[0], accent_rgb[1], accent_rgb[2], 1.0]
-            if is_dark:
-                app.theme_cls.primaryContainerColor = [accent_rgb[0] * 0.35, accent_rgb[1] * 0.35, accent_rgb[2] * 0.35, 1.0]
-                app.theme_cls.onPrimaryColor = [1.0, 1.0, 1.0, 1.0]
-            else:
-                app.theme_cls.primaryContainerColor = [accent_rgb[0] * 0.2 + 0.8, accent_rgb[1] * 0.2 + 0.8, accent_rgb[2] * 0.2 + 0.8, 1.0]
-                lum = get_perceived_luminance(accent_rgb)
-                app.theme_cls.onPrimaryColor = [0.1, 0.1, 0.1, 1.0] if lum > 0.55 else [1.0, 1.0, 1.0, 1.0]
-            app.theme_cls.surfaceTintColor = app.theme_cls.primaryColor
-
-            # Secondary / Tertiary derived from swatches
-            sw = palette.get("swatches", {})
-            sec = sw.get("vibrant") if is_dark else sw.get("dark_vibrant")
-            if sec:
-                app.theme_cls.secondaryColor = [sec[0], sec[1], sec[2], 1.0]
-            tert = sw.get("muted") or sw.get("light_vibrant")
-            if tert:
-                app.theme_cls.tertiaryColor = [tert[0], tert[1], tert[2], 1.0]
+    # 2. Consistent Base Theme Palette (Material Indigo - NEVER mutated by song artwork)
+    base_primary = DEFAULT_DARK_PRIMARY if is_dark else DEFAULT_LIGHT_PRIMARY
+    app.theme_cls.primaryColor = list(base_primary)
+    app.theme_cls.surfaceTintColor = list(base_primary)
+    app.theme_cls.onPrimaryColor = [1.0, 1.0, 1.0, 1.0]
+    app.theme_cls.primary_palette = "Indigo"
+    if is_dark:
+        app.theme_cls.primaryContainerColor = [base_primary[0] * 0.35, base_primary[1] * 0.35, base_primary[2] * 0.35, 1.0]
+        app.theme_cls.secondaryColor = [0.70, 0.75, 1.0, 1.0]
+        app.theme_cls.tertiaryColor = [0.85, 0.70, 0.95, 1.0]
     else:
-        # Default Material Indigo
-        base_primary = DEFAULT_DARK_PRIMARY if is_dark else DEFAULT_LIGHT_PRIMARY
-        app.theme_cls.primaryColor = list(base_primary)
-        app.theme_cls.surfaceTintColor = list(base_primary)
-        app.theme_cls.onPrimaryColor = [1.0, 1.0, 1.0, 1.0]
-        app.theme_cls.primary_palette = "Indigo"
+        app.theme_cls.primaryContainerColor = [base_primary[0] * 0.2 + 0.8, base_primary[1] * 0.2 + 0.8, base_primary[2] * 0.2 + 0.8, 1.0]
+        app.theme_cls.secondaryColor = [0.35, 0.40, 0.65, 1.0]
+        app.theme_cls.tertiaryColor = [0.55, 0.35, 0.65, 1.0]
 
-    # Refresh the Home header gradient texture (main-thread safe) so the header
-    # tint follows the active palette without rebuilding KV canvas instructions.
+    # Refresh the Home header gradient texture using clean base primary
     try:
         if hasattr(app, "_refresh_home_header_texture"):
             app._refresh_home_header_texture()
@@ -283,25 +267,29 @@ def update_theme_from_image(image_path: str):
     def _async_worker(img_path):
         palette = extract_palette_from_image(img_path)
         def _apply_on_main(dt):
+            global _ACTIVE_PALETTE
+            _ACTIVE_PALETTE = palette
             app = MDApp.get_running_app()
             if not app:
                 return
-            apply_simpmusic_theme(app, palette)
             if hasattr(app, "_refresh_player_background_texture"):
                 app._refresh_player_background_texture()
-            if hasattr(app, "_refresh_home_header_texture"):
-                app._refresh_home_header_texture()
             if hasattr(app, "update_player_animated_bg"):
                 app.update_player_animated_bg()
         Clock.schedule_once(_apply_on_main, 0)
 
     if image_path and os.path.exists(image_path) and not image_path.endswith("album_art.png"):
-        threading.Thread(target=_async_worker, args=(image_path,), daemon=True).start()
+        def _schedule_thread(dt):
+            threading.Thread(target=_async_worker, args=(image_path,), daemon=True).start()
+        _PENDING_THEME_EVENT = Clock.schedule_once(_schedule_thread, 0.25)
     else:
         def _apply_default(dt):
+            global _ACTIVE_PALETTE
+            _ACTIVE_PALETTE = None
             app = MDApp.get_running_app()
             if app:
-                apply_simpmusic_theme(app, None)
+                if hasattr(app, "_refresh_player_background_texture"):
+                    app._refresh_player_background_texture()
                 if hasattr(app, "update_player_animated_bg"):
                     app.update_player_animated_bg()
         _PENDING_THEME_EVENT = Clock.schedule_once(_apply_default, 0.05)

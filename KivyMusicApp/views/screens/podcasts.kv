@@ -82,15 +82,27 @@
                     bold: True
                     adaptive_height: True
 
-                MDLabel:
-                    text: "Loading episodes from YouTube..." if app.podcasts_loading else ""
-                    font_style: "Body"
-                    role: "small"
+                MDBoxLayout:
+                    orientation: "horizontal"
                     adaptive_height: True
+                    spacing: "8dp"
                     opacity: 1 if app.podcasts_loading else 0
-                    height: "20dp" if app.podcasts_loading else 0
-                    theme_text_color: "Custom"
-                    text_color: app.theme_cls.onSurfaceVariantColor
+                    height: "24dp" if app.podcasts_loading else 0
+                    YouTubeLoadingCircle:
+                        size_hint: None, None
+                        size: dp(18), dp(18)
+                        pos_hint: {"center_y": .5}
+                        active: bool(app.podcasts_loading)
+                        color: app.theme_cls.primaryColor
+                        line_width: dp(2)
+                    MDLabel:
+                        text: "Loading episodes from YouTube..." if app.podcasts_loading else ""
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        pos_hint: {"center_y": .5}
+                        theme_text_color: "Custom"
+                        text_color: app.theme_cls.onSurfaceVariantColor
 
                 # Real Dynamic Trending Episodes
                 EmbeddedRecycleView:

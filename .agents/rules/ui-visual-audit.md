@@ -32,9 +32,7 @@ This rule defines mandatory quality gates for all user interface changes in Kivy
 - **Startup Async Sequencing:** Trigger dynamic data ingestion (`load_data_async`) promptly on startup ($0.05\text{s}$) rather than on a delayed timer to eliminate mid-interaction stutter.
 
 ## 6. Verification Checklist Before Concluding Tasks
-Every UI change must be validated against:
-1. Automated headless test suite (`KIVY_HEADLESS=1`).
-2. Symmetrical margin verification (left vs right delta $< 1.0\text{dp}$).
-3. Touch delivery verification (clicking actionable targets opens sheets/dialogs without interception).
-4. Directional scrolling verification (vertical swipe over horizontal containers scrolls the parent vertical scrollview).
-5. Visual screenshot capture for rendering inspection.
+Every UI change must be evaluated transparently across layout constraints and the 4-tier test framework (`GEMINI.md` §11 & §20):
+1. **Viewport Constraint Resilience:** Design around the `360x640dp` reference viewport using constraint-based, scrollable containers that tolerate varied Android aspect ratios, display cutouts, system bars/insets, and accessibility font scaling.
+2. **Automated Headless Battery (`KIVY_HEADLESS=1`):** Verify bounding-box geometry, symmetrical margins (`< 1.0dp`), touch routing (clicking targets without hidden overlay interception), directional scrolling delegation, and visual screenshot captures.
+3. **Explicit Honesty Scope:** State clearly that headless UI/geometry checks do **not** verify Android GPU frame pacing, font rendering under OEM skins, or real device audio/background behavior — record real device checks separately when tested via `adb` / Perfetto.

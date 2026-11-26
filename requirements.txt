@@ -1,6 +1,6 @@
 kivy>=2.3.0
 kivymd>=1.1.1
-yt-dlp
+yt-dlp>=2026.11.23
 ffpyplayer
 pygame-ce
 panda3d

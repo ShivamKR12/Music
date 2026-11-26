@@ -61,3 +61,6 @@ desktop.ini
 *.db-journal
 *.log
 *Logs/
+*.db-wal
+*.db-shm
+*.apk

@@ -593,11 +593,13 @@
                             MDBoxLayout:
                                 orientation: "horizontal"
                                 spacing: "12dp"
-                                MDIcon:
-                                    icon: "cloud-search-outline"
+                                YouTubeLoadingCircle:
+                                    size_hint: None, None
+                                    size: dp(26), dp(26)
                                     pos_hint: {"center_y": .5}
-                                    theme_icon_color: "Custom"
-                                    icon_color: app.theme_cls.primaryColor
+                                    active: bool(app.search_loading)
+                                    color: app.theme_cls.primaryColor
+                                    line_width: dp(2.8)
                                 MDLabel:
                                     text: "Searching YouTube, Spotify & JioSaavn..."
                                     font_style: "Body"

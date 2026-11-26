@@ -14,6 +14,9 @@ import threading
 import time
 from typing import Dict, Any, List, Optional, Callable
 from kivy.clock import Clock
+from services.logger import get_logger
+
+logger = get_logger("ListenTogether")
 
 
 class ListenTogetherService:

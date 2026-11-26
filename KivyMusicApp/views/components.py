@@ -27,7 +27,7 @@ class MarqueeLabel(ScrollView):
         - When halign == 'center': centers the text cleanly.
         - When halign == 'left': aligns to the left edge.
     - If text exceeds the available width:
-        - Smooth ping-pong horizontal marquee animation (pauses at start/end).
+        - Smooth unidirectional right-to-left marquee animation (pauses at end for 3s, then restarts).
         - User can freely drag or swipe horizontally to read any part manually.
         - Animation pauses during user touch and automatically resumes on release.
     """
@@ -113,7 +113,7 @@ class MarqueeLabel(ScrollView):
             self._label.height = self.height
             self.scroll_x = 0
         else:
-            # Overflows view: size label to text width and start marquee animation with reading pauses
+            # Overflows view: size label to text width and start right-to-left marquee animation
             self._label.adaptive_size = False
             self._label.size_hint = (None, None)
             self._label.width = tex_w
@@ -124,9 +124,8 @@ class MarqueeLabel(ScrollView):
             self._anim = (
                 Animation(scroll_x=0.0, duration=2.5) +
                 Animation(scroll_x=1.0, duration=dur, t='linear') +
-                Animation(scroll_x=1.0, duration=2.0) +
-                Animation(scroll_x=0.0, duration=dur, t='linear') +
-                Animation(scroll_x=0.0, duration=2.5)
+                Animation(scroll_x=1.0, duration=3.0) +
+                Animation(scroll_x=0.0, duration=0.0)
             )
             self._anim.repeat = True
             Clock.schedule_once(lambda d: self._anim.start(self) if self._anim else None, 0)
@@ -434,6 +433,49 @@ class HomeMoodChip(MDChip):
 
 Factory.register('HomeMoodChip', cls=HomeMoodChip)
 
+class MiniPlayerCard(MDCard):
+    """
+    Floating capsule mini player card with swipe-down dismissal arbitration.
+    - Tap: Opens full-screen PlayerScreen (via on_release)
+    - Swipe Down: Dismisses the mini player and pauses playback
+    """
+    def on_touch_down(self, touch):
+        if not self.collide_point(*touch.pos):
+            return super().on_touch_down(touch)
+        touch.ud['mini_down_pos'] = touch.pos
+        touch.ud['mini_swiped'] = False
+        return super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        if 'mini_down_pos' in touch.ud:
+            ox, oy = touch.ud['mini_down_pos']
+            dy_down = oy - touch.y  # In Kivy, y=0 is at bottom; dragging down yields positive dy_down
+            dx = abs(touch.x - ox)
+            from kivy.metrics import dp
+            if dy_down >= dp(18) and dy_down > dx * 0.9:
+                touch.ud['mini_swiped'] = True
+        return super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        if 'mini_down_pos' in touch.ud:
+            ox, oy = touch.ud.pop('mini_down_pos')
+            dy_down = oy - touch.y
+            dx = abs(touch.x - ox)
+            from kivy.metrics import dp
+            if touch.ud.pop('mini_swiped', False) or (dy_down >= dp(18) and dy_down > dx * 0.9):
+                if hasattr(self, 'state'):
+                    self.state = 'normal'
+                if getattr(touch, 'grab_current', None) is self:
+                    touch.ungrab(self)
+                from kivymd.app import MDApp
+                app = MDApp.get_running_app()
+                if app and hasattr(app, "dismiss_mini_player"):
+                    app.dismiss_mini_player()
+                return True
+        return super().on_touch_up(touch)
+
+Factory.register('MiniPlayerCard', cls=MiniPlayerCard)
+
 class PlaylistTileItem(MDCard):
     """Recycled playlist tile for the Library Playlists grid (SimpMusic
     GridLibraryPlaylist pattern). Replaces ~138 eagerly built MDCards with ~10
@@ -452,6 +494,19 @@ class PlaylistTileItem(MDCard):
             app.open_playlist(self.name)
 
 Factory.register('PlaylistTileItem', cls=PlaylistTileItem)
+
+class HomePlaylistItem(MDCard):
+    """Card for Home screen mood, category, and curated playlists."""
+    name = StringProperty("Playlist")
+    subtitle = StringProperty("Curated Mix")
+    artwork = StringProperty("album_art.png")
+
+    def on_release(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        app.open_playlist(self.name)
+
+Factory.register('HomePlaylistItem', cls=HomePlaylistItem)
 
 class HomeCardItem(MDCard):
     title = StringProperty("Unknown Title")
@@ -596,6 +651,47 @@ Builder.load_string('''
             theme_text_color: "Custom"
             text_color: app.theme_cls.onPrimaryColor if root.is_create else app.theme_cls.onSurfaceVariantColor
 
+<HomePlaylistItem>:
+    style: "elevated"
+    size_hint: None, None
+    size: "140dp", "210dp"
+    theme_bg_color: "Custom"
+    md_bg_color: app.theme_cls.surfaceContainerColor
+    radius: [dp(16)]
+    ripple_behavior: True
+    padding: ["8dp", "8dp", "8dp", "8dp"]
+
+    MDBoxLayout:
+        orientation: "vertical"
+        size_hint: 1, 1
+        spacing: "4dp"
+
+        FitImage:
+            source: root.artwork if root.artwork else "album_art.png"
+            size_hint: 1, None
+            height: "124dp"
+            radius: [dp(12), dp(12), dp(12), dp(12)]
+            mipmap: False
+
+        MDLabel:
+            text: root.name
+            font_style: "Title"
+            role: "small"
+            bold: True
+            max_lines: 1
+            adaptive_height: True
+            theme_text_color: "Custom"
+            text_color: app.theme_cls.onSurfaceColor
+
+        MDLabel:
+            text: root.subtitle
+            font_style: "Body"
+            role: "small"
+            max_lines: 1
+            adaptive_height: True
+            theme_text_color: "Custom"
+            text_color: app.theme_cls.onSurfaceVariantColor
+
 <HomeCardItem>:
     style: "elevated"
     size_hint: None, None
@@ -616,6 +712,7 @@ Builder.load_string('''
             size_hint: 1, None
             height: "124dp"
             radius: [dp(12), dp(12), dp(12), dp(12)]
+            mipmap: False
             
         MDBoxLayout:
             orientation: "vertical"
@@ -664,6 +761,7 @@ Builder.load_string('''
             size: "48dp", "48dp"
             radius: [dp(10), dp(10), dp(10), dp(10)]
             pos_hint: {"center_y": .5}
+            mipmap: False
 
         MDBoxLayout:
             orientation: "vertical"
@@ -672,19 +770,25 @@ Builder.load_string('''
             height: "48dp"
             pos_hint: {"center_y": .5}
 
-            MarqueeLabel:
+            MDLabel:
                 text: root.title if root.title else root.text
                 font_style: "Label"
                 role: "large"
                 bold: True
-                height: "22dp"
+                adaptive_height: True
+                max_lines: 1
+                shorten: True
+                shorten_from: "right"
                 halign: "left"
 
-            MarqueeLabel:
+            MDLabel:
                 text: root.artist
                 font_style: "Body"
                 role: "small"
-                height: "18dp"
+                adaptive_height: True
+                max_lines: 1
+                shorten: True
+                shorten_from: "right"
                 halign: "left"
                 theme_text_color: "Custom"
                 text_color: app.theme_cls.onSurfaceVariantColor
@@ -731,18 +835,28 @@ class PlayerTimelineSlider(MDSlider):
     - Binds smoothly with audio engine progress without state jumping.
     - Captures touch scrubbing gestures and updates start timer in real-time.
     - Dispatches atomic seek to player_controller upon release.
+    - Visualizes YouTube-style buffering line advancing ahead of playhead.
     - Meets accessibility guidelines with 44dp touch target height.
     """
     is_seeking = BooleanProperty(False)
+    buffer_progress = NumericProperty(0.0)
+    buffer_color = ColorProperty([1, 1, 1, 0.35])
 
     def __init__(self, **kwargs):
         kwargs.setdefault('size_hint_y', None)
         kwargs.setdefault('height', dp(44))
         kwargs.setdefault('track_active_width', dp(4))
         kwargs.setdefault('track_inactive_width', dp(4))
+        kwargs.setdefault('track_active_color', [1, 1, 1, 1.0])
+        kwargs.setdefault('track_inactive_color', [1, 1, 1, 0.20])
         kwargs.setdefault('handle_anim_duration', 0)
         kwargs.setdefault('handle_anim_transition', 'linear')
         super().__init__(**kwargs)
+
+    def on__handle(self, instance, value):
+        if value:
+            value.theme_bg_color = "Custom"
+            value.md_bg_color = [1, 1, 1, 1.0]
 
     def on_value(self, instance, value):
         if self.is_seeking:
@@ -803,7 +917,86 @@ class PlayerTimelineSlider(MDSlider):
                 Clock.schedule_once(lambda dt: setattr(app.player_controller, "is_seeking", False), 0.05)
         return res
 
+
+class YouTubeLoadingCircle(Widget):
+    """
+    YouTube-style continuous rotating loading and buffering spinner:
+    - Continuous 360-degree smooth linear rotation (no stutter, no dot-based jumping).
+    - Polished circular open arc with rounded caps ('round').
+    - Fully reactive: starts rotation when active=True and visible; stops when inactive/hidden to preserve CPU & battery.
+    - Adaptable sizing and colors (defaults to theme primaryColor or clean white).
+    """
+    angle = NumericProperty(0)
+    line_width = NumericProperty(dp(3.5))
+    color = ColorProperty([1, 1, 1, 0.95])
+    active = BooleanProperty(True)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('size_hint', (None, None))
+        kwargs.setdefault('size', (dp(40), dp(40)))
+        super().__init__(**kwargs)
+        self._anim = None
+        self.bind(active=self._on_active, opacity=self._on_visibility, parent=self._on_parent)
+        Clock.schedule_once(lambda dt: self._start_anim() if (self.active and self.opacity > 0) else None, 0)
+
+    def _start_anim(self):
+        self._stop_anim()
+        self.angle = 0
+        self._anim = Animation(angle=-360, duration=0.85, t='linear')
+        self._anim.repeat = True
+        self._anim.start(self)
+
+    def _stop_anim(self):
+        if self._anim:
+            self._anim.stop(self)
+            self._anim = None
+
+    def _on_active(self, instance, value):
+        if value and self.opacity > 0 and self.parent:
+            self._start_anim()
+        else:
+            self._stop_anim()
+
+    def _on_visibility(self, instance, value):
+        if value > 0 and self.active and self.parent:
+            self._start_anim()
+        else:
+            self._stop_anim()
+
+    def _on_parent(self, instance, value):
+        if value is None:
+            self._stop_anim()
+        elif self.active and self.opacity > 0:
+            self._start_anim()
+
+
+Builder.load_string('''
+<YouTubeLoadingCircle>:
+    canvas:
+        PushMatrix
+        Rotate:
+            angle: root.angle
+            origin: root.center
+        Color:
+            rgba: root.color
+        Line:
+            circle: (root.center_x, root.center_y, max(dp(4), min(root.width, root.height)/2 - root.line_width), 0, 280)
+            width: root.line_width
+            cap: 'round'
+        PopMatrix
+
+<PlayerTimelineSlider>:
+    canvas.before:
+        Color:
+            rgba: root.buffer_color if root.buffer_progress > 0 else [0, 0, 0, 0]
+        Line:
+            points: [root.x, root.center_y, root.x + root.width * min(1.0, max(0.0, root.buffer_progress)), root.center_y] if root.buffer_progress > 0 else []
+            width: dp(4)
+            cap: 'round'
+''')
+
 Factory.register('PlayerTimelineSlider', cls=PlayerTimelineSlider)
+Factory.register('YouTubeLoadingCircle', cls=YouTubeLoadingCircle)
 
 
 class AnimatedBackground(Widget):
@@ -852,10 +1045,11 @@ class AnimatedBackground(Widget):
                 indices.extend([i0, i1, i2, i1, i3, i2])
         self.mesh.indices = indices
 
+        self._tick_event = None
         self.bind(pos=self._update_geom, size=self._update_geom)
         self.bind(color_primary=self._update_colors, color_secondary=self._update_colors, color_tertiary=self._update_colors)
-        self.bind(is_active=self._on_active_change)
-        Clock.schedule_interval(self._tick, 1.0 / 30.0)
+        self.bind(is_active=self._on_active_change, variation=self._on_variation_change)
+        Clock.schedule_once(lambda dt: self._sync_tick_state(), 0.5)
 
     def _update_geom(self, *args):
         self._bg_rect.pos = self.pos
@@ -866,10 +1060,40 @@ class AnimatedBackground(Widget):
     def _update_colors(self, *args):
         pass
 
+    def _sync_tick_state(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        is_player_current = False
+        if app and hasattr(app, "root") and app.root and hasattr(app.root, "ids") and "screen_manager" in app.root.ids:
+            is_player_current = (app.root.ids.screen_manager.current == "player")
+
+        should_run = self.is_active and (self.variation != "off") and is_player_current
+        if should_run and self._tick_event is None:
+            self._tick_event = Clock.schedule_interval(self._tick, 1.0 / 25.0)
+        elif not should_run and self._tick_event is not None:
+            Clock.unschedule(self._tick_event)
+            self._tick_event = None
+            if not self.is_active or self.variation == "off":
+                self.mesh.vertices = []
+
+    def start_animation(self):
+        if self._tick_event is None and self.is_active and self.variation != "off":
+            self._tick_event = Clock.schedule_interval(self._tick, 1.0 / 25.0)
+
+    def stop_animation(self):
+        if self._tick_event is not None:
+            Clock.unschedule(self._tick_event)
+            self._tick_event = None
+
+    def _on_variation_change(self, instance, variation):
+        self._sync_tick_state()
+
     def _on_active_change(self, instance, active):
         if not active or self.variation == "off":
+            self.stop_animation()
             self.mesh.vertices = []
         else:
+            self._sync_tick_state()
             self._tick(0.016)
 
     def _apply_extracted_colors(self, p, s, t):
@@ -923,6 +1147,7 @@ class AnimatedBackground(Widget):
 
     def _tick(self, dt):
         if not self.is_active or self.variation == "off":
+            self.stop_animation()
             if self.mesh.vertices:
                 self.mesh.vertices = []
             return
@@ -932,6 +1157,7 @@ class AnimatedBackground(Widget):
         app = MDApp.get_running_app()
         if app and hasattr(app, "root") and app.root and hasattr(app.root, "ids") and "screen_manager" in app.root.ids:
             if app.root.ids.screen_manager.current != "player":
+                self.stop_animation()
                 return
         self._t += dt * self.speed
         w, h = max(10, self.width), max(10, self.height)

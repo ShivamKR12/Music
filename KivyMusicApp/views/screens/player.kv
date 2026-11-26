@@ -21,274 +21,560 @@
             variation: app.animated_bg_variation
             speed: app.animated_bg_speed
 
-        MDBoxLayout:
-            orientation: "vertical"
-            padding: ["16dp", "0dp", "16dp", "16dp"]
-            spacing: "8dp"
+        MDScrollView:
+            id: player_scroll
+            do_scroll_x: False
+            bar_width: 0
+            size_hint: (1, 1)
 
-            # 1. Top App Bar (SimpMusic CenterAlignedTopAppBar parity: transparent, clean white text)
-            MDTopAppBar:
-                type: "small"
-                theme_bg_color: "Custom"
-                md_bg_color: [0, 0, 0, 0]
-                theme_shadow_color: "Custom"
-                shadow_color: [0, 0, 0, 0]
-                elevation_level: 0
-                MDTopAppBarLeadingButtonContainer:
-                    MDActionTopAppBarButton:
-                        icon: "chevron-down"
-                        theme_icon_color: "Custom"
-                        icon_color: [1, 1, 1, 0.95]
-                        on_release: app.go_back()
-                MDTopAppBarTitle:
-                    text: app.active_playlist_name.upper() if app.active_playlist_name else "NOW PLAYING"
-                    font_style: "Title"
-                    role: "large"
-                    bold: True
-                    halign: "center"
-                    pos_hint: {"center_x": .5}
-                    theme_text_color: "Custom"
-                    text_color: [1, 1, 1, 0.95]
-                MDTopAppBarTrailingButtonContainer:
-                    MDActionTopAppBarButton:
-                        icon: "heart" if app.player_controller.is_favorite else "heart-outline"
-                        theme_icon_color: "Custom"
-                        icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else [1, 1, 1, 0.90]
-                        on_release: app.player_controller.toggle_favorite()
-                    MDActionTopAppBarButton:
-                        icon: "text-box-outline"
-                        theme_icon_color: "Custom"
-                        icon_color: [1, 1, 1, 0.90]
-                        on_release: app.show_lyrics()
-                    MDActionTopAppBarButton:
-                        icon: "dots-vertical"
-                        theme_icon_color: "Custom"
-                        icon_color: [1, 1, 1, 0.95]
-                        on_release: app.show_track_options()
-
-            # 2. Centered Square Artwork Carousel (SimpMusic Pager parity: centered 230x230dp)
-            MDBoxLayout:
-                size_hint_y: 1
-                pos_hint: {"center_x": .5}
-
-                Carousel:
-                    id: album_carousel
-                    size_hint: (1, 1)
-                    pos_hint: {"center_x": .5, "center_y": .5}
-                    on_index: app.on_carousel_index(self.index)
-
-            # 3. Inline Synchronized Lyric Teaser (SimpMusic Spotify-style inline lyric)
-            MDCard:
-                style: "filled"
-                size_hint: None, None
-                size: "320dp", "30dp"
-                pos_hint: {"center_x": .5}
-                radius: [dp(15)]
-                theme_bg_color: "Custom"
-                md_bg_color: [1, 1, 1, 0.08]
-                padding: ["12dp", "0dp"]
-                ripple_behavior: True
-                on_release: app.show_lyrics()
-                MDBoxLayout:
-                    spacing: "8dp"
-                    pos_hint: {"center_y": .5}
-                    MDIcon:
-                        icon: "microphone-variant"
-                        adaptive_size: True
-                        pos_hint: {"center_y": .5}
-                        theme_icon_color: "Custom"
-                        icon_color: app.theme_cls.primaryColor
-                    MarqueeLabel:
-                        text: app.current_lyric_line
-                        font_style: "Body"
-                        role: "small"
-                        theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 0.90]
-                        height: "20dp"
-                        pos_hint: {"center_y": .5}
-
-            # 4. Track Info & Favorite Heart Row (SimpMusic NowPlayingTrackInfoRow)
-            MDBoxLayout:
-                orientation: "horizontal"
-                size_hint_y: None
-                height: "48dp"
-                spacing: "8dp"
-                padding: ["8dp", "0dp"]
-
-                MDBoxLayout:
-                    orientation: "vertical"
-                    size_hint_x: 1
-                    pos_hint: {"center_y": .5}
-                    spacing: "1dp"
-
-                    MarqueeLabel:
-                        text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
-                        font_style: "Title"
-                        role: "large"
-                        bold: True
-                        halign: "left"
-                        height: "26dp"
-                        theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 1.0]
-
-                    MarqueeLabel:
-                        text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown"
-                        font_style: "Body"
-                        role: "medium"
-                        halign: "left"
-                        height: "18dp"
-                        theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 0.70]
-
-                MDIconButton:
-                    icon: "heart" if app.player_controller.is_favorite else "heart-outline"
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom"
-                    icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else [1, 1, 1, 0.70]
-                    on_release: app.player_controller.toggle_favorite()
-
-            # 5. Timeline Slider & Timestamps (SimpMusic SpotifyPlaybackControls)
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                spacing: "0dp"
-                padding: ["4dp", "0dp"]
-
-                PlayerTimelineSlider:
-                    id: timeline_slider
-                    value: app.player_controller.current_time if (app.player_controller and not self.is_seeking) else self.value
-                    min: 0
-                    max: app.player_controller.duration if (app.player_controller and app.player_controller.duration > 0) else 100
-                    size_hint_y: None
-                    height: "32dp"
-                    track_active_color: app.theme_cls.primaryColor
-                    track_inactive_color: [1, 1, 1, 0.18]
-                    pos_hint: {"center_y": .5}
-                    handle_anim_duration: 0
-                    handle_anim_transition: "linear"
-
-                MDBoxLayout:
-                    orientation: "horizontal"
-                    size_hint_y: None
-                    height: "14dp"
-                    padding: ["4dp", "0dp"]
-
-                    MDLabel:
-                        id: player_current_time_label
-                        text: app.player_controller.formatted_current_time if app.player_controller else "00:00"
-                        font_style: "Label"
-                        role: "small"
-                        theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 0.65]
-                        adaptive_width: True
-                        pos_hint: {"center_y": .5}
-
-                    Widget:
-
-                    MDLabel:
-                        id: player_duration_label
-                        text: app.player_controller.formatted_duration if app.player_controller else "00:00"
-                        font_style: "Label"
-                        role: "small"
-                        theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 0.65]
-                        adaptive_width: True
-                        pos_hint: {"center_y": .5}
-
-            # 6. Transport Controls (SimpMusic PlayerControlLayout parity)
-            MDBoxLayout:
-                orientation: "horizontal"
-                adaptive_size: True
                 spacing: "16dp"
-                pos_hint: {"center_x": .5}
+                padding: ["16dp", "0dp", "16dp", "32dp"]
 
-                MDIconButton:
-                    icon: "shuffle-variant" if app.player_controller.is_shuffle else "shuffle-disabled"
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom"
-                    icon_color: app.theme_cls.primaryColor if app.player_controller.is_shuffle else [1, 1, 1, 0.65]
-                    on_release: app.player_controller.toggle_shuffle()
-
-                MDIconButton:
-                    icon: "skip-previous"
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom"
-                    icon_color: [1, 1, 1, 1.0]
-                    on_release: app.player_controller.prev_track()
-
-                MDFabButton:
-                    icon: "pause" if app.player_controller.is_playing else "play"
-                    style: "standard"
-                    theme_bg_color: "Custom"
-                    md_bg_color: [1, 1, 1, 1.0]
-                    theme_icon_color: "Custom"
-                    icon_color: [0, 0, 0, 1.0]
-                    pos_hint: {"center_y": .5}
-                    on_release: app.player_controller.toggle_play()
-
-                MDIconButton:
-                    icon: "skip-next"
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom"
-                    icon_color: [1, 1, 1, 1.0]
-                    on_release: app.player_controller.next_track()
-
-                MDIconButton:
-                    icon: "repeat-once" if app.player_controller.repeat_mode == "one" else ("repeat" if app.player_controller.repeat_mode == "all" else "repeat-off")
-                    pos_hint: {"center_y": .5}
-                    theme_icon_color: "Custom"
-                    icon_color: app.theme_cls.primaryColor if app.player_controller.is_repeat else [1, 1, 1, 0.65]
-                    on_release: app.player_controller.toggle_repeat()
-
-            # 7. YouTube Music / SimpMusic Style Up-Next Bottom Pill (Translucent Frosted Card)
-            MDCard:
-                id: up_next_pill
-                style: "filled"
-                size_hint_y: None
-                height: "48dp"
-                radius: [dp(24)]
-                theme_bg_color: "Custom"
-                md_bg_color: [1, 1, 1, 0.10]
-                padding: ["16dp", "0dp"]
-                ripple_behavior: True
-                pos_hint: {"center_x": .5}
-                on_release: app.show_queue_sheet()
-
+                # ─── SECTION 1: PRIMARY PLAYER VIEWPORT (Full Window Height, Exactly Above the Fold) ───
                 MDBoxLayout:
+                    orientation: "vertical"
+                    size_hint: (1, None)
+                    height: root.height
                     spacing: "8dp"
-                    pos_hint: {"center_y": .5}
+                    padding: ["0dp", "0dp", "0dp", "16dp"]
 
-                    MDIcon:
-                        icon: "playlist-play"
+                    # 1. Top App Bar (SimpMusic CenterAlignedTopAppBar parity: transparent, clean white text)
+                    MDTopAppBar:
+                        type: "small"
+                        theme_bg_color: "Custom"
+                        md_bg_color: [0, 0, 0, 0]
+                        theme_shadow_color: "Custom"
+                        shadow_color: [0, 0, 0, 0]
+                        elevation_level: 0
+                        size_hint_y: None
+                        height: "56dp"
+                        MDTopAppBarLeadingButtonContainer:
+                            MDActionTopAppBarButton:
+                                icon: "chevron-down"
+                                theme_icon_color: "Custom"
+                                icon_color: [1, 1, 1, 0.95]
+                                on_release: app.go_back()
+                        MDTopAppBarTitle:
+                            text: app.active_playlist_name.upper() if app.active_playlist_name else "NOW PLAYING"
+                            font_style: "Title"
+                            role: "large"
+                            bold: True
+                            halign: "center"
+                            pos_hint: {"center_x": .5}
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.95]
+                        MDTopAppBarTrailingButtonContainer:
+                            MDActionTopAppBarButton:
+                                icon: "dots-vertical"
+                                theme_icon_color: "Custom"
+                                icon_color: [1, 1, 1, 0.95]
+                                on_release: app.show_track_options()
+
+                    # 2. Centered Square Artwork Carousel (SimpMusic Pager parity: centered)
+                    MDBoxLayout:
+                        size_hint_y: 1
+                        pos_hint: {"center_x": .5}
+
+                        MDFloatLayout:
+                            size_hint: (1, 1)
+                            pos_hint: {"center_x": .5, "center_y": .5}
+
+                            Carousel:
+                                id: album_carousel
+                                size_hint: (1, 1)
+                                pos_hint: {"center_x": .5, "center_y": .5}
+                                on_index: app.on_carousel_index(self.index)
+
+                            # Central YouTube Buffering & Loading Spinner
+                            MDCard:
+                                id: player_buffering_badge
+                                size_hint: None, None
+                                size: dp(60), dp(60)
+                                radius: [dp(30)]
+                                pos_hint: {"center_x": .5, "center_y": .5}
+                                theme_bg_color: "Custom"
+                                md_bg_color: [0, 0, 0, 0.55]
+                                opacity: 1 if (app.player_controller and app.player_controller.is_loading) else 0
+                                disabled: not (app.player_controller and app.player_controller.is_loading)
+                                padding: dp(8)
+                                YouTubeLoadingCircle:
+                                    size_hint: None, None
+                                    size: dp(44), dp(44)
+                                    pos_hint: {"center_x": .5, "center_y": .5}
+                                    active: bool(app.player_controller and app.player_controller.is_loading)
+                                    color: [1, 1, 1, 0.95]
+                                    line_width: dp(3.5)
+
+                    # 3. Track Info & Favorite Heart Row (SimpMusic NowPlayingTrackInfoRow)
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "48dp"
+                        spacing: "8dp"
+                        padding: ["8dp", "0dp"]
+
+                        MDBoxLayout:
+                            orientation: "vertical"
+                            size_hint_x: 1
+                            pos_hint: {"center_y": .5}
+                            spacing: "1dp"
+
+                            MarqueeLabel:
+                                text: app.player_controller.active_track.title if app.player_controller.active_track else "No Track"
+                                font_style: "Title"
+                                role: "large"
+                                bold: True
+                                halign: "left"
+                                height: "26dp"
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 1.0]
+
+                            MarqueeLabel:
+                                text: f"{app.player_controller.active_track.artist}  •  {app.player_controller.active_track.view_count:,} views" if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.view_count > 0) else (app.player_controller.active_track.artist if (app.player_controller and app.player_controller.active_track) else "Unknown")
+                                font_style: "Body"
+                                role: "medium"
+                                halign: "left"
+                                height: "18dp"
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 0.70]
+
+                        MDIconButton:
+                            icon: "heart" if app.player_controller.is_favorite else "heart-outline"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else [1, 1, 1, 0.70]
+                            on_release: app.player_controller.toggle_favorite()
+
+                    # 4. Timeline Slider & Timestamps (SimpMusic SpotifyPlaybackControls)
+                    MDBoxLayout:
+                        orientation: "vertical"
+                        adaptive_height: True
+                        spacing: "0dp"
+                        padding: ["4dp", "0dp"]
+
+                        PlayerTimelineSlider:
+                            id: timeline_slider
+                            value: app.player_controller.current_time if (app.player_controller and not self.is_seeking) else self.value
+                            min: 0
+                            max: app.player_controller.duration if (app.player_controller and app.player_controller.duration > 0) else 100
+                            buffer_progress: app.player_controller.buffer_progress if app.player_controller else 0.0
+                            buffer_color: [1, 1, 1, 0.32]
+                            size_hint_y: None
+                            height: "32dp"
+                            track_active_color: [1, 1, 1, 1.0]
+                            track_inactive_color: [1, 1, 1, 0.18]
+                            pos_hint: {"center_y": .5}
+                            handle_anim_duration: 0
+                            handle_anim_transition: "linear"
+
+                        MDBoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: None
+                            height: "14dp"
+                            padding: ["4dp", "0dp"]
+
+                            MDLabel:
+                                id: player_current_time_label
+                                text: app.player_controller.formatted_current_time if app.player_controller else "00:00"
+                                font_style: "Label"
+                                role: "small"
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 0.65]
+                                adaptive_width: True
+                                pos_hint: {"center_y": .5}
+
+                            Widget:
+
+                            MDLabel:
+                                id: player_duration_label
+                                text: app.player_controller.formatted_duration if app.player_controller else "00:00"
+                                font_style: "Label"
+                                role: "small"
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 0.65]
+                                adaptive_width: True
+                                pos_hint: {"center_y": .5}
+
+                    # 5. Transport Controls (SimpMusic PlayerControlLayout parity)
+                    MDBoxLayout:
+                        orientation: "horizontal"
                         adaptive_size: True
-                        pos_hint: {"center_y": .5}
-                        theme_icon_color: "Custom"
-                        icon_color: app.theme_cls.primaryColor
+                        spacing: "16dp"
+                        pos_hint: {"center_x": .5}
+
+                        MDIconButton:
+                            icon: "shuffle-variant" if app.player_controller.is_shuffle else "shuffle-disabled"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 1.0] if app.player_controller.is_shuffle else [1, 1, 1, 0.50]
+                            on_release: app.player_controller.toggle_shuffle()
+
+                        MDIconButton:
+                            icon: "skip-previous"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 1.0]
+                            on_release: app.player_controller.prev_track()
+
+                        MDFloatLayout:
+                            size_hint: None, None
+                            size: dp(56), dp(56)
+                            pos_hint: {"center_y": .5}
+
+                            MDFabButton:
+                                id: player_play_fab
+                                icon: "pause" if app.player_controller.is_playing else "play"
+                                style: "standard"
+                                theme_bg_color: "Custom"
+                                md_bg_color: [1, 1, 1, 1.0]
+                                theme_icon_color: "Custom"
+                                icon_color: [0, 0, 0, 1.0]
+                                pos_hint: {"center_x": .5, "center_y": .5}
+                                opacity: 0 if (app.player_controller and app.player_controller.is_loading) else 1
+                                disabled: bool(app.player_controller and app.player_controller.is_loading)
+                                on_release: app.player_controller.toggle_play()
+
+                            YouTubeLoadingCircle:
+                                size_hint: None, None
+                                size: dp(42), dp(42)
+                                pos_hint: {"center_x": .5, "center_y": .5}
+                                active: bool(app.player_controller and app.player_controller.is_loading)
+                                opacity: 1 if (app.player_controller and app.player_controller.is_loading) else 0
+                                color: [1, 1, 1, 1.0]
+                                line_width: dp(3.5)
+
+                        MDIconButton:
+                            icon: "skip-next"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 1.0]
+                            on_release: app.player_controller.next_track()
+
+                        MDIconButton:
+                            icon: "repeat-once" if app.player_controller.repeat_mode == "one" else ("repeat" if app.player_controller.repeat_mode == "all" else "repeat-off")
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 1.0] if app.player_controller.is_repeat else [1, 1, 1, 0.50]
+                            on_release: app.player_controller.toggle_repeat()
+
+                    # 6. SimpMusic 5-Icon Action Bar
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_size: True
+                        spacing: "20dp"
+                        pos_hint: {"center_x": .5}
+
+                        MDIconButton:
+                            icon: "information-outline"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.85]
+                            on_release: app.show_track_options()
+
+                        MDIconButton:
+                            icon: "headphones"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.85]
+                            on_release: app.show_toast(f"Audio Quality: {app.audio_quality.upper()} • High Fidelity")
+
+                        MDIconButton:
+                            icon: "format-quote-close"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.85]
+                            on_release: app.show_lyrics()
+
+                        MDIconButton:
+                            icon: "playlist-play"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.85]
+                            on_release: app.show_queue_sheet()
+
+                        MDIconButton:
+                            icon: "tune"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.85]
+                            on_release: app.switch_screen("equalizer")
+
+                    # 7. YouTube Music / SimpMusic Style Up-Next Bottom Pill
+                    MDCard:
+                        id: up_next_pill
+                        style: "filled"
+                        size_hint: (1, None)
+                        height: "48dp"
+                        radius: [dp(24)]
+                        theme_bg_color: "Custom"
+                        md_bg_color: [1, 1, 1, 0.10]
+                        padding: ["16dp", "0dp"]
+                        ripple_behavior: True
+                        pos_hint: {"center_x": .5}
+                        on_release: app.show_queue_sheet()
+
+                        MDBoxLayout:
+                            spacing: "8dp"
+                            pos_hint: {"center_y": .5}
+
+                            MDIcon:
+                                icon: "playlist-play"
+                                adaptive_size: True
+                                pos_hint: {"center_y": .5}
+                                theme_icon_color: "Custom"
+                                icon_color: [1, 1, 1, 0.85]
+
+                            MDLabel:
+                                text: "UP NEXT"
+                                font_style: "Label"
+                                role: "large"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 0.95]
+                                pos_hint: {"center_y": .5}
+
+                            Widget:
+
+                            MDLabel:
+                                text: f"{len(app.player_controller.queue)} tracks" if app.player_controller else ""
+                                font_style: "Label"
+                                role: "medium"
+                                halign: "right"
+                                adaptive_width: True
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 0.65]
+                                pos_hint: {"center_y": .5}
+
+                            MDIcon:
+                                icon: "chevron-down"
+                                adaptive_size: True
+                                pos_hint: {"center_y": .5}
+                                theme_icon_color: "Custom"
+                                icon_color: [1, 1, 1, 0.70]
+
+                # ─── SECTION 2: BELOW THE FOLD (SimpMusic Expressive Cards) ───
+
+                # Card 1: Synchronized Lyrics Card
+                MDCard:
+                    id: lyrics_card
+                    style: "filled"
+                    radius: [dp(20)]
+                    size_hint: (1, None)
+                    height: "360dp"
+                    theme_bg_color: "Custom"
+                    md_bg_color: [1, 1, 1, 0.08]
+                    padding: ["16dp", "14dp"]
+                    orientation: "vertical"
+                    spacing: "8dp"
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "36dp"
+                        spacing: "8dp"
+
+                        MDIcon:
+                            icon: "microphone-variant"
+                            adaptive_size: True
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.95]
+
+                        MDLabel:
+                            text: "Lyrics"
+                            font_style: "Title"
+                            role: "medium"
+                            bold: True
+                            adaptive_width: True
+                            pos_hint: {"center_y": .5}
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 1.0]
+
+                        Widget:
+
+                        MDIconButton:
+                            icon: "av-timer"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.75]
+                            on_release: app.show_toast(f"Lyrics Timing Offset: {app.lyrics_timing_offset:+.1f}s")
+
+                        MDIconButton:
+                            icon: "arrow-expand"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.75]
+                            on_release: app.show_lyrics()
+
+                    LyricsScrollView:
+                        id: inline_lyrics_scroll
+                        size_hint: (1, 1)
+                        do_scroll_x: False
+                        bar_width: 0
+
+                        MDBoxLayout:
+                            id: inline_lyrics_box
+                            orientation: "vertical"
+                            adaptive_height: True
+                            padding: ["8dp", "30dp", "8dp", "30dp"]
+                            spacing: "10dp"
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "20dp"
+
+                        Widget:
+
+                        MDLabel:
+                            id: inline_lyrics_footer
+                            text: "LINE_SYNCED • SimpMusic / LRCLIB / YouTube"
+                            font_style: "Label"
+                            role: "small"
+                            halign: "right"
+                            adaptive_width: True
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.55]
+
+                # Card 2: Artists Card
+                MDCard:
+                    id: artist_card
+                    style: "filled"
+                    radius: [dp(20)]
+                    size_hint: (1, None)
+                    height: "250dp"
+                    theme_bg_color: "Custom"
+                    md_bg_color: [1, 1, 1, 0.08]
+                    ripple_behavior: True
+                    orientation: "vertical"
+                    on_release: app.show_artist(app.player_controller.active_track.artist if app.player_controller.active_track else "")
+
+                    MDFloatLayout:
+                        size_hint: (1, None)
+                        height: "170dp"
+
+                        FitImage:
+                            id: player_artist_banner
+                            source: app.player_controller.active_track.album_art if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.album_art) else "album_art.png"
+                            radius: [dp(20), dp(20), 0, 0]
+                            size_hint: (1, 1)
+                            pos_hint: {"x": 0, "y": 0}
+
+                        MDCard:
+                            size_hint: (None, None)
+                            size: ("68dp", "26dp")
+                            radius: [dp(13)]
+                            pos_hint: {"x": 0.04, "top": 0.92}
+                            theme_bg_color: "Custom"
+                            md_bg_color: [0, 0, 0, 0.65]
+                            MDLabel:
+                                text: "Artists"
+                                font_style: "Label"
+                                role: "small"
+                                bold: True
+                                halign: "center"
+                                theme_text_color: "Custom"
+                                text_color: [1, 1, 1, 1.0]
+
+                    MDBoxLayout:
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: "80dp"
+                        padding: ["16dp", "10dp"]
+                        spacing: "2dp"
+
+                        MarqueeLabel:
+                            text: app.player_controller.active_track.artist if app.player_controller.active_track else "Unknown Artist"
+                            font_style: "Title"
+                            role: "medium"
+                            bold: True
+                            height: "24dp"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 1.0]
+
+                        MDLabel:
+                            text: "YouTube Artist • Tap to view discography"
+                            font_style: "Body"
+                            role: "small"
+                            adaptive_height: True
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.65]
+
+                # Card 3: Description & Stats Card
+                MDCard:
+                    id: description_card
+                    style: "filled"
+                    radius: [dp(20)]
+                    size_hint: (1, None)
+                    adaptive_height: True
+                    theme_bg_color: "Custom"
+                    md_bg_color: [1, 1, 1, 0.08]
+                    padding: ["16dp", "16dp"]
+                    orientation: "vertical"
+                    spacing: "8dp"
 
                     MDLabel:
-                        text: "UP NEXT"
+                        text: f"Published on {app.player_controller.active_track.release_date}" if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.release_date) else "Published on YouTube"
                         font_style: "Label"
-                        role: "large"
-                        bold: True
+                        role: "small"
+                        adaptive_height: True
                         theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 0.95]
-                        pos_hint: {"center_y": .5}
-
-                    Widget:
+                        text_color: [1, 1, 1, 0.70]
 
                     MDLabel:
-                        text: f"{len(app.player_controller.queue)} tracks" if app.player_controller else ""
-                        font_style: "Label"
+                        text: f"{app.player_controller.active_track.view_count:,} views" if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.view_count > 0) else "Streaming via YouTube Music"
+                        font_style: "Title"
                         role: "medium"
-                        halign: "right"
-                        adaptive_width: True
+                        bold: True
+                        adaptive_height: True
                         theme_text_color: "Custom"
-                        text_color: [1, 1, 1, 0.65]
-                        pos_hint: {"center_y": .5}
+                        text_color: [1, 1, 1, 1.0]
 
-                    MDIcon:
-                        icon: "chevron-up"
+                    MDLabel:
+                        text: f"{app.player_controller.active_track.like_count:,} like(s)" if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.like_count > 0) else ""
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: [1, 1, 1, 0.70]
+
+                    MDDivider:
+                        color: [1, 1, 1, 0.12]
+
+                    MDLabel:
+                        text: "Description"
+                        font_style: "Title"
+                        role: "small"
+                        bold: True
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: [1, 1, 1, 1.0]
+
+                    MDLabel:
+                        id: player_description_label
+                        text: (app.player_controller.active_track.description[:180] + "..." if (len(app.player_controller.active_track.description) > 180 and not root.is_description_expanded) else app.player_controller.active_track.description) if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.description) else "No description provided for this track."
+                        font_style: "Body"
+                        role: "small"
+                        adaptive_height: True
+                        theme_text_color: "Custom"
+                        text_color: [1, 1, 1, 0.82]
+
+                    MDButton:
+                        style: "text"
                         adaptive_size: True
-                        pos_hint: {"center_y": .5}
-                        theme_icon_color: "Custom"
-                        icon_color: [1, 1, 1, 0.70]
+                        pos_hint: {"right": 1}
+                        opacity: 1 if (app.player_controller and app.player_controller.active_track and len(app.player_controller.active_track.description) > 180) else 0
+                        disabled: not (app.player_controller and app.player_controller.active_track and len(app.player_controller.active_track.description) > 180)
+                        on_release: root.toggle_description()
+                        MDButtonText:
+                            text: "Less" if root.is_description_expanded else "More"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.95]
+
+                # Bottom Spacer
+                Widget:
+                    size_hint_y: None
+                    height: "24dp"

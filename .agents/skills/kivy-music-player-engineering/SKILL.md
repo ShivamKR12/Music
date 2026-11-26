@@ -179,15 +179,21 @@ When dispatching synthetic touch events (`on_touch_down`, `on_touch_move`, `on_t
 - Every interactive button, chip, and floating action button across `.kv` files MUST have a bound event handler (`on_release`, `on_press`) or be explicitly marked `disabled: True`.
 - Run `tests/test_interactive_widgets_audit.py` to statically verify all `.kv` files before concluding UI work.
 
-### 6.3 Permanent 10-Suite Master Test Battery
-The project maintains a 10-suite test suite in `KivyMusicApp/tests/run_all_tests.py`:
-1. `test_lyrics_engine_and_math.py`: LRC timestamp parsing, viewport centering math, user drag debounce.
-2. `test_player_queue_and_offline.py`: Queue sync, track transition, duration formatting.
-3. `test_interactive_widgets_audit.py`: 100% action binding verification across all `.kv` files.
-4. `test_settings_and_persistence.py`: Light theme default, `PassiveTrailingCheckbox`, SQLite roundtrip.
-5. `test_artwork_and_ui_geometry.py`: Non-zero bar heights, zero-overlap, hidden overlay `disabled: True`.
-6. `test_artist_and_album_dynamic.py`: Dynamic discography, zero mock albums, dynamic card generation.
-7. `test_podcasts_and_trending.py`: `TrackModel` serialization, spotlight card bindings.
-8. `test_backend_integration.py`: SQLite track caching, playlists, favorites, search history, `AudioEngine`.
-9. `test_battery_fixes.py`: Multilingual Unicode textures, duration accuracy, artwork sync.
-10. `test_comprehensive_audit.py`: 13-suite end-to-end integration (18 screens zero overlap, back stacks, dialogs, sheets, carousel Option A, button symmetry, directional gestures).
+### 6.3 19-Suite Headless Runner & Four-Tier Production Verification Matrix
+The repository runs 19 isolated headless suites via `KivyMusicApp/tests/run_all_tests.py` (including lyrics math, queue/offline precision, 100% widget binding audit, SQLite persistence, 5-level logging, UI mode lock, geometry/artwork, dynamic artist/podcast checks, backend integration, multi-source routing, SimpMusic parity & palette, mini-player startup/swipe dismiss, buffering UI/controller bindings, dynamic recommendation shelves, and the 13-suite comprehensive audit).
+
+**Critical Engineering Constraint — Never Equate Headless Passes with Full Production Readiness:**
+All test reports and feature sign-offs MUST distinguish **Designed vs. Implemented vs. Verified** across four explicit tiers:
+1. **Unit Tests:** Pure math & logic (e.g., recency decay/novelty boundary assertions, LRC parsing, serialization).
+2. **Integration Tests (Mocked / Headless):** `KIVY_HEADLESS=1` UI geometry, SQLite queries, and controller callbacks (mocks `AudioEngine` / skips live network/decoders).
+3. **Device Tests (Real Audio & Android APK via `adb`):** Real Opus/AAC/MP3 chunked stream decoding, packet-loss recovery, runtime `READ_MEDIA_AUDIO` / `MediaStore`, `ForegroundService` + `MediaSession` lock-screen controls, headphone/Bluetooth switches, and call interruptions.
+4. **Performance Telemetry:** Measured cold startup time, time-to-first-audio, buffering stall count/duration, frame-time percentiles (`Perfetto` / profiler), long-session RAM usage, DSP CPU load, network speed/retransmissions, and provider failure rates.
+
+---
+
+## 7. Backend, Audio, Buffer & Concurrency Discipline
+1. **Single-Responsibility Decomposition:** Keep `PlaybackCoordinator`, `DecoderManager`, `BufferManager`, and `DSPPipeline` logically separated; keep `MusicRepository` between providers (`MusicProviderRouter`) and controllers (`PlayerController`); decompose `main.py` incrementally into clean coordinators.
+2. **Audio DSP Contract:** Any equalizer/AutoEq or equal-power crossfade (`cos`/`sin` with headroom management) must operate on an explicitly verified PCM path (`Decoder -> PCM -> DSP -> Mixer -> Output`), never assuming unverified `SoundLoader` filter hooks exist (`ffpyplayer.player.MediaPlayer` has no `set_filter`, and Android `SoundAndroidPlayer` lacks PCM DSP hooks).
+3. **Buffering Integrity:** Track **Download Progress** (bytes), **Playable Buffer** (decodable seconds), and **Buffer Safety** (playable audio ahead of playhead) separately; never mark incomplete partial files `is_downloaded = True` or run destructive postprocessing (`FFmpegExtractAudio`) against an open playback file handle.
+4. **Dedicated SQLite Worker:** Route DB writes asynchronously through a single sequential Database Worker (with `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`, `busy_timeout`, Unicode-safe sanitization preserving combining marks) rather than acquiring shared `DB_LOCK` synchronously on UI toggle handlers.
+5. **External Extraction & Sync Realism:** Treat YouTube `extractor_args` / `missing_pot` as best-effort fallbacks requiring PO-token hooks, URL expiration refresh, exponential backoff, and non-silent error logs; label Spotify clearly as *metadata lookup mapped to external audio*; require clock-offset/drift compensation + auth + redaction before claiming real-world WAN sync in Listen Together.

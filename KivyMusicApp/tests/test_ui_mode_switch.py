@@ -54,33 +54,22 @@ try:
     check("New library tiles present", "favorites_fan" in ids("library"))
     check("New settings grouped scroll present", "settings_scroll" in ids("settings"))
 
-    # --- 2. Toggle row exists in both settings variants ---
+    # --- 2. Verify settings has no deprecated skin toggles ---
     def has_toggle_row():
         return any(
             w.__class__.__name__ == "MDListItemHeadlineText" and getattr(w, "text", "") == "Interface Style"
             for w in sm.get_screen("settings").walk()
         )
-    check("New settings has Interface Style row", has_toggle_row())
+    check("Deprecated Interface Style toggle removed from settings", not has_toggle_row())
 
-    # --- 3. Switch to classic ---
+    # --- 3. Calling toggle_ui_mode is safe and leaves modern look active ---
     app.toggle_ui_mode()
     pump()
-    check("ui_mode flips to classic", app.ui_mode == "classic", f"ui_mode={app.ui_mode}")
-    check("Choice persisted to SQLite", get_setting("ui_mode") == "classic")
-    check("Classic home header absent", "home_header" not in ids("home"))
-    check("Classic home shelves absent", "listen_again_list" not in ids("home"))
-    check("Classic library grid restored", "library_grid_card_box" in ids("library") or "playlists_grid" in ids("library") or len(ids("library")) > 0)
-    check("Classic settings row still available", has_toggle_row())
-    check("Quick picks data repopulated", len(sm.get_screen("home").ids.quick_picks_list.data) > 0)
-
-    # --- 4. Switch back to new ---
-    app.toggle_ui_mode()
-    pump()
-    check("ui_mode returns to new", app.ui_mode == "new", f"ui_mode={app.ui_mode}")
-    check("Choice persisted as new", get_setting("ui_mode") == "new")
-    check("New home header restored", "home_header" in ids("home"))
-    check("New library tiles restored", "favorites_fan" in ids("library"))
-    check("New settings scroll restored", "settings_scroll" in ids("settings"))
+    check("ui_mode remains modern 'new'", app.ui_mode == "new", f"ui_mode={app.ui_mode}")
+    check("Choice persisted to SQLite as new", get_setting("ui_mode") == "new")
+    check("Home header still present", "home_header" in ids("home"))
+    check("Home shelves still present", {"listen_again_list", "quick_picks_list", "trending_list"} <= ids("home"))
+    check("Player below-the-fold cards present", {"lyrics_card", "artist_card", "description_card"} <= ids("player"))
     check("Current screen still valid", sm.current in sm.screen_names, f"current={sm.current}")
 
 finally:

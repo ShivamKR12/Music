@@ -95,12 +95,13 @@ def run_test(on_complete=None):
         results["anim_bg_persisted"] = True
         print("  [PASS] animated_bg toggles and persists to SQLite.")
 
-        # 7. Test Dialogs (About, Logs, Provider Selector) do not throw exceptions
+        # 7. Test Dialogs (About, Logs, Log Level, Provider Selector) do not throw exceptions
         app.show_about_dialog()
         app.show_logs_dialog()
+        app.show_log_level_dialog()
         app.show_provider_selector_dialog()
         results["dialogs_verified"] = True
-        print("  [PASS] About, Logs, and Provider Selector dialogs instantiate without error.")
+        print("  [PASS] About, Logs, Log Level, and Provider Selector dialogs instantiate without error.")
 
         # Ensure Light theme is strictly persisted on exit
         app.theme_cls.theme_style = "Light"

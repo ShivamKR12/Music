@@ -1,0 +1,206 @@
+{
+  "generated_utc": "2026-11-26T19:15:39Z",
+  "windows_desktop_live_telemetry": {
+    "cold_startup": {
+      "cold_startup_ms": 9118.07,
+      "stages_ms": {
+        "build_done": 5778.54,
+        "on_start": 5779.39,
+        "splash_ready": 8774.08,
+        "app_usable": 9118.07
+      }
+    },
+    "time_to_first_audio": {
+      "count": 1,
+      "min_ms": 112.017,
+      "avg_ms": 112.017,
+      "p50_ms": 112.017,
+      "p95_ms": 112.017,
+      "p99_ms": 112.017,
+      "max_ms": 112.017,
+      "last_track": "Telemetry Verification Sine"
+    },
+    "buffering": {
+      "stall_count": 0,
+      "total_stall_seconds": 0.0,
+      "min_safety_seconds": null,
+      "avg_safety_seconds": null,
+      "sample_count": 0
+    },
+    "frame_pacing": {
+      "count": 56,
+      "min_ms": 7.832,
+      "avg_ms": 445.457,
+      "p50_ms": 29.462,
+      "p95_ms": 2107.399,
+      "p99_ms": 4277.832,
+      "max_ms": 5111.406,
+      "total_frames_recorded": 56,
+      "missed_16ms_count": 40,
+      "missed_16ms_pct": 71.43,
+      "jank_33ms_count": 26,
+      "avg_fps": 2.24
+    },
+    "memory_rss_mb": {
+      "current_mb": 1132.02,
+      "baseline_mb": 221.62,
+      "peak_mb": 1132.02,
+      "delta_mb": 910.4,
+      "sample_count": 23
+    },
+    "dsp_cpu": {
+      "count": 6,
+      "min_ms": 0.815,
+      "avg_ms": 12.149,
+      "p50_ms": 14.349,
+      "p95_ms": 21.755,
+      "p99_ms": 23.293,
+      "max_ms": 23.677,
+      "total_compute_seconds": 0.0729,
+      "total_audio_seconds": 0.5573,
+      "realtime_cpu_load_pct": 13.081
+    },
+    "network": {
+      "total_bytes_downloaded": 0,
+      "avg_bps": 0.0,
+      "peak_bps": 0.0,
+      "http_retry_count": 0,
+      "stream_refresh_count": 0,
+      "range_checks": {}
+    },
+    "providers": {
+      "youtube:extract_metadata": {
+        "provider": "youtube",
+        "operation": "extract_metadata",
+        "total": 4,
+        "success": 4,
+        "failure": 0,
+        "failure_rate_pct": 0.0,
+        "error_codes": {},
+        "latency_ms": {
+          "count": 4,
+          "min_ms": 1731.464,
+          "avg_ms": 2827.034,
+          "p50_ms": 2529.418,
+          "p95_ms": 4316.925,
+          "p99_ms": 4477.655,
+          "max_ms": 4517.837
+        }
+      },
+      "jiosaavn:search": {
+        "provider": "jiosaavn",
+        "operation": "search",
+        "total": 1,
+        "success": 1,
+        "failure": 0,
+        "failure_rate_pct": 0.0,
+        "error_codes": {},
+        "latency_ms": {
+          "count": 1,
+          "min_ms": 1157.419,
+          "avg_ms": 1157.419,
+          "p50_ms": 1157.419,
+          "p95_ms": 1157.419,
+          "p99_ms": 1157.419,
+          "max_ms": 1157.419
+        }
+      },
+      "youtube:search": {
+        "provider": "youtube",
+        "operation": "search",
+        "total": 1,
+        "success": 1,
+        "failure": 0,
+        "failure_rate_pct": 0.0,
+        "error_codes": {},
+        "latency_ms": {
+          "count": 1,
+          "min_ms": 1731.837,
+          "avg_ms": 1731.837,
+          "p50_ms": 1731.837,
+          "p95_ms": 1731.837,
+          "p99_ms": 1731.837,
+          "max_ms": 1731.837
+        }
+      },
+      "youtube:extract_stream": {
+        "provider": "youtube",
+        "operation": "extract_stream",
+        "total": 1,
+        "success": 1,
+        "failure": 0,
+        "failure_rate_pct": 0.0,
+        "error_codes": {},
+        "latency_ms": {
+          "count": 1,
+          "min_ms": 2581.805,
+          "avg_ms": 2581.805,
+          "p50_ms": 2581.805,
+          "p95_ms": 2581.805,
+          "p99_ms": 2581.805,
+          "max_ms": 2581.805
+        }
+      }
+    },
+    "live_provider_probes": {
+      "jiosaavn_search": {
+        "ok": true,
+        "latency_ms": 1157.49,
+        "count_or_ext": 5,
+        "error": null
+      },
+      "youtube_search": {
+        "ok": true,
+        "latency_ms": 1731.86,
+        "count_or_ext": 3,
+        "error": null
+      },
+      "youtube_stream_extract": {
+        "ok": true,
+        "latency_ms": 2581.83,
+        "count_or_ext": "mp4",
+        "error": null
+      }
+    }
+  },
+  "android_device_verification": {
+    "package_id": "org.shivam.music.kivymusicapp",
+    "timestamp_utc": "2026-11-26T19:15:33Z",
+    "adb_devices": [
+      "RZCY91AQGKW            device product:a17xins model:SM_A176B device:a17x transport_id:1"
+    ],
+    "device_info": {
+      "serial": "RZCY91AQGKW",
+      "manufacturer": "samsung",
+      "model": "SM-A176B",
+      "android_release": "17",
+      "sdk_int": 37,
+      "abi_list": "arm64-v8a,armeabi-v7a,armeabi",
+      "wm_size": "Physical size: 1080x2340",
+      "wm_density": "Physical density: 450\nOverride density: 454",
+      "audio_flinger_sample_rates": [
+        "48000"
+      ],
+      "audio_flinger_hal_frames": [
+        "192",
+        "480",
+        "960"
+      ],
+      "sdcard_music_file_count": 2
+    },
+    "host_build_capability": {
+      "platform": "win32",
+      "wsl_installed": false,
+      "wsl_detail": "The Windows Subsystem for Linux is not installed. You can install by running 'wsl.exe --install'.\n\n\nFor more information please visit https://aka.ms/wslinstall",
+      "buildozer_on_host": false,
+      "buildozer_version": ""
+    },
+    "apk_installed": false,
+    "device_verification_status": "BLOCKED_APK_NOT_INSTALLED",
+    "blockers": [
+      "Package 'org.shivam.music.kivymusicapp' is not installed on SM-A176B (RZCY91AQGKW).",
+      "Windows host cannot run `buildozer android debug` (WSL distro not installed)."
+    ],
+    "runtime_metrics": null
+  }
+}

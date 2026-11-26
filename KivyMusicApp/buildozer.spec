@@ -19,10 +19,10 @@ source.include_exts = py,png,jpg,jpeg,kv,atlas,ttf,otf,json,md
 source.exclude_dirs = tests, cache, bin, .buildozer, .git, __pycache__, .pytest_cache, docs, recipes
 
 # (list) List of exclusions using pattern matching
-source.exclude_patterns = tests/*, cache/*, bin/*, *.db, *.db-journal, test_tone.wav
+source.exclude_patterns = tests/*, cache/*, bin/*, *.db, *.db-journal, *.db-wal, *.db-shm, test_tone.wav
 
 # (str) Application versioning (method 1)
-version = 0.1.3
+version = 0.1.4
 
 # (list) Application requirements
 # Pinned to exact system-validated versions to prevent PyPI dependency resolution conflicts
@@ -39,8 +39,11 @@ orientation = portrait
 # (bool) Indicate if the application should be fullscreen or not
 fullscreen = 0
 
+# (list) Application services (python-for-android background foreground media service)
+services = MusicPlayback:service/main.py:foreground
+
 # (list) Permissions
-android.permissions = INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, WAKE_LOCK, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, READ_MEDIA_AUDIO, VIBRATE
+android.permissions = INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, WAKE_LOCK, POST_NOTIFICATIONS, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, READ_MEDIA_AUDIO, VIBRATE, BLUETOOTH_CONNECT
 
 # (int) Target Android API, should be as high as possible.
 android.api = 33

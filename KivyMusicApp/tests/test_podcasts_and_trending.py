@@ -30,7 +30,7 @@ def run_test(on_complete=None):
         sm = app.root.ids.screen_manager
         sm.transition = NoTransition()
 
-        # 1. TrackModel Roundtrip Serialization
+        # 1. TrackModel Roundtrip Serialization & Complete yt-dlp Metadata
         orig_track = TrackModel(
             video_id="pod_vid_99",
             title="The Future of AI & Robotics",
@@ -38,6 +38,18 @@ def run_test(on_complete=None):
             url="https://youtube.com/watch?v=pod_vid_99",
             duration=7540,
             album_art="album_art.png",
+            album="Lex Fridman Podcast",
+            album_artist="Lex Fridman",
+            genre="Technology & Science",
+            description="Deep conversation with leading roboticists and engineers.",
+            view_count=1542000,
+            like_count=82000,
+            channel="Lex Fridman",
+            channel_id="UC_x5XG1OV2P6uZZ5FSM9Ttw",
+            release_date="2024-05-15",
+            chapters='[{"title": "Intro", "start_time": 0, "end_time": 120}]',
+            track_number=420,
+            media_type="podcast",
             lyrics="Intro discussion...",
             synced_lyrics="[00:05.00]Welcome to the podcast",
             is_favorite=True,
@@ -48,24 +60,43 @@ def run_test(on_complete=None):
         assert serialized["video_id"] == "pod_vid_99"
         assert serialized["title"] == "The Future of AI & Robotics"
         assert serialized["duration"] == 7540
+        assert serialized["media_type"] == "podcast"
+        assert serialized["album"] == "Lex Fridman Podcast"
+        assert serialized["genre"] == "Technology & Science"
+        assert serialized["channel_id"] == "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+        assert serialized["view_count"] == 1542000
 
         deserialized = TrackModel.from_dict(serialized)
         assert deserialized.video_id == orig_track.video_id
         assert deserialized.title == orig_track.title
         assert deserialized.artist == orig_track.artist
         assert deserialized.duration == orig_track.duration
+        assert deserialized.media_type == "podcast"
+        assert deserialized.album == "Lex Fridman Podcast"
+        assert deserialized.genre == "Technology & Science"
+        assert deserialized.view_count == 1542000
         results["track_model_serialization_valid"] = True
-        print("  [PASS] TrackModel.to_dict() and from_dict() maintain 100% fidelity.")
+        print("  [PASS] TrackModel.to_dict() and from_dict() maintain 100% fidelity across all yt-dlp metadata.")
 
-        # 2. Podcasts Screen Dynamic Binding
+        # 2. Classifier Validation (Music vs Podcasts)
+        from utils.media_utils import is_podcast_item
+        pod_item = {"title": "JRE #2150 - Terrence Howard", "duration": 10800, "uploader": "PowerfulJRE"}
+        assert is_podcast_item(pod_item) is True, "JRE episode must be classified as podcast"
+        mix_item = {"title": "Arijit Singh Best Songs Jukebox - Non Stop Bollywood Hits", "duration": 3600, "uploader": "T-Series"}
+        assert is_podcast_item(mix_item) is False, "Music Jukebox must NOT be classified as podcast"
+        song_item = {"title": "Blinding Lights", "duration": 200, "artist": "The Weeknd"}
+        assert is_podcast_item(song_item) is False, "Standard song must NOT be classified as podcast"
+        results["media_classifier_valid"] = True
+        print("  [PASS] is_podcast_item accurately distinguishes podcasts from songs and music mixes.")
+
+        # 3. Podcasts Screen Dynamic Binding
         app.open_podcasts()
         podcasts_screen = sm.get_screen("podcasts")
         assert "podcasts_list" in podcasts_screen.ids, "podcasts_list ID missing from PodcastsScreen"
 
-        # Check no obsolete hardcoded strings exist in screen rules
         p_episodes = [
-            TrackModel(video_id="p1", title="Episode 1: Science & Focus", artist="Huberman Lab", url="https://youtube.com/p1", duration=3600, album_art="album_art.png"),
-            TrackModel(video_id="p2", title="Episode 2: Deep Work", artist="Cal Newport", url="https://youtube.com/p2", duration=2400, album_art="album_art2.png"),
+            TrackModel(video_id="p1", title="Episode 1: Science & Focus", artist="Huberman Lab", url="https://youtube.com/p1", duration=3600, album_art="album_art.png", media_type="podcast"),
+            TrackModel(video_id="p2", title="Episode 2: Deep Work", artist="Cal Newport", url="https://youtube.com/p2", duration=2400, album_art="album_art2.png", media_type="podcast"),
         ]
         app.podcast_featured_track = p_episodes[0]
         app.podcast_featured_title = p_episodes[0].title
@@ -77,7 +108,22 @@ def run_test(on_complete=None):
         results["podcast_featured_dynamic"] = True
         print("  [PASS] Featured podcast spotlight card binds dynamically.")
 
-        # 3. Trending Playlist Validation
+        # 4. Strict Podcast Exclusion from Home Music Shelves
+        app.switch_screen("home")
+        app.populate_home_screen_data()
+        home = sm.get_screen("home")
+        for rv_name in ("quick_picks_list", "listen_again_list", "trending_list", "featured_list", "forgotten_favorites_list", "daily_mix_list"):
+            if rv_name in home.ids:
+                rv_data = home.ids[rv_name].data
+                for item in rv_data:
+                    t_obj = item.get("track_obj")
+                    if t_obj:
+                        assert t_obj.media_type != "podcast", f"Podcast '{t_obj.title}' leaked into home shelf '{rv_name}'!"
+                        assert not is_podcast_item(t_obj.to_dict()), f"Podcast item '{t_obj.title}' detected in home shelf '{rv_name}'!"
+        results["home_shelves_podcast_free"] = True
+        print("  [PASS] Home music shelves are 100% free of podcasts.")
+
+        # 5. Trending Playlist Validation
         app.open_playlist("Top Charts")
         assert app.active_playlist_name == "Top Charts"
         pl_screen = sm.get_screen("playlist")

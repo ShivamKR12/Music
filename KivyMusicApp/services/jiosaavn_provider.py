@@ -11,7 +11,10 @@ import base64
 import requests
 from typing import List, Dict, Optional, Any
 from services.music_provider_base import BaseMusicProvider
+from services.logger import get_logger
 from utils.des import des, ECB, PAD_PKCS5
+
+logger = get_logger("JioSaavnProvider")
 
 JIOSAAVN_API_BASE = "https://www.jiosaavn.com/api.php"
 DES_CIPHER_KEY = b"38346591"
@@ -44,7 +47,7 @@ class JioSaavnProvider(BaseMusicProvider):
                     return decrypted.replace(sfx, target_suffix)
             return decrypted
         except Exception as e:
-            print(f"[JioSaavnProvider] DES decryption error: {e}")
+            logger.warning("DES decryption error: %s", e)
             return None
 
     def _clean_text(self, text: Any) -> str:
@@ -107,7 +110,7 @@ class JioSaavnProvider(BaseMusicProvider):
                         "year": item.get("year", ""),
                     })
         except Exception as e:
-            print(f"[JioSaavnProvider] Search exception: {e}")
+            logger.error("Search exception: %s", e)
 
         # Fallback to autocomplete if full search returned zero results
         if not tracks:
@@ -152,7 +155,7 @@ class JioSaavnProvider(BaseMusicProvider):
                         "year": "",
                     })
         except Exception as e:
-            print(f"[JioSaavnProvider] Autocomplete search failed: {e}")
+            logger.warning("Autocomplete search failed: %s", e)
         return tracks
 
     def get_track_details(self, track_id: str) -> Optional[Dict[str, Any]]:
@@ -197,7 +200,7 @@ class JioSaavnProvider(BaseMusicProvider):
                     "year": item.get("year", ""),
                 }
         except Exception as e:
-            print(f"[JioSaavnProvider] get_track_details failed for {track_id}: {e}")
+            logger.error("get_track_details failed for %s: %s", track_id, e)
         return None
 
     def get_stream_url(self, track_id_or_url: str, quality: str = "320") -> Optional[Dict[str, Any]]:
@@ -270,5 +273,5 @@ class JioSaavnProvider(BaseMusicProvider):
                     "source": "jiosaavn"
                 }
         except Exception as e:
-            print(f"[JioSaavnProvider] get_playlist failed: {e}")
+            logger.error("get_playlist failed: %s", e)
         return None

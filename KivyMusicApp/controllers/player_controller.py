@@ -5,10 +5,17 @@ from kivy.clock import Clock
 from kivy.event import EventDispatcher
 from kivy.properties import ObjectProperty, BooleanProperty, StringProperty, NumericProperty
 from models.track_model import TrackModel
-from models.database import is_favorite, toggle_favorite, mark_track_played, update_local_track_path
+from models.database import (
+    is_favorite, toggle_favorite, mark_track_played,
+    record_track_skip, update_local_track_path
+)
+from services.android_media_lifecycle import AndroidMediaLifecycleCoordinator
 from services.audio_engine import AudioEngine
 from services.discord_rpc_service import DiscordRPCService
+from services.logger import get_logger
 from utils.theme_utils import update_theme_from_image
+
+logger = get_logger("PlayerController")
 
 class PlayerController(EventDispatcher):
     playlist_model = ObjectProperty(None, allownone=True)
@@ -20,6 +27,8 @@ class PlayerController(EventDispatcher):
     is_favorite = BooleanProperty(False)
     is_loading = BooleanProperty(False)
     is_seeking = BooleanProperty(False)
+    buffer_progress = NumericProperty(0.0)
+    buffer_time = NumericProperty(0.0)
     status_text = StringProperty("")
     current_time = NumericProperty(0.0)
     duration = NumericProperty(180.0)
@@ -41,13 +50,19 @@ class PlayerController(EventDispatcher):
         self.audio_engine.on_artwork_loaded = self._on_audio_artwork_loaded
         self.audio_engine.on_loading = self._on_audio_loading
         self.audio_engine.on_download_progress = self._on_audio_download_progress
+        self.audio_engine.on_buffer_update = self._on_audio_buffer_update
+        self.audio_engine.on_buffer_metrics = self._on_audio_buffer_metrics
         self.audio_engine.on_error = self._on_audio_error
         self.audio_engine.on_track_loaded = self._on_audio_track_loaded
         self.audio_engine.on_sponsorblock_skipped = self._on_sponsorblock_skipped
         self.audio_engine.on_crossfade_trigger = self._on_crossfade_trigger
+        self.audio_engine.on_crossfade_track_advanced = self._on_crossfade_track_advanced
 
         self.discord_rpc = DiscordRPCService()
+        self.media_lifecycle = AndroidMediaLifecycleCoordinator(self)
         self._pre_mute_volume = 1.0
+        self._manual_stopped = True
+        self._consecutive_error_skips = 0
 
     def set_playlist(self, playlist_model):
         self.playlist_model = playlist_model
@@ -191,6 +206,9 @@ class PlayerController(EventDispatcher):
         dsec = max(0, int(dur))
         dm, ds = divmod(dsec, 60)
         self.formatted_duration = f"{dm:02d}:{ds:02d}"
+        is_dl = getattr(track, "is_downloaded", False) or bool(getattr(track, "local_path", "") and os.path.exists(getattr(track, "local_path", "")))
+        self.buffer_progress = 1.0 if is_dl else 0.0
+        self.buffer_time = dur if is_dl else 0.0
         if self.active_track:
             self.active_track.current_time = 0.0
         if track in self.queue:
@@ -220,40 +238,43 @@ class PlayerController(EventDispatcher):
             self.active_track.is_favorite = self.is_favorite
 
     def play(self):
-        """Explicitly starts or resumes playback of the active track."""
+        """Explicitly starts or resumes playback without blocking the main UI thread."""
         if not self.active_track:
             return
+        if not self.media_lifecycle.request_audio_focus():
+            logger.warning("OS declined audio focus; holding playback cleanly")
+            self.is_playing = False
+            return
+        self._manual_stopped = False
+        if not getattr(self, "_advancing_from_error", False):
+            self._consecutive_error_skips = 0
+        self._advancing_from_error = False
         if self.audio_engine.paused and self.audio_engine.player:
             self.audio_engine.unpause()
             self.is_playing = True
+            self.media_lifecycle.sync_playback_state(
+                self.active_track, True, self.current_time, self.duration, force=True
+            )
             if self.discord_rpc and self.active_track:
                 t_title, t_artist, t_cur, t_dur = self.active_track.title, self.active_track.artist, self.current_time, self.duration
                 Clock.schedule_once(lambda dt: self.discord_rpc.update_track(t_title, t_artist, t_cur, t_dur, True), 0)
         else:
-            target_src = getattr(self.active_track, "local_path", "")
-            if not target_src or not os.path.exists(target_src):
-                try:
-                    from services.music_provider_router import MusicProviderRouter
-                    resolved = MusicProviderRouter().resolve_stream(self.active_track)
-                    target_src = resolved.get("url") or getattr(self.active_track, "url", "")
-                except Exception as e:
-                    print(f"[PlayerController] Stream resolution fallback: {e}")
-                    target_src = getattr(self.active_track, "url", "")
-
-            track_meta = {
-                "id": getattr(self.active_track, "video_id", ""),
+            track_meta = self.active_track.to_dict() if hasattr(self.active_track, "to_dict") else {
+                "video_id": getattr(self.active_track, "video_id", ""),
                 "title": self.active_track.title,
                 "artist": self.active_track.artist,
                 "duration": self.active_track.duration,
                 "artwork": self.active_track.album_art,
-                "source": getattr(self.active_track, "source", "youtube")
+                "local_path": getattr(self.active_track, "local_path", ""),
+                "url": getattr(self.active_track, "url", ""),
+                "source": getattr(self.active_track, "source", "youtube"),
             }
-            # If target_src is empty or doesn't exist, check local bundled art/demo
-            if not target_src and hasattr(self.active_track, "video_id") and self.active_track.video_id:
-                target_src = f"https://www.youtube.com/watch?v={self.active_track.video_id}"
-
-            started = self.audio_engine.start_play(target_src, track_meta)
+            # Resolve remote streams asynchronously off the Kivy UI thread
+            started = self.audio_engine.resolve_and_play_track(track_meta)
             self.is_playing = bool(started)
+            self.media_lifecycle.sync_playback_state(
+                self.active_track, self.is_playing, 0.0, self.duration, force=True
+            )
             if self.discord_rpc and self.active_track:
                 t_title, t_artist, t_dur = self.active_track.title, self.active_track.artist, self.duration
                 Clock.schedule_once(lambda dt: self.discord_rpc.update_track(t_title, t_artist, 0.0, t_dur, True), 0)
@@ -265,11 +286,20 @@ class PlayerController(EventDispatcher):
         if self.is_playing:
             self.audio_engine.pause()
             self.is_playing = False
+            self.media_lifecycle.sync_playback_state(
+                self.active_track, False, self.current_time, self.duration, force=True
+            )
+            self.media_lifecycle.persist_snapshot(wait=False)
             if self.discord_rpc and self.active_track:
                 t_title, t_artist, t_cur, t_dur = self.active_track.title, self.active_track.artist, self.current_time, self.duration
                 Clock.schedule_once(lambda dt: self.discord_rpc.update_track(t_title, t_artist, t_cur, t_dur, False), 0)
         else:
             self.play()
+
+    def pause(self):
+        """Explicitly pauses playback of the active track if currently playing."""
+        if self.is_playing:
+            self.toggle_play()
 
     def seek(self, pos: float):
         """Seek to position in seconds."""
@@ -280,6 +310,9 @@ class PlayerController(EventDispatcher):
         if self.active_track:
             self.active_track.current_time = pos
         self.audio_engine.seek(pos)
+        self.media_lifecycle.sync_playback_state(
+            self.active_track, self.is_playing, self.current_time, self.duration, force=True
+        )
 
     def get_next_track(self):
         """Calculates next track based on queue and repeat mode without random repeating."""
@@ -315,6 +348,21 @@ class PlayerController(EventDispatcher):
         return self.queue[prev_idx]
 
     def next_track(self):
+        # Record genuine early-skip behavioral telemetry if user skipped an actively playing track early
+        if (
+            self.is_playing
+            and self.active_track
+            and not getattr(self, "_advancing_from_error", False)
+            and float(self.current_time or 0.0) >= 0.5
+        ):
+            vid = getattr(self.active_track, "video_id", "")
+            dur = float(self.duration or getattr(self.active_track, "duration", 0) or 0.0)
+            played = float(self.current_time or 0.0)
+            if vid and played < 30.0 and (dur <= 0 or played < dur * 0.35):
+                threading.Thread(
+                    target=lambda v=vid, l=played, d=dur: record_track_skip(v, l, d),
+                    daemon=True,
+                ).start()
         next_t = self.get_next_track()
         if not next_t:
             self.is_playing = False
@@ -335,11 +383,22 @@ class PlayerController(EventDispatcher):
         if app and hasattr(app, "play_selected_track"):
             app.play_selected_track(self.active_track)
 
+    def persist_session_snapshot(self, wait: bool = False):
+        return self.media_lifecycle.persist_snapshot(wait=wait)
+
+    def restore_session_snapshot(self):
+        return self.media_lifecycle.restore_saved_session()
+
     def stop(self):
+        self._manual_stopped = True
+        self._consecutive_error_skips = 0
         self.is_playing = False
+        self.is_loading = False
+        self.media_lifecycle.persist_snapshot(wait=False)
+        self.media_lifecycle.release()
         if self.discord_rpc:
             self.discord_rpc.clear()
-        self.audio_engine.cleanup_player()
+        self.audio_engine.cleanup_player(cancel_workers=True)
 
     def fade_out_and_stop(self, duration: float = 0.25, on_complete=None):
         """Gradually fades out playback volume over duration, then cleanly halts audio engine."""
@@ -378,36 +437,69 @@ class PlayerController(EventDispatcher):
             )
 
     def _on_crossfade_trigger(self):
-        """Triggered when track reaches crossfade window before ending."""
-        # Pre-cache next track if in queue
+        """Triggered ahead of track conclusion: stages Deck B cleanly for equal-power crossfade."""
+        if self.repeat_mode == "one":
+            return
         next_t = self.get_next_track()
-        if next_t and hasattr(next_t, "video_id") and next_t.video_id:
-            vid = next_t.video_id
-            from services.audio_engine import get_cache_dir
-            cp = os.path.join(get_cache_dir(), f"{vid}.mp3")
-            if not os.path.exists(cp):
-                from utils.media_utils import fetch_youtube_metadata
-                threading.Thread(
-                    target=lambda: fetch_youtube_metadata(f"https://www.youtube.com/watch?v={vid}", extract_flat=True),
-                    daemon=True
-                ).start()
+        if not next_t or next_t == self.active_track:
+            return
+        next_dict = next_t.to_dict() if hasattr(next_t, "to_dict") else {
+            "video_id": getattr(next_t, "video_id", ""),
+            "title": getattr(next_t, "title", ""),
+            "artist": getattr(next_t, "artist", ""),
+            "duration": getattr(next_t, "duration", 0),
+            "artwork": getattr(next_t, "album_art", ""),
+            "local_path": getattr(next_t, "local_path", ""),
+            "url": getattr(next_t, "url", ""),
+            "source": getattr(next_t, "source", "youtube"),
+        }
+        self.audio_engine.stage_next_deck(next_dict)
+
+    def _on_crossfade_track_advanced(self, next_info: dict):
+        """Advance active_track and queue index seamlessly after Deck B promotion."""
+        next_t = self.get_next_track()
+        if not next_t:
+            return
+        self.active_track = next_t
+        if next_t in self.queue:
+            self.queue_index = self.queue.index(next_t)
+        dur = float(getattr(next_t, "duration", 0) or (next_info or {}).get("duration") or 180.0)
+        self.duration = dur
+        dsec = max(0, int(dur))
+        dm, ds = divmod(dsec, 60)
+        self.formatted_duration = f"{dm:02d}:{ds:02d}"
+        vid = getattr(next_t, "video_id", "")
+        self.is_favorite = is_favorite(vid) if vid else getattr(next_t, "is_favorite", False)
+        if vid:
+            threading.Thread(target=lambda: mark_track_played(vid), daemon=True).start()
+        if self.discord_rpc:
+            self.discord_rpc.update_track(next_t.title, next_t.artist, 0.0, self.duration, True)
 
     # AudioEngine Callbacks
     def _on_audio_time_update(self, elapsed, duration):
+        if float(elapsed or 0.0) >= 2.0 and self._consecutive_error_skips:
+            self._consecutive_error_skips = 0
         if not self.is_seeking:
             self.current_time = float(elapsed)
             sec = max(0, int(elapsed or 0))
-            m, s = divmod(sec, 60)
-            self.formatted_current_time = f"{m:02d}:{s:02d}"
+            if getattr(self, "_last_disp_sec", -1) != sec:
+                self._last_disp_sec = sec
+                m, s = divmod(sec, 60)
+                self.formatted_current_time = f"{m:02d}:{s:02d}"
             if duration > 0:
                 self.duration = float(duration)
                 dsec = max(0, int(duration or 0))
-                dm, ds = divmod(dsec, 60)
-                self.formatted_duration = f"{dm:02d}:{ds:02d}"
+                if getattr(self, "_last_disp_dur_sec", -1) != dsec:
+                    self._last_disp_dur_sec = dsec
+                    dm, ds = divmod(dsec, 60)
+                    self.formatted_duration = f"{dm:02d}:{ds:02d}"
         if self.active_track and not self.is_seeking:
             self.active_track.current_time = elapsed
             if duration > 0 and self.active_track.duration != duration:
                 self.active_track.duration = duration
+            self.media_lifecycle.sync_playback_state(
+                self.active_track, self.is_playing, self.current_time, self.duration, force=False
+            )
 
     def _on_audio_track_end(self):
         if self.is_repeat:
@@ -435,11 +527,74 @@ class PlayerController(EventDispatcher):
         if self.active_track:
             self.active_track.download_progress = percent_str
 
+    def _on_audio_buffer_update(self, progress: float):
+        self.buffer_progress = max(0.0, min(1.0, float(progress or 0.0)))
+        if self.duration > 0:
+            self.buffer_time = self.buffer_progress * self.duration
+
+    def _on_audio_buffer_metrics(self, metrics):
+        self.buffer_progress = max(0.0, min(1.0, float(metrics.download_progress or 0.0)))
+        if metrics.playable_buffer_seconds > 0:
+            self.buffer_time = float(metrics.playable_buffer_seconds)
+        elif self.duration > 0:
+            self.buffer_time = self.buffer_progress * self.duration
+
     def _on_audio_error(self, err_msg):
-        self.status_text = f"Error: {err_msg}"
-        print(f"[PlayerController] Audio error: {err_msg}")
+        from services.youtube_extractor import redact_sensitive_text
+        clean_err = redact_sensitive_text(err_msg) or "Playback error"
+        self.status_text = f"Error: {clean_err}"
+        self.is_playing = False
+        self.is_loading = False
+        if self.active_track:
+            self.active_track.is_loading = False
+        logger.error("Audio error: %s", clean_err)
+
+        try:
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if app and hasattr(app, "show_toast"):
+                Clock.schedule_once(lambda dt, m=clean_err: app.show_toast(m), 0)
+        except Exception:
+            pass
+
+        # Fail-safe queue protection: skip dead/blocked track up to 3 consecutive items without infinite looping
+        if (
+            not getattr(self, "_manual_stopped", True)
+            and len(self.queue) > 1
+            and self.repeat_mode != "one"
+        ):
+            max_skips = min(3, len(self.queue) - 1)
+            if getattr(self, "_consecutive_error_skips", 0) < max_skips:
+                self._consecutive_error_skips = getattr(self, "_consecutive_error_skips", 0) + 1
+                logger.warning(
+                    "Fail-safe queue protection advancing past unplayable track (%d/%d)",
+                    self._consecutive_error_skips, max_skips,
+                )
+                Clock.schedule_once(lambda dt: self._safe_advance_after_error(), 0.25)
+            else:
+                logger.warning("Halted queue auto-skip after %d consecutive extraction failures.", max_skips)
+
+    def _safe_advance_after_error(self):
+        if getattr(self, "_manual_stopped", True) or len(self.queue) <= 1:
+            return
+        self._advancing_from_error = True
+        self.next_track()
+        try:
+            from kivymd.app import MDApp
+            app = MDApp.get_running_app()
+            if not (app and hasattr(app, "play_selected_track")):
+                self.play()
+        except Exception:
+            pass
+        self._advancing_from_error = False
 
     def _on_audio_track_loaded(self, path, info):
+        """Mark offline persistence strictly when a verified non-.part file completed on disk."""
+        is_complete_file = bool(path and not str(path).endswith(".part") and os.path.exists(path))
+        if not is_complete_file:
+            return
+        self.buffer_progress = 1.0
+        self.buffer_time = self.duration
         if self.active_track:
             self.active_track.local_path = path
             self.active_track.is_downloaded = True

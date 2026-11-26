@@ -25,6 +25,8 @@ from utils.theme_utils import (
     get_active_palette,
     get_active_immersive_bg,
     clear_palette,
+    DEFAULT_LIGHT_PRIMARY,
+    DEFAULT_DARK_PRIMARY,
     _PALETTE_CACHE
 )
 
@@ -128,9 +130,9 @@ class TestSimpMusicColorPalette(unittest.TestCase):
         # 2. Text MUST be crisp dark #1B1B1B ([0.11, 0.11, 0.11, 1.0])
         self.assertEqual(app.theme_cls.onSurfaceColor[:3], [0.11, 0.11, 0.11])
 
-        # 3. Primary MUST carry the vibrant artwork accent!
-        self.assertEqual(app.theme_cls.primaryColor[:3], palette["light_primary"][:3])
-        print("[PASS] Test 4: Light theme neutral surfaces & vibrant primary verified")
+        # 3. Primary MUST remain the stable base theme color (e.g. Indigo), NOT mutated by artwork!
+        self.assertEqual(app.theme_cls.primaryColor[:3], DEFAULT_LIGHT_PRIMARY[:3])
+        print("[PASS] Test 4: Light theme neutral surfaces & stable base primary verified")
 
     def test_05_neutral_surfaces_dark_theme(self):
         """Verify Dark theme enforces clean AMOLED dark surfaces per SimpMusic Theme.kt."""
@@ -158,9 +160,9 @@ class TestSimpMusicColorPalette(unittest.TestCase):
         # 2. Text MUST be crisp white #F5F5F5 ([0.96, 0.96, 0.96, 1.0])
         self.assertEqual(app.theme_cls.onSurfaceColor[:3], [0.96, 0.96, 0.96])
 
-        # 3. Primary MUST carry dark_primary rich accent!
-        self.assertEqual(app.theme_cls.primaryColor[:3], palette["dark_primary"][:3])
-        print("[PASS] Test 5: Dark theme AMOLED neutral surfaces & rich primary verified")
+        # 3. Primary MUST remain the stable base theme color (e.g. Indigo), NOT mutated by artwork!
+        self.assertEqual(app.theme_cls.primaryColor[:3], DEFAULT_DARK_PRIMARY[:3])
+        print("[PASS] Test 5: Dark theme AMOLED neutral surfaces & stable base primary verified")
 
     def test_06_non_existent_image_graceful_fallback(self):
         """Verify non-existent or corrupted image paths gracefully fall back without crash."""
@@ -186,6 +188,32 @@ class TestSimpMusicColorPalette(unittest.TestCase):
         # Should apply default Indigo primary cleanly
         self.assertIsNotNone(app.theme_cls.primaryColor)
         print("[PASS] Test 6: Non-existent image fallback safely handled")
+
+    def test_07_artwork_palette_isolated_to_now_playing_gradient(self):
+        """Verify dynamic artwork colors are cached in active palette for the Now Playing gradient and never leak into global icon or primary colors."""
+        class MockThemeCls:
+            theme_style = "Dark"
+            primary_palette = "Indigo"
+            primaryColor = [0, 0, 0, 1]
+            backgroundColor = [1, 1, 1, 1]
+            surfaceColor = [1, 1, 1, 1]
+            surfaceContainerColor = [1, 1, 1, 1]
+            onSurfaceColor = [0, 0, 0, 1]
+            onSurfaceVariantColor = [0, 0, 0, 1]
+
+        class MockApp:
+            theme_cls = MockThemeCls()
+            extract_artwork_colors = True
+
+        app = MockApp()
+        palette = extract_palette_from_image(self.test_image_path)
+        apply_simpmusic_theme(app, palette)
+        # Palette is available for player_background_texture
+        self.assertIsNotNone(get_active_palette())
+        self.assertEqual(get_active_palette()["dark_primary"], palette["dark_primary"])
+        # Global theme primary is unaffected
+        self.assertEqual(app.theme_cls.primaryColor[:3], DEFAULT_DARK_PRIMARY[:3])
+        print("[PASS] Test 7: Dynamic artwork palette strictly isolated to Now Playing gradient")
 
 if __name__ == "__main__":
     unittest.main()

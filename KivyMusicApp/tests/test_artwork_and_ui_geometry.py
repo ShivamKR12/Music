@@ -53,9 +53,21 @@ def run_test(on_complete=None):
             print(f"  [PASS] Bottom navigation bar has valid height ({nav_bar.height}dp).")
 
         if mini_player:
-            assert mini_player.height > 0, "Mini player has collapsed height"
-            results["mini_player_height_valid"] = True
-            print(f"  [PASS] Mini player has valid non-zero height ({mini_player.height}dp).")
+            # On fresh startup before selecting any track, mini player must remain hidden
+            assert mini_player.height == 0, f"Fresh startup mini player should have height 0, got {mini_player.height}"
+            assert mini_player.disabled is True, "Fresh startup mini player must be disabled"
+            results["mini_player_fresh_startup_hidden"] = True
+            print("  [PASS] Fresh startup mini player is cleanly hidden and disabled (height 0dp).")
+
+            # Activate a track to verify stacked height invariant when mini player is active
+            if app.playlist_model.tracks:
+                app.player_controller.set_track(app.playlist_model.tracks[0])
+                app.mini_player_visible = True
+                from kivy.clock import Clock
+                Clock.tick()
+                assert mini_player.height > 0, "Active mini player has collapsed height"
+                results["mini_player_height_valid"] = True
+                print(f"  [PASS] Active mini player has valid non-zero height ({mini_player.height}dp).")
 
         # 3. Hidden Overlay Disabled State Invariant
         app.switch_screen("player")

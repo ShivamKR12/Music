@@ -6,6 +6,7 @@ and 1-click Spotify playlist import into local SQLite storage.
 """
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Any, Union
 
@@ -13,6 +14,10 @@ from services.music_provider_base import BaseMusicProvider
 from services.youtube_provider import YouTubeProvider
 from services.jiosaavn_provider import JioSaavnProvider
 from services.spotify_provider import SpotifyProvider
+from services.logger import get_logger
+from services.telemetry_service import get_telemetry
+
+logger = get_logger("MusicRouter")
 from models.database import (
     DB_LOCK, get_db_connection, add_track, add_playlist,
     add_track_to_playlist, get_all_playlists
@@ -38,6 +43,21 @@ class MusicProviderRouter:
         self._executor = ThreadPoolExecutor(max_workers=4)
         self._initialized = True
 
+    @staticmethod
+    def _timed_provider_call(provider_name: str, operation: str, fn, *args, **kwargs):
+        t0 = time.perf_counter()
+        try:
+            res = fn(*args, **kwargs)
+            lat = (time.perf_counter() - t0) * 1000.0
+            get_telemetry().record_provider_outcome(provider_name, operation, True, lat)
+            return res
+        except Exception as exc:
+            lat = (time.perf_counter() - t0) * 1000.0
+            get_telemetry().record_provider_outcome(
+                provider_name, operation, False, lat, type(exc).__name__,
+            )
+            raise
+
     def search(self, query: str, provider: str = "all", limit: int = 20) -> List[Dict[str, Any]]:
         """
         Executes unified search across requested providers.
@@ -49,22 +69,26 @@ class MusicProviderRouter:
 
         # 1. URL-based direct routing
         if "open.spotify.com/" in clean_q or clean_q.startswith("spotify:"):
-            return self.spotify.search(clean_q, limit=limit)
+            return self._timed_provider_call("spotify", "search", self.spotify.search, clean_q, limit=limit)
         if "youtube.com/" in clean_q or "youtu.be/" in clean_q:
-            return self.youtube.search(clean_q, limit=limit)
+            return self._timed_provider_call("youtube", "search", self.youtube.search, clean_q, limit=limit)
 
         # 2. Single provider routing
         if provider == "jiosaavn":
-            return self.jiosaavn.search(clean_q, limit=limit)
+            return self._timed_provider_call("jiosaavn", "search", self.jiosaavn.search, clean_q, limit=limit)
         if provider == "youtube":
-            return self.youtube.search(clean_q, limit=limit)
+            return self._timed_provider_call("youtube", "search", self.youtube.search, clean_q, limit=limit)
         if provider == "spotify":
-            return self.spotify.search(clean_q, limit=limit)
+            return self._timed_provider_call("spotify", "search", self.spotify.search, clean_q, limit=limit)
 
         # 3. Parallel multi-source fan-out ('all')
         futures = {
-            self._executor.submit(self.jiosaavn.search, clean_q, max(5, limit // 2)): "jiosaavn",
-            self._executor.submit(self.youtube.search, clean_q, max(5, limit // 2)): "youtube",
+            self._executor.submit(
+                self._timed_provider_call, "jiosaavn", "search", self.jiosaavn.search, clean_q, max(5, limit // 2)
+            ): "jiosaavn",
+            self._executor.submit(
+                self._timed_provider_call, "youtube", "search", self.youtube.search, clean_q, max(5, limit // 2)
+            ): "youtube",
         }
         combined: List[Dict[str, Any]] = []
         js_results: List[Dict[str, Any]] = []
@@ -79,7 +103,7 @@ class MusicProviderRouter:
                 else:
                     yt_results = res
             except Exception as e:
-                print(f"[MusicProviderRouter] Search failed for {src}: {e}")
+                logger.error("Search failed for %s: %s", src, e)
 
         # Interleave JioSaavn (320kbps HD) and YouTube results smoothly
         max_len = max(len(js_results), len(yt_results))

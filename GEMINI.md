@@ -14,8 +14,8 @@ These rules must be strictly followed when working on this workspace:
 - Use code search and file reading tools to trace where functions and classes are being utilized across the app before editing them.
 
 ## 3. Architecture & Structure
-- **Maintain MVC/Modular Structure:** Keep business logic, UI definitions (Views), and Controllers separate. Do not pollute UI widgets with complex background logic.
-- **Asynchronous Execution:** Heavy operations (like downloading videos or fetching metadata via `yt-dlp`) must never block the main Kivy UI thread. Always use asynchronous tasks, threading, or Kivy's `Clock`.
+- **Maintain MVC/Modular Structure & Single-Responsibility Boundaries:** Keep UI definitions (Views), state/controllers, repositories, database workers, and media pipelines separate. Do **not** keep expanding monoliths (`main.py` or a god-object `AudioEngine`). Gradually decompose `main.py` into focused coordinators (`AppBootstrap`, `ServiceContainer`, `NavigationCoordinator`, `ApplicationLifecycle`, `AppState`) and decompose audio into `PlaybackCoordinator`, `DecoderManager`, `BufferManager`, and `DSPPipeline`, sitting behind a `MusicRepository` layer above `MusicProviderRouter`.
+- **Asynchronous Execution:** Heavy operations (downloading media, stream resolution via `MusicProviderRouter`/`yt-dlp`, image quantization, filesystem scans, and database writes) must never execute on the main Kivy UI thread. Always use background workers or a dedicated asynchronous executor, and marshal UI updates via `Clock.schedule_once`.
 
 ## 4. Coding Standards
 - **Follow PEP 8:** Write clean, readable, and consistent Python code.
@@ -51,15 +51,16 @@ Whenever any UI modification is made (in `.kv` or Python UI components), you MUS
 - **Debounced & Cached Dynamic Theming:** Material You wallpaper/album art quantization (`theme_cls.path_to_wallpaper`) is synchronous and heavy. Always debounce theme updates via `Clock.schedule_once`, cache the active image path, and avoid triggering theme updates multiple times on screen switches.
 - **Startup Async Sequencing:** Schedule background data population (`load_data_async`) promptly on startup ($0.05\text{s}$) rather than on a delayed timer (e.g. $1.0\text{s}$) to avoid freezing the UI while the user is actively navigating.
 
-## 11. Automated Headless Verification Battery
-- After any UI change, execute an automated verification script in headless mode (`KIVY_HEADLESS=1`).
-- The test suite must assert:
-  1. Zero exceptions during startup and screen navigation across all screens.
-  2. Bounding-box non-overlap across all stacked bars and screens.
-  3. Correct touch routing (sheets open on click, hidden overlays do not steal touches).
-  4. Symmetrical alignment (difference $< 1.0\text{dp}$ on centered rows).
-  5. Directional scrolling delegation (vertical swipe over horizontal container scrolls parent).
-  6. Screenshot captures saved for visual regression review.
+## 11. Four-Tier Verification Discipline (Never Equate Headless Mocks with Production Proof)
+Always separate and report verification strictly across these **four testing categories**, clearly stating scope, mocks used, and limitations:
+1. **Unit Tests:** Verify pure algorithms, recommendation/novelty math (with boundary tests), LRC parsers, queue state transitions, and serialization (`to_dict`/`from_dict`).
+2. **Integration Tests (Headless / Mocked):** After any UI or controller change, run the headless verification battery (`KIVY_HEADLESS=1`, `tests/run_all_tests.py`), asserting:
+   - Zero exceptions during startup and screen navigation across all screens (`NoTransition()`).
+   - Bounding-box non-overlap across stacked bars and screens, symmetrical alignment (`< 1.0dp`), touch routing (sheets open, hidden overlays disabled), directional scroll delegation, and screenshot captures.
+   - **Explicit limitation:** Headless/mock tests **never** establish real Opus/AAC/MP3 audio playback reliability, DSP filter execution, hardware decoder behavior, packet-loss buffering, GPU frame pacing, memory leaks over long sessions, Android background lifecycle, or live external provider resilience.
+3. **Device Tests (Real Windows Audio & Real Android APK via `adb`):** Verify actual playback on physical/emulated hardware, runtime permissions, Android `ForegroundService` / `MediaSession` lock-screen controls, headphone/Bluetooth route changes, incoming call audio focus, and real network conditions.
+4. **Performance Telemetry:** Measure and log real runtime metrics rather than guessing responsiveness:
+   - **Cold startup** (time to first usable screen), **Time to first audio** (tap play -> audible output), **Buffering stalls** (count & total stall duration), **Frame pacing** (missed frames / percentiles via Android Studio / Perfetto), **Long-session RAM usage**, **DSP CPU load**, **Network throughput/retransmissions**, and **Provider crash/failure rates**.
 
 ## 12. Zero-Mock & Dynamic Live Streaming Invariant
 - **No Hardcoded Mock Content:** Production screens (Artist, Album, Podcasts, Browse) must never display hardcoded dummy cards, fake album titles (*"Future Echoes"*, *"Midnight Drive"*), or fake podcast episodes (*"The Sound Architecture"*).
@@ -71,9 +72,10 @@ Whenever any UI modification is made (in `.kv` or Python UI components), you MUS
 - **Mandatory `Clock.schedule_once` Marshalling:** Every thread completion must schedule UI mutations back on the main thread loop: `Clock.schedule_once(lambda dt: update_ui(), 0)`.
 - **Bidirectional Serialization:** Any data model (`TrackModel`) passed across threads or cached in SQLite/JSON must implement both `from_dict()` and `to_dict()`.
 
-## 14. Settings Persistence & Trailing Toggle Invariant
-- **Instant SQLite Persistence:** Every setting toggle (theme style, Wi-Fi only, background animation, SponsorBlock, EQ, audio quality) must immediately persist to disk via `set_setting(...)` and apply to the active theme/engine.
-- **Default Theme is Light:** The default theme style must strictly be `Light` unless the user explicitly toggles Dark Mode.
+## 14. Settings Persistence, Database Worker Concurrency & Trailing Toggle Invariant
+- **Non-Blocking SQLite Persistence (Dedicated Database Worker):** Do **not** execute synchronous SQLite writes (`set_setting`, `add_track`, `mark_track_played`) under a blocking global lock on the Kivy UI thread. Settings toggles must update observable app state optimistically on the UI thread and persist asynchronously through a dedicated single-writer **Database Worker** (using `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`, `busy_timeout`, explicit transaction boundaries, and atomic schema migrations) so background scans never freeze UI clicks.
+- **Unicode-Safe Sanitization:** Text sanitization for SQLite/display must preserve Unicode combining diacritics/matras (Devanagari, Gurmukhi, etc.) rather than stripping `\p{M}` characters.
+- **Default Theme is Light:** The default theme style must strictly be `Light` unless the user explicitly toggles Dark Mode (and default fallbacks in `main.py` and `database.py` must agree).
 - **Passive Trailing Checkboxes:** In list items with toggle checkboxes, trailing widgets must use `disabled: True` (`PassiveTrailingCheckbox`) so touches dispatch cleanly to the parent `MDListItem.on_release` without event hijacking.
 
 ## 15. Synced Lyrics Engine & Centered Viewport Standards
@@ -92,8 +94,48 @@ Whenever any UI modification is made (in `.kv` or Python UI components), you MUS
 
 ## 18. Queue Synchronization & Offline Audio Precision
 - The "Up Next" queue bottomsheet must strictly reflect the active playback context (`player_controller.queue`). When playing offline songs or custom playlists, call `set_custom_queue(...)` so queue reflects all active tracks.
-- Audio durations for offline songs must be accurately read from file headers (`mutagen` or `ffprobe`) rather than defaulting to arbitrary 5:00 fallbacks.
+- Audio durations for offline songs must be accurately read from file headers (`mutagen` or `ffprobe` / binary header parser) rather than defaulting to arbitrary 5:00 fallbacks.
 
 ## 19. ScreenManager Lifecycle & Transition Arbitration
 - In headless test suites, splash screen completion (`_splash_completed`) and screen slide transitions take non-zero time. Always use `NoTransition()` or schedule assertions after frame completion.
 - The splash screen fadeout callback (`_on_fade_complete`) must only switch to `"home"` if the current screen is still `"splash"`, preventing it from overriding user navigations.
+
+## 20. Ground-Truth Reporting Contract: Designed vs. Implemented vs. Verified
+- **Never Blur Status States:** In all docs, architecture reviews, and responses to the user, strictly separate:
+  1. **Designed:** What the architecture intends or proposes.
+  2. **Implemented:** Only what genuinely exists in inspected source code (exact files, symbols, hardcoded shortcuts, and incomplete paths). Never claim a module implements behavior (e.g. equal-power crossfade, PCM EQ convolution, WebSockets, or ML vector scoring) without reading the file to prove it exists.
+  3. **Verified:** Only what has actually been proven by tests covering that exact code path, tagged by tier (**Unit**, **Integration/Headless**, **Device**, **Performance**). Never imply "guaranteed uninterrupted streaming" or "100% app reliability" from unit/headless passes alone.
+- **Spotify / Multi-Source Honesty:** Always distinguish explicitly between *Spotify public metadata/playlist lookup* and *actual audio playback source* (JioSaavn or YouTube). Avoid claiming Spotify audio streaming, and avoid brittle scraping where official APIs/integrations apply.
+- **Viewport Adaptation Beyond 360×640:** Treat 360×640 dp as the **reference design viewport**, while ensuring layouts are constraint-based, scrollable, and tolerant of varying aspect ratios, display cutouts, Android system bars/insets, and accessibility font scaling.
+
+## 21. Audio Pipeline, Progressive Buffering & DSP Standards
+- **Explicit PCM Processing Path:** Real-time EQ, headphone AutoEq convolution, and crossfade headroom require a verified PCM audio path (`Compressed Audio -> Decoder -> PCM Samples -> DSP Processing -> Volume / Mixing -> Audio Output`). Never assume Kivy `SoundLoader` (`SoundAndroidPlayer` / `SoundFFPy`) supports FFmpeg filter graphs without empirical runtime verification (e.g., `ffpyplayer.player.MediaPlayer` has no `set_filter`, and Android builds exclude `ffpyplayer`).
+- **True Streaming vs Partial `.part` Hacks:** Progressive buffering must be treated as an independent subsystem (`BufferManager`) rather than opening a growing file mid-download alongside a destructive postprocessor. Track three distinct metrics:
+  1. **Download Progress:** Bytes retrieved / total bytes (`Content-Length` + HTTP `Range` verification).
+  2. **Playable Buffer:** Actual decodable seconds buffered.
+  3. **Buffer Safety:** Seconds of playable audio strictly ahead of the current playhead.
+- **Completion Semantics:** Never mark `is_downloaded = True` or persist final `local_path` to SQLite until the full audio stream and container finalization/remux succeed.
+- **Equal-Power Crossfade Testing:** Any equal-power (`cos`/`sin`) crossfade must manage output headroom and be tested with real overlapping audio frames to catch correlated-signal clipping.
+
+## 22. External Provider Resilience & Security Boundaries
+- **No "Guaranteed" YouTube Extraction:** Never assume `player_client` or `formats: ['missing_pot']` bypasses BotGuard / PO-Token requirements permanently. Design extraction as: `Extractor -> Client Selection -> PO-Token Provider Hook -> Format Validation -> Signed Stream URL -> Playback Engine`, backed by URL expiration detection, stream re-resolution, exponential backoff retries, error classification (never silence warnings/errors in `SilentLogger`), and fail-safe queue protection so failed extracts never crash playback.
+- **Security & Redaction:** Securely store any external API credentials/tokens, enforce WebSocket/room host authorization and payload validation, redact signed stream URLs and tokens from all logs, and isolate desktop-only IPC (Discord RPC) from Android builds.
+
+## 23. Android Runtime Lifecycle & Scoped Storage Compliance
+- **Native Media Playback Lifecycle:** Declaring manifest permissions (`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `WAKE_LOCK`) is insufficient without native Android lifecycle integration: foreground media playback service, notification + lock-screen transport controls, `MediaSession`, audio focus negotiation, noisy/headphone disconnect pausing, phone-call interruptions, Bluetooth routing changes, and process-recreation state restoration.
+- **Modern Android Storage (`API 33+`):** Declare and check `READ_MEDIA_AUDIO` (not just legacy external-storage permissions) and prefer `MediaStore` queries over raw recursive `os.walk` traversal where scoped storage applies.
+
+## 24. Recommendation Contracts & Mathematical Verification
+- **Explicit Data Contracts:** Clearly define where track features (`popularity`, `genre`, or any future `energy`/`valence`/`tempo`) and listener features (`play history`, `artist affinity`, `skip behavior`, `listening time`) actually originate (multi-timestamp observations for trending rather than single view counts).
+- **Mandatory Math Boundary Tests:** Any scoring or ranking formula must have explicit boundary unit tests matching intended directionality (e.g., recency novelty must start low at $\Delta t = 0$ and increase as time elapsed since last play grows: $H_i = 1 - \exp(-\Delta t/\tau)$ or subtracting a decay penalty, never adding $\exp(-\Delta t/\tau)$ positively).
+
+## 25. Feature Scope & Priority Execution Roadmap
+Resist expanding parallel 80%-complete features. Prioritize stabilizing the core systems in strict order:
+1. **Priority 1:** Validate the real audio & PCM DSP pipeline (playback reliability first).
+2. **Priority 2:** Redesign progressive buffering (`BufferManager` state machine + true buffer metrics + real Opus/M4A/MP3 tests).
+3. **Priority 3:** Harden YouTube extraction (PO-token hook, retries, URL refresh, explicit error taxonomy).
+4. **Priority 4:** Establish clean recommendation data contracts & tested ranking math.
+5. **Priority 5:** Move SQLite to a dedicated non-blocking **Database Worker** (WAL mode, FK enforcement, Unicode-safe sanitization).
+6. **Priority 6:** Implement real Android native media lifecycle (`ForegroundService`, `MediaSession`, audio focus, `MediaStore`).
+7. **Priority 7:** Introduce real Device-level & Performance Telemetry testing (`adb`, Perfetto/profiler metrics).
+8. **Priority 8:** Decompose `main.py` incrementally into clean coordinators & repository boundaries.

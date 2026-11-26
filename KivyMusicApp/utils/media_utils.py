@@ -3,18 +3,11 @@ import re
 import socket
 import threading
 import urllib.request
+from models.db_worker import sanitize_text
+from services.logger import get_logger
+from services.youtube_extractor import YtdlpLogBridge, SilentLogger
 
-class SilentLogger:
-    def debug(self, msg): pass
-    def warning(self, msg): pass
-    def error(self, msg): print(f"[YTDLP ERROR]: {msg}")
-
-def sanitize_text(text):
-    """Strips out emojis and extended non-ASCII symbols to prevent font rendering bugs."""
-    if not text:
-        return "Unknown"
-    clean = re.sub(r'[^\w\s\x20-\x7E]', '', str(text))
-    return re.sub(r'\s+', ' ', clean).strip() or "Unknown"
+logger = get_logger("MediaUtils")
 
 def format_time(seconds):
     """Converts seconds into M:SS formatted string."""
@@ -47,6 +40,137 @@ def extract_video_id(url):
         return url.split("youtu.be/")[-1].split("?")[0]
     cleaned = re.sub(r'[^a-zA-Z0-9_-]', '', str(url))
     return cleaned[:11] if cleaned else "unknown"
+
+def is_podcast_item(item: dict) -> bool:
+    """
+    Accurately classifies whether a media item is a podcast or talk content vs a music track.
+    Evaluates yt-dlp explicit episodic fields, media types, categories, tags, channel,
+    and duration heuristics.
+    """
+    if not item or not isinstance(item, dict):
+        return False
+
+    # 1. Explicit episodic fields (Category 11)
+    if any(item.get(k) for k in ('series', 'series_id', 'season', 'season_id', 'episode', 'episode_id', 'episode_number')):
+        return True
+
+    # 2. Explicit media_type (Category 1)
+    mtype = (item.get('media_type') or '').lower()
+    if mtype in ('podcast', 'episode', 'show', 'talk', 'audiobook'):
+        return True
+
+    title = str(item.get('title') or '').lower()
+    artist = str(item.get('artist') or item.get('uploader') or item.get('channel') or '').lower()
+    dur = int(item.get('duration') or 0)
+    cats = [str(c).lower() for c in (item.get('categories') or [])]
+    tags = [str(t).lower() for t in (item.get('tags') or [])]
+
+    # 3. Known podcast channel or show names (Category 2)
+    podcast_channels = (
+        'podcast', 'podcasts', 'raj shamani', 'figuring out', 'rich roll', 
+        'mel robbins', 'huberman', 'ranveer allahbadia', 'beerbiceps', 
+        'joe rogan', 'lex fridman', 'super soul', 'the music podcast', 'ted talks',
+        'think with shamani', 'english unleashed', 'akshat gupta'
+    )
+    if any(ch in artist for ch in podcast_channels) or any(ch in title for ch in ('podcast', 'podcasts', 'beerbiceps', 'ranveer allahbadia', 'raj shamani')):
+        return True
+
+    # 4. Keyword patterns in title or tags (Category 1)
+    podcast_kw = re.compile(
+        r'\b(podcast|podcasts|full episode|episode\s*\d+|ep\.\s*\d+|talk show|interview with|'
+        r'exclusive interview|q&a with|fo\s*\d+|fo\d+|deep dive with|conversations with)\b',
+        re.IGNORECASE
+    )
+    if podcast_kw.search(title):
+        return True
+    if any(podcast_kw.search(t) for t in tags):
+        return True
+
+    # 5. Non-music category with long duration (Category 1 & 5)
+    if cats and 'music' not in cats:
+        if any(c in cats for c in ('podcasts', 'education', 'news & politics', 'people & blogs', 'entertainment')):
+            if dur > 600:
+                return True
+
+    # 6. Long duration (> 20 min = 1200s) without album/jukebox/mix designation
+    if dur > 1200:
+        music_mix_kw = re.compile(r'\b(album|jukebox|songs|mashup|nonstop|non-stop|mix|playlist|audio|t-series|speed records|zee music)\b', re.IGNORECASE)
+        if not music_mix_kw.search(title):
+            return True
+
+    return False
+
+def parse_complete_media_metadata(info: dict) -> dict:
+    """
+    Extracts and normalizes all available yt-dlp metadata fields into a structured dictionary:
+    - Video identification (id, title, description, url, media_type)
+    - Channel and creator info (channel, channel_id, uploader)
+    - Music and audio metadata (track, artist, album, genre, release_date)
+    - Engagement & technical properties (duration, view_count, like_count, chapters)
+    - Categorization & tags
+    """
+    if not info or not isinstance(info, dict):
+        return {}
+    vid = info.get("id") or info.get("video_id") or ""
+    title = info.get("track") or info.get("title") or "Unknown Title"
+
+    # Artist extraction with multi-artist fallback
+    artist = info.get("artist")
+    if not artist and info.get("artists"):
+        artist = ", ".join(info.get("artists"))
+    if not artist:
+        artist = info.get("uploader") or info.get("channel") or "Unknown Artist"
+
+    album = info.get("album") or ""
+    album_artist = info.get("album_artist") or ""
+    genre = info.get("genre") or (", ".join(info.get("genres")) if info.get("genres") else "")
+    duration = int(info.get("duration") or 0)
+    url = info.get("webpage_url") or info.get("url") or (f"https://www.youtube.com/watch?v={vid}" if vid else "")
+    thumb = info.get("thumbnail") or ""
+    description = info.get("description") or ""
+    view_count = int(info.get("view_count") or 0)
+    like_count = int(info.get("like_count") or 0)
+    channel = info.get("channel") or info.get("uploader") or ""
+    channel_id = info.get("channel_id") or info.get("uploader_id") or ""
+    release_date = str(info.get("release_date") or info.get("release_year") or info.get("upload_date") or "")
+    track_number = int(info.get("track_number") or 0)
+
+    # Chapters handling (JSON serialize if structured list)
+    chapters = info.get("chapters")
+    chapters_str = ""
+    if chapters and isinstance(chapters, list):
+        import json
+        try:
+            chapters_str = json.dumps(chapters)
+        except Exception:
+            pass
+
+    # Classify media type
+    mtype = "podcast" if is_podcast_item(info) else "song"
+
+    return {
+        "video_id": vid,
+        "source_id": vid,
+        "title": title,
+        "artist": artist,
+        "album": album,
+        "album_artist": album_artist,
+        "genre": genre,
+        "duration": duration,
+        "url": url,
+        "artwork": thumb,
+        "description": description,
+        "view_count": view_count,
+        "like_count": like_count,
+        "channel": channel,
+        "channel_id": channel_id,
+        "release_date": release_date,
+        "chapters": chapters_str,
+        "track_number": track_number,
+        "media_type": mtype,
+        "source": "youtube",
+        "bitrate": 128,
+    }
 
 def download_artwork(video_id, custom_url=None, cache_dir=None, on_success=None):
     """
@@ -164,26 +288,11 @@ def ensure_artworks_downloaded(tracks, on_track_updated=None, cache_dir=None):
 
 def fetch_youtube_metadata(query_or_url, extract_flat=False):
     """
-    Fetches video metadata or search results via yt-dlp atomically without downloading audio.
-    Employs robust multi-client fallbacks to avoid YouTube 'content not available' restrictions.
-    yt-dlp is imported lazily here: importing it at module scope added ~0.6-0.8s to
-    every startup (main.py imports media_utils at import time)."""
-    from yt_dlp import YoutubeDL  # lazy: only pay the import cost on first network use
-    ydl_opts = {
-        'quiet': True,
-        'noplaylist': True,
-        'logger': SilentLogger(),
-        'socket_timeout': 15,
-        'nocheckcertificate': True,
-        'extract_flat': extract_flat,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web', 'mweb'],
-            }
-        },
-    }
-    with YoutubeDL(ydl_opts) as ydl:
-        return ydl.extract_info(query_or_url, download=False)
+    Fetches video metadata or search results via the centralized YouTubeExtractor
+    without downloading audio, preserving lazy yt-dlp import on first network use.
+    """
+    from services.youtube_extractor import get_youtube_extractor
+    return get_youtube_extractor().extract_metadata(query_or_url, extract_flat=extract_flat)
 
 def enforce_max_cache_size(cache_dir=None, max_size_mb=5000):
     """
@@ -210,18 +319,18 @@ def enforce_max_cache_size(cache_dir=None, max_size_mb=5000):
             return
 
         files.sort(key=lambda x: x[0])
-        print(f"[CacheManager] Cache limit exceeded ({total_size / 1024 / 1024:.2f} MB > {max_size_mb} MB). Evicting older entries...")
+        logger.info("Cache limit exceeded (%.2f MB > %s MB). Evicting older entries...", total_size / 1024 / 1024, max_size_mb)
         for _, size, path in files:
             if total_size <= max_bytes:
                 break
             try:
                 os.remove(path)
                 total_size -= size
-                print(f"[CacheManager] Evicted item: {path}")
+                logger.debug("Evicted item: %s", path)
             except Exception as e:
-                print(f"[CacheManager] Failed to evict {path}: {e}")
+                logger.warning("Failed to evict %s: %s", path, e)
     except Exception as e:
-        print(f"[CacheManager] General cache eviction check error: {e}")
+        logger.warning("General cache eviction check error: %s", e)
 
 def get_cache_size_mb(cache_dir=None) -> float:
     """Calculates total size of files in cache_dir in Megabytes."""

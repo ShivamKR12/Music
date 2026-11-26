@@ -1,5 +1,6 @@
 from kivymd.uix.screen import MDScreen
-from kivy.properties import StringProperty, NumericProperty
+from kivymd.app import MDApp
+from kivy.properties import StringProperty, NumericProperty, BooleanProperty
 from kivy.clock import Clock
 
 class SplashScreen(MDScreen):
@@ -18,7 +19,23 @@ class SettingsScreen(MDScreen):
     pass
 
 class PlayerScreen(MDScreen):
-    pass
+    is_description_expanded = BooleanProperty(False)
+
+    def toggle_description(self):
+        self.is_description_expanded = not self.is_description_expanded
+
+    def on_enter(self, *args):
+        super().on_enter(*args)
+        if "player_animated_bg" in self.ids:
+            self.ids.player_animated_bg.start_animation()
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "populate_inline_lyrics"):
+            app.populate_inline_lyrics()
+
+    def on_leave(self, *args):
+        super().on_leave(*args)
+        if "player_animated_bg" in self.ids:
+            self.ids.player_animated_bg.stop_animation()
 
 class AnalyticsScreen(MDScreen):
     total_tracks_text = StringProperty("0 Tracks")
