@@ -42,10 +42,17 @@ AUDIOFOCUS_REQUEST_FAILED = 0
 AUDIOFOCUS_REQUEST_GRANTED = 1
 
 # Transport action broadcast strings
+ACTION_PLAY = "org.shivam.music.ACTION_PLAY"
+ACTION_PAUSE = "org.shivam.music.ACTION_PAUSE"
 ACTION_PLAY_PAUSE = "org.shivam.music.ACTION_PLAY_PAUSE"
 ACTION_NEXT = "org.shivam.music.ACTION_NEXT"
 ACTION_PREV = "org.shivam.music.ACTION_PREV"
 ACTION_STOP = "org.shivam.music.ACTION_STOP"
+ACTION_SEEK = "org.shivam.music.ACTION_SEEK"
+ACTION_FAVORITE = "org.shivam.music.ACTION_FAVORITE"
+ACTION_SHUFFLE = "org.shivam.music.ACTION_SHUFFLE"
+ACTION_REQUEST_MEDIA_TOKEN = "org.shivam.music.ACTION_REQUEST_MEDIA_TOKEN"
+ACTION_SYNC_MEDIA_TOKEN = "org.shivam.music.ACTION_SYNC_MEDIA_TOKEN"
 
 SNAPSHOT_CACHE_KEY = "playback_session_snapshot"
 
@@ -140,6 +147,7 @@ class AndroidMediaLifecycleCoordinator:
         # Native Android JNI references (populated only on Android or injected mocks)
         self._media_session = None
         self._media_session_cb = None
+        self._media_token = None
         self._audio_manager = None
         self._focus_listener = None
         self._focus_request = None
@@ -148,6 +156,7 @@ class AndroidMediaLifecycleCoordinator:
 
         self._last_state_sync_ts: float = 0.0
         self._state_file_dir: Optional[str] = None
+        self._last_service_sig: Optional[tuple] = None
 
     def bind_controller(self, controller) -> None:
         self._controller = controller
@@ -223,14 +232,23 @@ class AndroidMediaLifecycleCoordinator:
 
             coord = self
 
-            # NOTE: android.media.session.MediaSession$Callback is an abstract Java class
-            # (not an interface), so PyJNIus PythonJavaClass cannot extend it directly.
-            # Transport callbacks are wired via ForegroundService notification Broadcasts.
+            # Attach native Java MediaSession.Callback bridge (compiled via android.add_src)
+            # so lock-screen Now Bar / Quick Settings play, pause, skip, seek, and custom
+            # Heart/Shuffle actions dispatch cleanly on Android 13-17 even when backgrounded.
             try:
                 ms = MediaSession(activity, "KivyMusicSession")
                 ms.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
+                try:
+                    MediaSessionBridge = autoclass("org.shivam.music.MediaSessionBridge")
+                    cb = MediaSessionBridge.createCallback(activity)
+                    ms.setCallback(cb)
+                    self._media_session_cb = cb
+                    logger.info("Attached native Java MediaSession.Callback bridge")
+                except Exception as cb_exc:
+                    logger.debug("Native MediaSession.Callback bridge unavailable: %s", cb_exc)
                 ms.setActive(True)
                 self._media_session = ms
+                self._media_token = ms.getSessionToken()
             except Exception as ms_exc:
                 logger.warning("Android MediaSession setup skipped: %s", ms_exc)
 
@@ -262,16 +280,24 @@ class AndroidMediaLifecycleCoordinator:
                         "android.intent.action.HEADSET_PLUG",
                         "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED",
                         "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED",
+                        ACTION_PLAY,
+                        ACTION_PAUSE,
                         ACTION_PLAY_PAUSE,
                         ACTION_NEXT,
                         ACTION_PREV,
                         ACTION_STOP,
+                        ACTION_SEEK,
+                        ACTION_FAVORITE,
+                        ACTION_SHUFFLE,
+                        ACTION_REQUEST_MEDIA_TOKEN,
                     ],
                 )
                 br.start()
                 self._broadcast_receiver = br
             except Exception as br_exc:
                 logger.warning("Android BroadcastReceiver setup skipped: %s", br_exc)
+
+            self._broadcast_media_token()
 
             with self._lock:
                 self._session_initialized = True
@@ -281,20 +307,63 @@ class AndroidMediaLifecycleCoordinator:
             logger.warning("Android native media init failed (non-fatal): %s", exc)
             return False
 
+    def _broadcast_media_token(self) -> None:
+        """Broadcast live MediaSession.Token to `:service_MusicPlayback` for MediaStyle binding."""
+        if platform != "android" or not self._media_token:
+            return
+        try:
+            from jnius import autoclass
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            activity = PythonActivity.mActivity
+            if not activity:
+                return
+            Intent = autoclass("android.content.Intent")
+            it = Intent(ACTION_SYNC_MEDIA_TOKEN)
+            it.setPackage(activity.getPackageName())
+            it.putExtra("media_token", self._media_token)
+            activity.sendBroadcast(it)
+        except Exception as exc:
+            logger.debug("MediaSession token broadcast skipped: %s", exc)
+
     # =========================================================================
     # 2. Foreground Service Lifecycle + WakeLock Management
     # =========================================================================
-    def start_foreground_service(self, title: str, artist: str, is_playing: bool) -> bool:
+    def start_foreground_service(
+        self,
+        title: str,
+        artist: str,
+        is_playing: bool,
+        album: str = "",
+        artwork: str = "",
+        is_favorite: bool = False,
+        is_shuffle: bool = False,
+    ) -> bool:
         """Persist service state and start python-for-android foreground playback service."""
-        self._write_service_state(
-            {
-                "title": title or "Kivy Music",
-                "artist": artist or "Playing Audio",
-                "is_playing": bool(is_playing),
-                "stop_service": False,
-                "updated_at": time.time(),
-            }
+        sig = (
+            str(title or "Kivy Music"),
+            str(artist or "Playing Audio"),
+            bool(is_playing),
+            str(album or ""),
+            str(artwork or ""),
+            bool(is_favorite),
+            bool(is_shuffle),
         )
+        if sig != self._last_service_sig:
+            self._last_service_sig = sig
+            self._write_service_state(
+                {
+                    "title": sig[0],
+                    "artist": sig[1],
+                    "is_playing": sig[2],
+                    "album": sig[3],
+                    "artwork": sig[4],
+                    "is_favorite": sig[5],
+                    "is_shuffle": sig[6],
+                    "stop_service": False,
+                    "updated_at": time.time(),
+                }
+            )
+            self._broadcast_media_token()
         self._set_wakelock(bool(is_playing))
 
         if self._jni is not None:
@@ -315,6 +384,7 @@ class AndroidMediaLifecycleCoordinator:
                 service_cls.start(PythonActivity.mActivity, "")
                 self.foreground_service_running = True
                 logger.info("Started Android ForegroundService MusicPlayback")
+                self._broadcast_media_token()
             return True
         except Exception as exc:
             logger.debug("Foreground service start fallback: %s", exc)
@@ -502,7 +572,15 @@ class AndroidMediaLifecycleCoordinator:
                 pass
             return
 
-        if act == ACTION_PLAY_PAUSE:
+        if act == ACTION_REQUEST_MEDIA_TOKEN:
+            self._broadcast_media_token()
+            return
+
+        if act == ACTION_PLAY:
+            self.dispatch_transport_action("play")
+        elif act == ACTION_PAUSE:
+            self.dispatch_transport_action("pause")
+        elif act == ACTION_PLAY_PAUSE:
             self.dispatch_transport_action("play_pause")
         elif act == ACTION_NEXT:
             self.dispatch_transport_action("next")
@@ -510,6 +588,17 @@ class AndroidMediaLifecycleCoordinator:
             self.dispatch_transport_action("previous")
         elif act == ACTION_STOP:
             self.dispatch_transport_action("stop")
+        elif act == ACTION_FAVORITE:
+            self.dispatch_transport_action("favorite")
+        elif act == ACTION_SHUFFLE:
+            self.dispatch_transport_action("shuffle")
+        elif act == ACTION_SEEK and intent is not None:
+            try:
+                seek_ms = int(intent.getLongExtra("seek_ms", -1))
+                if seek_ms >= 0:
+                    self.dispatch_transport_action("seek", float(seek_ms) / 1000.0)
+            except Exception:
+                pass
 
     def _pause_on_route_disconnect(self) -> None:
         self.paused_by_transient_focus = False
@@ -537,12 +626,28 @@ class AndroidMediaLifecycleCoordinator:
                 pc.prev_track()
             elif command == "seek":
                 pc.seek(max(0.0, float(value or 0.0)))
+            elif command == "favorite":
+                pc.toggle_favorite()
+            elif command == "shuffle":
+                pc.toggle_shuffle()
             elif command == "stop":
                 pc.stop()
                 self.stop_foreground_service()
                 self.abandon_audio_focus()
 
         Clock.schedule_once(_exec, 0)
+
+    @staticmethod
+    def _resolve_artwork_path(raw_art: Any) -> str:
+        art = str(raw_art or "").strip()
+        if not art or art.startswith(("http://", "https://")):
+            return ""
+        if os.path.exists(art) and os.path.isfile(art):
+            return os.path.abspath(art)
+        candidate = os.path.join(os.path.dirname(os.path.dirname(__file__)), art)
+        if os.path.exists(candidate) and os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+        return ""
 
     # =========================================================================
     # 4. MediaSession Metadata & PlaybackState Synchronization
@@ -555,7 +660,7 @@ class AndroidMediaLifecycleCoordinator:
         duration_seconds: float,
         force: bool = False,
     ) -> None:
-        """Update MediaSession metadata, PlaybackState, WakeLock, and ForegroundService."""
+        """Update MediaSession metadata, artwork, PlaybackState, CustomActions, WakeLock & ForegroundService."""
         now = time.monotonic()
         if (not force) and (now - self._last_state_sync_ts) < 1.0:
             return
@@ -563,12 +668,25 @@ class AndroidMediaLifecycleCoordinator:
 
         title = getattr(track, "title", "Kivy Music") if track else "Kivy Music"
         artist = getattr(track, "artist", "") if track else ""
+        album = getattr(track, "album", "") if track else ""
+        art_path = self._resolve_artwork_path(getattr(track, "album_art", "") if track else "")
+        pc = self._controller
+        is_fav = bool(getattr(pc, "is_favorite", False) or getattr(track, "is_favorite", False)) if track else False
+        is_shuf = bool(getattr(pc, "is_shuffle", False))
         dur_ms = max(0, int(float(duration_seconds or 0.0) * 1000))
         pos_ms = max(0, int(float(position_seconds or 0.0) * 1000))
 
         self._set_wakelock(bool(is_playing))
         if track and (is_playing or self.foreground_service_running):
-            self.start_foreground_service(title, artist, is_playing)
+            self.start_foreground_service(
+                title,
+                artist,
+                is_playing,
+                album=album,
+                artwork=art_path,
+                is_favorite=is_fav,
+                is_shuffle=is_shuf,
+            )
 
         if self._jni is not None:
             self._jni.update_media_session(title, artist, dur_ms, pos_ms, bool(is_playing))
@@ -579,19 +697,49 @@ class AndroidMediaLifecycleCoordinator:
 
         try:
             from jnius import autoclass
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            activity = PythonActivity.mActivity
+            try:
+                MediaSessionBridge = autoclass("org.shivam.music.MediaSessionBridge")
+                MediaSessionBridge.updateSession(
+                    self._media_session,
+                    activity,
+                    str(title),
+                    str(artist),
+                    str(album),
+                    int(dur_ms),
+                    int(pos_ms),
+                    bool(is_playing),
+                    bool(is_fav),
+                    bool(is_shuf),
+                    str(art_path),
+                )
+                return
+            except Exception:
+                pass
+
             MediaMetadata = autoclass("android.media.MediaMetadata")
             MediaMetadataBuilder = autoclass("android.media.MediaMetadata$Builder")
             PlaybackState = autoclass("android.media.session.PlaybackState")
             PlaybackStateBuilder = autoclass("android.media.session.PlaybackState$Builder")
 
-            meta = (
+            mb = (
                 MediaMetadataBuilder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, str(title))
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, str(artist))
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, dur_ms)
-                .build()
             )
-            self._media_session.setMetadata(meta)
+            if album:
+                mb.putString(MediaMetadata.METADATA_KEY_ALBUM, str(album))
+            if art_path and os.path.exists(art_path):
+                try:
+                    BitmapFactory = autoclass("android.graphics.BitmapFactory")
+                    bmp = BitmapFactory.decodeFile(art_path)
+                    if bmp is not None:
+                        mb.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, bmp)
+                except Exception:
+                    pass
+            self._media_session.setMetadata(mb.build())
 
             actions = (
                 PlaybackState.ACTION_PLAY

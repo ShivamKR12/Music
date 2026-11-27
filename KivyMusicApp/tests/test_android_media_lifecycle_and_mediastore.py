@@ -34,9 +34,14 @@ from controllers.player_controller import PlayerController
 from models import database as db
 from models.track_model import TrackModel
 from services.android_media_lifecycle import (
+    ACTION_FAVORITE,
     ACTION_NEXT,
+    ACTION_PAUSE,
+    ACTION_PLAY,
     ACTION_PLAY_PAUSE,
     ACTION_PREV,
+    ACTION_SEEK,
+    ACTION_SHUFFLE,
     ACTION_STOP,
     AUDIOFOCUS_GAIN,
     AUDIOFOCUS_LOSS,
@@ -97,6 +102,9 @@ class _MockIntent:
     def getIntExtra(self, key: str, default: int = -1) -> int:
         return int(self._extras.get(key, default))
 
+    def getLongExtra(self, key: str, default: int = -1) -> int:
+        return int(self._extras.get(key, default))
+
 
 def test_1_unit_sdk_permissions_and_snapshot_contract():
     print("\n--- [Unit] 1. Android SDK Permission Rules & Buildozer Service Manifest ---")
@@ -119,6 +127,20 @@ def test_1_unit_sdk_permissions_and_snapshot_contract():
     assert "WAKE_LOCK" in perms
     assert "MusicPlayback:service/main.py:foreground" in svcs
     assert os.path.exists(os.path.join(APP_DIR, "service", "main.py"))
+    assert os.path.exists(os.path.join(APP_DIR, "android_src", "org", "shivam", "music", "MediaSessionBridge.java"))
+    for res_name in (
+        "ic_music_note.xml",
+        "ic_media_prev.xml",
+        "ic_media_pause.xml",
+        "ic_media_play.xml",
+        "ic_media_next.xml",
+        "ic_favorite_border.xml",
+        "ic_favorite_filled.xml",
+        "ic_shuffle.xml",
+    ):
+        assert os.path.exists(os.path.join(APP_DIR, "android_res", "drawable", res_name)), res_name
+    assert "android_src" in cfg.get("app", "android.add_src")
+    assert "android_res/drawable:drawable" in cfg.get("app", "android.add_resources")
 
     # Verify service/main.py compiles cleanly
     with open(os.path.join(APP_DIR, "service", "main.py"), "r", encoding="utf-8") as sf:
@@ -218,10 +240,29 @@ def test_2_integration_audio_focus_routes_and_transport():
         assert pc.is_playing is False
         assert jni.abandoned_count >= 1
 
-        # 2h. Notification broadcast transport controls (PLAY_PAUSE -> NEXT -> STOP)
+        # 2h. Notification broadcast transport controls (PLAY_PAUSE -> PAUSE -> PLAY -> FAVORITE -> SHUFFLE -> SEEK -> NEXT -> STOP)
         pc.media_lifecycle.on_os_broadcast(ACTION_PLAY_PAUSE)
         Clock.tick()
         assert pc.is_playing is True
+        pc.media_lifecycle.on_os_broadcast(ACTION_PAUSE)
+        Clock.tick()
+        assert pc.is_playing is False
+        pc.media_lifecycle.on_os_broadcast(ACTION_PLAY)
+        Clock.tick()
+        assert pc.is_playing is True
+        prev_fav = bool(pc.is_favorite)
+        pc.media_lifecycle.on_os_broadcast(ACTION_FAVORITE)
+        Clock.tick()
+        assert bool(pc.is_favorite) is (not prev_fav)
+        prev_shuf = bool(pc.is_shuffle)
+        pc.media_lifecycle.on_os_broadcast(ACTION_SHUFFLE)
+        Clock.tick()
+        assert bool(pc.is_shuffle) is (not prev_shuf)
+        pc.media_lifecycle.on_os_broadcast(ACTION_SEEK, _MockIntent({"seek_ms": 1200}))
+        Clock.tick()
+        assert abs(float(pc.current_time) - 1.2) < 0.05
+        svc_state = json.load(open(os.path.join(tmpdir, "playback_service_state.json"), "r", encoding="utf-8"))
+        assert "is_favorite" in svc_state and "is_shuffle" in svc_state and "artwork" in svc_state
         pc.media_lifecycle.on_os_broadcast(ACTION_NEXT)
         Clock.tick()
         assert pc.active_track.video_id == "t2"

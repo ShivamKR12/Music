@@ -16,7 +16,7 @@ source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas,ttf,otf,json,md
 
 # (list) List of directory to exclude (let empty to not exclude anything)
-source.exclude_dirs = tests, cache, bin, .buildozer, .git, __pycache__, .pytest_cache, docs, recipes
+source.exclude_dirs = tests, cache, bin, .buildozer, .git, __pycache__, .pytest_cache, docs, recipes, android_src, android_res
 
 # (list) List of exclusions using pattern matching
 source.exclude_patterns = tests/*, cache/*, bin/*, *.db, *.db-journal, *.db-wal, *.db-shm, test_tone.wav
@@ -38,6 +38,10 @@ orientation = portrait
 
 # (bool) Indicate if the application should be fullscreen or not
 fullscreen = 0
+
+# (list) Java source & Android resources bundled natively for MediaStyle/MediaSessionCallback
+android.add_src = ./android_src
+android.add_resources = ./android_res/drawable:drawable
 
 # (list) Application services (python-for-android background foreground media service)
 services = MusicPlayback:service/main.py:foreground

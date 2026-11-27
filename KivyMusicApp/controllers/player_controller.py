@@ -117,6 +117,10 @@ class PlayerController(EventDispatcher):
         if app and hasattr(app, "show_toast"):
             msg = "Shuffle ON: Tracks randomized" if self.is_shuffle else "Shuffle OFF: Playing sequentially"
             app.show_toast(msg)
+        if self.active_track:
+            self.media_lifecycle.sync_playback_state(
+                self.active_track, self.is_playing, self.current_time, self.duration, force=True
+            )
 
     def cycle_repeat_mode(self):
         """Cycles through repeat modes: off -> all -> one -> off."""
@@ -174,6 +178,9 @@ class PlayerController(EventDispatcher):
         # 1. Optimistic UI update in the current frame (<1ms latency)
         self.is_favorite = target_status
         self.active_track.is_favorite = target_status
+        self.media_lifecycle.sync_playback_state(
+            self.active_track, self.is_playing, self.current_time, self.duration, force=True
+        )
 
         if vid:
             # 2. Asynchronous disk persistence; safely reconciles or rolls back on error
@@ -474,6 +481,7 @@ class PlayerController(EventDispatcher):
             threading.Thread(target=lambda: mark_track_played(vid), daemon=True).start()
         if self.discord_rpc:
             self.discord_rpc.update_track(next_t.title, next_t.artist, 0.0, self.duration, True)
+        self.media_lifecycle.sync_playback_state(next_t, True, 0.0, self.duration, force=True)
 
     # AudioEngine Callbacks
     def _on_audio_time_update(self, elapsed, duration):
@@ -516,6 +524,9 @@ class PlayerController(EventDispatcher):
             app = MDApp.get_running_app()
             if not app or getattr(app, "extract_artwork_colors", True):
                 update_theme_from_image(art_path)
+            self.media_lifecycle.sync_playback_state(
+                self.active_track, self.is_playing, self.current_time, self.duration, force=True
+            )
 
     def _on_audio_loading(self, is_loading):
         self.is_loading = is_loading
