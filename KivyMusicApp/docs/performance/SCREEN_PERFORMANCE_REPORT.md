@@ -92,3 +92,23 @@ Performance parity between modes is preserved — both benefit equally because t
 - Master battery: **15/15 PASSED** (`OVERALL RESULT: 100% OF TESTS PASSED WITH ZERO CRASHES OR REGRESSIONS`), suite time 363 s → 97 s.
 - Visual: the new `PlaylistTileItem` RecycleView grid renders correctly (Create tile + 143 playlist tiles, 3 columns, artwork and counts).
 - Re-run: `python -X utf8 tests\benchmark_screen_performance.py new AFTER_FIXES` (same for `classic`); results saved alongside the baseline files listed above.
+
+
+---
+
+## 2026-11-27 — Post-refactor / interaction-fix re-measurement
+
+New raw record: `raw_new_20261127_POST_INTERACTION_20261127.json` (tag `POST_INTERACTION_20261127`). Previous post-refactor record kept as `raw_new_20261127_POST_REFACTOR_20261127.json`.
+
+| Checkpoint | POST_REFACTOR | POST_INTERACTION | Delta |
+|---|---:|---:|---:|
+| `import_main` | 5,835.5 ms | 1,821.5 ms | **-4,014 ms** |
+| `app_construct` | 6,232.9 ms | 2,217.1 ms | -4,016 ms |
+| `kv_build` | 7,391.6 ms | 3,876.9 ms | -3,515 ms |
+| `app_ready` | 7,782.6 ms | 4,646.1 ms | **-3,137 ms (-40%)** |
+
+Root cause of the regression: `services/dsp_pipeline.py` imported `scipy.signal` at module load (~2.5 s). It is now imported lazily on a daemon warm-up thread after startup; DSP uses the pure-NumPy fallback until the vectorized backend is ready. Audio correctness was previously verified in `test_audio_dsp_pipeline.py`; the lazy path is functionally identical once SciPy is loaded.
+
+Warm revisit costs stayed low (search 38.9 ms, player 34.3 ms, lyrics 36.0 ms, settings 47.1 ms). First visits to settings (1,950.9 ms), podcasts (1,403.2 ms), listen_together (1,020.1 ms) and equalizer (947.0 ms) remain the next optimization target. Instrumented hotspots: `refresh_library_data` 3 / 688.7 ms, `populate_home_screen_data` 1 / 276.2 ms - all worker/DB work, no audio.
+
+Interaction fixes implemented in the same pass (see `UI_UX_LATENCY_TARGETS_PLAN.md`): stale ripple reset on navigation, FAB touch containment, rounded icon/settings/search feedback, debounced search suggestions, haptics + icon pops, tab crossfade, swipe-to-like/queue, lyrics query rewrite, AI/tutorial content filtering, single-line queue rows.

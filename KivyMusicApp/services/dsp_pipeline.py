@@ -24,12 +24,56 @@ except ImportError:
     np = None  # type: ignore
     _HAS_NUMPY = False
 
-try:
-    import scipy.signal as _scipy_sig
-    _HAS_SCIPY = True
-except ImportError:
-    _scipy_sig = None  # type: ignore
-    _HAS_SCIPY = False
+# `scipy.signal` costs ~2.5 s to import and single-handedly regressed cold start.
+# It is loaded lazily on a background thread after startup; DSP chunks use the
+# pure-NumPy biquad fallback until the vectorized backend is ready.
+_scipy_sig = None  # type: ignore
+_SCIPY_LOCK = threading.Lock()
+_SCIPY_THREAD: Optional[threading.Thread] = None
+_SCIPY_IMPORT_FAILED = False
+
+
+def _load_scipy_signal() -> None:
+    global _scipy_sig, _SCIPY_IMPORT_FAILED
+    try:
+        import scipy.signal as _sig  # noqa: PLC0415 - intentional lazy import
+        _scipy_sig = _sig
+    except Exception:
+        _scipy_sig = None
+        _SCIPY_IMPORT_FAILED = True
+
+
+def ensure_scipy_loaded_async() -> None:
+    """Start (or reuse) a daemon thread that imports `scipy.signal`.
+
+    Never blocks the caller. Once loaded, subsequent `DSPPipeline.process()`
+    calls automatically switch to the vectorized `sosfilt` path.
+    """
+    global _SCIPY_THREAD
+    if _scipy_sig is not None or _SCIPY_IMPORT_FAILED:
+        return
+    with _SCIPY_LOCK:
+        if _scipy_sig is not None or _SCIPY_IMPORT_FAILED:
+            return
+        if _SCIPY_THREAD is not None and _SCIPY_THREAD.is_alive():
+            return
+        _SCIPY_THREAD = threading.Thread(
+            target=_load_scipy_signal, name="scipy-signal-warmup", daemon=True
+        )
+        _SCIPY_THREAD.start()
+
+
+def ensure_scipy_loaded(timeout: float = 10.0) -> bool:
+    """Blocking variant for DSP benchmarks/tests that require `sosfilt`.
+
+    Normal app startup never calls this; the asynchronous warm-up keeps the
+    UI thread and cold start free of the ~2.5 s SciPy import cost.
+    """
+    ensure_scipy_loaded_async()
+    thread = _SCIPY_THREAD
+    if thread is not None and thread.is_alive():
+        thread.join(timeout)
+    return _scipy_sig is not None
 
 ISO_EQ_FREQUENCIES: Tuple[float, ...] = (
     32.0, 64.0, 125.0, 250.0, 500.0,
@@ -232,10 +276,13 @@ class DSPPipeline:
             with self._lock:
                 x = pcm.astype(np.float64, copy=False)
                 if not self._bypass_eq:
-                    if _HAS_SCIPY:
+                    sig = _scipy_sig
+                    if sig is None:
+                        ensure_scipy_loaded_async()
+                    if sig is not None:
                         # scipy.signal.sosfilt expects zi shaped (n_sections, 2, n_channels)
                         zi_scipy = np.transpose(self._zi, (0, 2, 1))
-                        y, zi_out = _scipy_sig.sosfilt(self._sos, x, axis=0, zi=zi_scipy)
+                        y, zi_out = sig.sosfilt(self._sos, x, axis=0, zi=zi_scipy)
                         self._zi = np.transpose(zi_out, (0, 2, 1))
                     else:
                         y = self._biquad_numpy_fallback(x)

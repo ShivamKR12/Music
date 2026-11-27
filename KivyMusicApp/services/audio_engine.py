@@ -28,7 +28,7 @@ from services.android_audio_fx import AndroidAudioEffectBridge
 from services.audio_output import BasePCMOutput, create_pcm_output
 from services.buffer_manager import BufferManager, BufferMetrics, BufferState, is_valid_audio_header
 from services.decoder_manager import BasePCMDecoder, DecoderManager, probe_duration_seconds
-from services.dsp_pipeline import DSPPipeline, mix_crossfade
+from services.dsp_pipeline import DSPPipeline, ensure_scipy_loaded_async, mix_crossfade
 from services.logger import get_logger
 from services.sponsorblock_service import SponsorBlockService
 from services.telemetry_service import get_telemetry
@@ -167,6 +167,13 @@ class AudioEngine:
 
         # Subsystems
         self.dsp = DSPPipeline(sample_rate=44100, channels=2)
+        # Warm the optional vectorized DSP backend after the UI is interactive so
+        # `scipy.signal` never delays startup or the first audio chunk.
+        if os.environ.get("KIVY_HEADLESS") != "1" and platform in ("win", "linux", "macosx"):
+            try:
+                Clock.schedule_once(lambda dt: ensure_scipy_loaded_async(), 2.0)
+            except Exception:
+                pass
         self.buffer_manager = BufferManager(min_buffer_seconds=3.5)
         self._android_fx = AndroidAudioEffectBridge()
         self._pcm_output: Optional[BasePCMOutput] = None

@@ -36,7 +36,12 @@ from services.audio_engine import AudioEngine
 from services.audio_output import SDL2PCMOutput
 from services.buffer_manager import BufferManager, BufferState, is_valid_audio_header
 from services.decoder_manager import DecoderManager, probe_duration_seconds
-from services.dsp_pipeline import DSPPipeline, ISO_EQ_FREQUENCIES, mix_crossfade
+from services.dsp_pipeline import (
+    DSPPipeline,
+    ISO_EQ_FREQUENCIES,
+    ensure_scipy_loaded,
+    mix_crossfade,
+)
 
 
 def _make_sine_pcm(freq_hz: float, seconds: float = 2.0, amp: float = 0.25, sr: int = 44100) -> np.ndarray:
@@ -235,6 +240,9 @@ def test_4_real_http_range_buffer_manager():
 
 def test_5_nonblocking_controller_and_dsp_cpu_telemetry():
     print("\n--- [Integration + Telemetry] 5. Non-Blocking PlayerController & DSP CPU Load ---")
+    # App startup loads SciPy lazily; this CPU benchmark specifically measures
+    # the production vectorized path, so warm it before timing.
+    assert ensure_scipy_loaded(), "scipy.signal required for DSP CPU telemetry"
     pc = PlayerController()
     remote_track = TrackModel(
         video_id="yt_nonexistent_test_id",
