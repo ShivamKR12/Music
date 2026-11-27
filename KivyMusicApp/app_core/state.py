@@ -121,6 +121,9 @@ class AppState:
         saved_wifi = get_setting("wifi_only", "True")
         app.wifi_only = str(saved_wifi).lower() in ("true", "1")
 
+        saved_ai = get_setting("show_ai_songs", "False")
+        app.show_ai_songs = str(saved_ai).lower() in ("true", "1")
+
         saved_sponsor = get_setting("sponsorblock_enabled", "True")
         app.sponsorblock_enabled = str(saved_sponsor).lower() in ("true", "1")
 

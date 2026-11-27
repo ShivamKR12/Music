@@ -12,6 +12,7 @@ from models import database as db_mod
 from models.track_model import TrackModel
 from services.logger import app_logger
 from utils import media_utils
+from utils.content_filters import filter_tracks
 
 
 class SearchCoordinator:
@@ -19,9 +20,13 @@ class SearchCoordinator:
 
     def __init__(self, app: Any):
         self.app = app
+        self._suggest_event = None
 
     def clear_search_input(self) -> None:
         app = self.app
+        if self._suggest_event:
+            self._suggest_event.cancel()
+            self._suggest_event = None
         try:
             if hasattr(app, "root") and app.root:
                 sm = app.root.ids.get("screen_manager")
@@ -87,45 +92,62 @@ class SearchCoordinator:
             pass
 
     def on_search_text_change(self, text: str) -> None:
+        """Debounce suggestion computation so typing never stalls the UI thread."""
         app = self.app
         query = (text or "").strip()
+        if self._suggest_event:
+            self._suggest_event.cancel()
+            self._suggest_event = None
         if not query:
             if app.search_state != "empty":
                 app.search_state = "empty"
             return
         if app.search_state == "results":
             app.search_state = "suggestions"
+        # 120 ms debounce: the keystroke handler itself is O(1).
+        self._suggest_event = Clock.schedule_once(
+            lambda dt, q=query: self._compute_suggestions(q), 0.12
+        )
 
-        if app.search_state != "results":
-            app.search_state = "suggestions"
-            q_lower = query.lower()
-            matches = []
-            try:
-                get_hist = resolve_symbol("get_search_history", db_mod.get_search_history)
-                for h in get_hist(limit=15):
-                    if q_lower in h.lower() and h not in matches:
-                        matches.append(h)
-            except Exception:
-                pass
-            for t in getattr(app.playlist_model, "tracks", []):
-                t_title = t.title or ""
-                t_artist = t.artist or ""
-                if q_lower in t_title.lower() and t_title not in matches:
-                    matches.append(t_title)
-                if q_lower in t_artist.lower() and t_artist not in matches:
-                    matches.append(t_artist)
-                if len(matches) >= 8:
-                    break
-            try:
-                if hasattr(app, "root") and app.root:
-                    search_screen = app.root.ids.screen_manager.get_screen("search")
-                    if "search_suggestions_list" in search_screen.ids:
-                        search_screen.ids.search_suggestions_list.data = [{"text": m, "query": m} for m in matches[:8]]
-            except Exception:
-                pass
+    def _compute_suggestions(self, query: str) -> None:
+        """Build local history/library suggestions off the keystroke path."""
+        self._suggest_event = None
+        app = self.app
+        if app.search_state == "results":
+            return
+        q_lower = query.lower()
+        matches = []
+        try:
+            get_hist = resolve_symbol("get_search_history", db_mod.get_search_history)
+            for h in get_hist(limit=15):
+                if q_lower in h.lower() and h not in matches:
+                    matches.append(h)
+        except Exception:
+            pass
+        for t in getattr(app.playlist_model, "tracks", []):
+            t_title = t.title or ""
+            t_artist = t.artist or ""
+            if q_lower in t_title.lower() and t_title not in matches:
+                matches.append(t_title)
+            if q_lower in t_artist.lower() and t_artist not in matches:
+                matches.append(t_artist)
+            if len(matches) >= 8:
+                break
+        try:
+            if hasattr(app, "root") and app.root:
+                search_screen = app.root.ids.screen_manager.get_screen("search")
+                if "search_suggestions_list" in search_screen.ids:
+                    search_screen.ids.search_suggestions_list.data = [
+                        {"text": m, "query": m} for m in matches[:8]
+                    ]
+        except Exception:
+            pass
 
     def perform_search(self, query: str) -> None:
         app = self.app
+        if self._suggest_event:
+            self._suggest_event.cancel()
+            self._suggest_event = None
         if not query or not str(query).strip():
             return
         q = str(query).strip()
@@ -165,10 +187,13 @@ class SearchCoordinator:
             threading.Thread(target=app._async_url_extractor, args=(q,), daemon=True).start()
             return
 
-        local_matches = [
-            t for t in app.playlist_model.tracks
-            if q.lower() in t.title.lower() or q.lower() in t.artist.lower()
-        ]
+        local_matches = filter_tracks(
+            [
+                t for t in app.playlist_model.tracks
+                if q.lower() in t.title.lower() or q.lower() in t.artist.lower()
+            ],
+            include_ai=bool(getattr(app, "show_ai_songs", False)),
+        )
         try:
             search_screen = app.root.ids.screen_manager.get_screen("search")
             if local_matches:
@@ -325,6 +350,9 @@ class SearchCoordinator:
 
     def on_search_results(self, entries: list, query: str) -> None:
         app = self.app
+        entries = filter_tracks(
+            entries, include_ai=bool(getattr(app, "show_ai_songs", False))
+        )
         app.search_loading = False
         try:
             search_screen = app.root.ids.screen_manager.get_screen("search")

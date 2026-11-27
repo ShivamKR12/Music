@@ -295,10 +295,18 @@ class PlaybackUICoordinator:
                 MDListItemHeadlineText(
                     text=tr.title,
                     bold=is_active,
+                    max_lines=1,
+                    shorten=True,
+                    font_name=app.resolved_unicode_font_name,
                     theme_text_color="Custom" if is_active else "Primary",
                     text_color=app.theme_cls.primaryColor if is_active else app.theme_cls.onSurfaceColor,
                 ),
-                MDListItemSupportingText(text=f"{tr.artist} • {tr.formatted_duration}"),
+                MDListItemSupportingText(
+                    text=f"{tr.artist} • {tr.formatted_duration}",
+                    max_lines=1,
+                    shorten=True,
+                    font_name=app.resolved_unicode_font_name,
+                ),
             ]
             if is_active:
                 row_children.append(

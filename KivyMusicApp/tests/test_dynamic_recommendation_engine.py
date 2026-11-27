@@ -4,6 +4,10 @@ import sys
 # Ensure headless mode and correct paths
 os.environ["KIVY_HEADLESS"] = "1"
 os.environ["KIVY_NO_ARGS"] = "1"
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, ".."))
 if app_dir not in sys.path:

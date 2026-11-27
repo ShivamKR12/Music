@@ -144,12 +144,28 @@ def get_cache_dir():
     return path
 
 def clean_song_title(title: str) -> str:
-    """Removes common YouTube fluff like (Official Video), [HQ], etc."""
+    """Strip YouTube/Music-video fluff so LRCLIB queries actually match.
+
+    Handles the app's real titles, e.g.
+    ``Maati - MC Square (8D Audio) | Use Headphones | Darken Nights`` -> ``Maati``.
+    """
     if not title:
         return ""
-    cleaned = re.sub(r'[\(\[\{].*?[\)\]\}]', '', title)
-    cleaned = re.sub(r'(?i)\b(official|video|audio|remix|hd|4k|lyric|lyrics|full song)\b', '', cleaned)
-    return cleaned.strip()
+    cleaned = str(title).split("|")[0]
+    cleaned = re.sub(r"[\(\[\{].*?[\)\]\}]", "", cleaned)
+    cleaned = re.sub(
+        r"(?i)\b(official|video|audio|remix|hd|hq|4k|lyrics?|full\s+song|8d|headphones|"
+        r"use|darken|nights?|visualizer|cover|live|performance|feat\.?|ft\.?)\b",
+        "",
+        cleaned,
+    )
+    # Titles are frequently stored as "Song - Artist"; keep the song name only.
+    if " - " in cleaned:
+        parts = [p.strip() for p in cleaned.split(" - ") if p.strip()]
+        if len(parts) > 1 and len(parts[0]) >= 2:
+            cleaned = parts[0]
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -_|")
+    return cleaned or str(title).strip()
 
 def get_cached_lyrics(video_id: str, cache_dir: str = None):
     """Retrieves cached lyrics text from disk if available."""
@@ -233,35 +249,68 @@ def fetch_lyrics_sync(title: str, artist: str = "", video_id: str = None, cache_
     clean_t = clean_song_title(title)
     clean_a = re.sub(r'(?i)\b(feat\.?|ft\.?)\b.*', '', artist).strip() if artist else ""
 
-    queries = []
-    if clean_t and clean_a:
-        queries.append(f"{clean_t} {clean_a}".strip())
-    if clean_t:
-        queries.append(clean_t)
-    if title and title != clean_t:
-        queries.append(title)
+    def _candidate_score(item):
+        """Prefer exact track-name matches and matching artists over fuzzy hits."""
+        name = (item.get("trackName") or "").strip().lower()
+        artist = (item.get("artistName") or "").strip().lower()
+        score = 0
+        target = clean_t.lower()
+        if name == target:
+            score += 5
+        elif target and target in name:
+            score += 2
+        if clean_a:
+            a_target = clean_a.lower()
+            if a_target and a_target in artist:
+                score += 3
+            elif set(a_target.split()) & set(artist.split()):
+                score += 1
+        if item.get("syncedLyrics"):
+            score += 1
+        return score
 
-    # 3. Query LRCLIB (supports multi-language: English, Hindi, Punjabi, Spanish, Japanese, etc.)
-    for q in queries:
+    # 3. Query LRCLIB with structured parameters first. The plain `q=` endpoint
+    #    ranks full video titles very poorly (e.g. "Song - Artist | 8D Audio").
+    strategies = []
+    if clean_t and clean_a:
+        strategies.append({"track_name": clean_t, "artist_name": clean_a})
+    if clean_t:
+        strategies.append({"track_name": clean_t})
+        strategies.append({"q": f"{clean_t} {clean_a}".strip()})
+        strategies.append({"q": clean_t})
+    if title and title != clean_t:
+        strategies.append({"q": title})
+
+    for params in strategies:
         try:
-            url = f"https://lrclib.net/api/search?q={urllib.parse.quote(q)}"
+            url = "https://lrclib.net/api/search?" + urllib.parse.urlencode(params)
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KivyMusicApp/2.0"}
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=6) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
-                if isinstance(data, list) and len(data) > 0:
-                    for item in data:
-                        synced = (item.get("syncedLyrics") or "").strip()
-                        plain = (item.get("plainLyrics") or "").strip()
-                        if (synced and len(synced) > 20) or (plain and len(plain) > 20):
-                            if not plain and synced:
-                                plain = strip_lrc_tags(synced)
-                            if video_id:
-                                save_cached_lyrics(video_id, plain, synced, cache_dir)
-                            return LyricsResult(plain=plain, synced=synced)
-        except Exception:
+            if not isinstance(data, list) or not data:
+                continue
+            data.sort(key=_candidate_score, reverse=True)
+            for item in data:
+                if _candidate_score(item) < 2:
+                    continue
+                synced = (item.get("syncedLyrics") or "").strip()
+                plain = (item.get("plainLyrics") or "").strip()
+                if (synced and len(synced) > 20) or (plain and len(plain) > 20):
+                    if not plain and synced:
+                        plain = strip_lrc_tags(synced)
+                    if video_id:
+                        save_cached_lyrics(video_id, plain, synced, cache_dir)
+                    logger.debug(
+                        "Lyrics found: %s - %s (query=%s, score=%d)",
+                        item.get("trackName"), item.get("artistName"), params,
+                        _candidate_score(item),
+                    )
+                    return LyricsResult(plain=plain, synced=synced)
+        except Exception as exc:
+            logger.debug("LRCLIB query %s failed: %s", params, exc)
             continue
 
     # 4. Fallback to Lyrics.ovh for romanized / international tracks
@@ -282,6 +331,7 @@ def fetch_lyrics_sync(title: str, artist: str = "", video_id: str = None, cache_
         except Exception:
             pass
 
+    logger.debug("No lyrics found for title=%r artist=%r", title, artist)
     return LyricsResult(plain="No lyrics found for this track.", synced="")
 
 def fetch_lyrics_async(title: str, artist: str = "", video_id: str = None, cache_dir: str = None, on_success=None, local_path: str = None):

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import atexit
 import json
+import functools
 import os
 import sqlite3
 import threading
@@ -28,6 +29,7 @@ from kivy.utils import platform
 
 from models.db_worker import DatabaseWorker, sanitize_text
 from services.logger import get_logger
+from utils.content_filters import filter_tracks as _filter_tracks
 
 logger = get_logger("Database")
 
@@ -1365,3 +1367,30 @@ def clean_and_resync_offline_tracks(cache_dir=None):
         return len(canonical_tracks)
 
     return _WORKER.submit_write(_apply_offline_sync, wait=True)
+
+# ---- Content-quality gate: keep tutorials/AI songs out of every track read ----
+def _apply_content_quality_filter(fn):
+    @functools.wraps(fn)
+    def _wrapped(*args, **kwargs):
+        rows = fn(*args, **kwargs)
+        if not isinstance(rows, list) or not rows or not isinstance(rows[0], dict):
+            return rows
+        try:
+            include_ai = bool(get_setting("show_ai_songs", False))
+        except Exception:
+            include_ai = False
+        podcast = rows[0].get("media_type") == "podcast"
+        return _filter_tracks(rows, include_ai=include_ai, filter_non_music=not podcast)
+    return _wrapped
+
+
+for _filtered_read in (
+    "get_all_tracks", "get_on_repeat", "get_heavy_rotation",
+    "get_forgotten_favorites", "get_daily_mix", "get_top_artists",
+    "get_local_library_tracks", "get_dynamic_playlist_tracks",
+    "get_recently_played", "get_continue_listening", "get_recently_added",
+    "get_playlist_tracks",
+):
+    _original = globals().get(_filtered_read)
+    if _original is not None:
+        globals()[_filtered_read] = _apply_content_quality_filter(_original)

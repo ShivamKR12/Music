@@ -35,6 +35,7 @@ TEST_MODULES = [
     ("Performance Telemetry & Runtime Counters", "test_telemetry_service.py"),
     ("Modular App Coordinators & Delegation", "test_app_coordinators.py"),
     ("Comprehensive 13-Suite UI/UX Audit", "test_comprehensive_audit.py"),
+    ("UI Interaction Regressions (2026-11-27)", "test_ui_interaction_regressions.py"),
 ]
 
 def main():

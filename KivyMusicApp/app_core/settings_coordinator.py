@@ -96,6 +96,15 @@ class SettingsCoordinator:
         self.app.sponsorblock_enabled = is_enabled
         set_setting("sponsorblock_enabled", str(self.app.sponsorblock_enabled))
 
+    def toggle_show_ai_songs(self) -> None:
+        """Include/exclude AI-generated tracks in recommendations and libraries."""
+        app = self.app
+        app.show_ai_songs = not bool(getattr(app, "show_ai_songs", False))
+        set_setting("show_ai_songs", str(app.show_ai_songs))
+        app.show_toast(
+            "AI songs shown" if app.show_ai_songs else "AI songs hidden from recommendations"
+        )
+
     def toggle_discord_rpc(self) -> None:
         app = self.app
         app.discord_rpc_enabled = not app.discord_rpc_enabled
