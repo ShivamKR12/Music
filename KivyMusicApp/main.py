@@ -201,6 +201,7 @@ class MusicApp(MDApp):
     mini_player_visible = BooleanProperty(False)
     mini_player_dismissed = BooleanProperty(False)
     selected_audio_quality = StringProperty("High (320kbps)")
+    show_ai_songs = BooleanProperty(False)
     selected_eq_profile = StringProperty("Flat")
     active_playlist_name = StringProperty("Favorites")
     active_playlist_artwork = StringProperty("album_art2.png")
@@ -355,6 +356,7 @@ class MusicApp(MDApp):
     def toggle_extract_artwork_colors(self, is_enabled=None): return self.settings_coord.toggle_extract_artwork_colors(is_enabled)
     def toggle_animated_bg(self, is_enabled=None): return self.settings_coord.toggle_animated_bg(is_enabled)
     def toggle_sponsorblock(self): return self.settings_coord.toggle_sponsorblock()
+    def toggle_show_ai_songs(self): return self.settings_coord.toggle_show_ai_songs()
     def set_sponsorblock_enabled(self, is_enabled: bool): return self.settings_coord.set_sponsorblock_enabled(is_enabled)
     def toggle_discord_rpc(self): return self.settings_coord.toggle_discord_rpc()
     def show_crossfade_dialog(self): return self.settings_coord.show_crossfade_dialog()
@@ -394,6 +396,10 @@ class MusicApp(MDApp):
     def on_carousel_index(self, index): return self.playback_ui.on_carousel_index(index)
     def dismiss_mini_player(self): return self.playback_ui.dismiss_mini_player()
     def play_selected_track(self, track): return self.playback_ui.play_selected_track(track)
+    def pop_icon(self, widget):
+        """Zero-layout, render-only press pop for control icons (latency polish)."""
+        from utils.motion import pop_widget
+        pop_widget(widget)
     def file_manager_open(self): return self.playback_ui.file_manager_open()
     def select_path(self, path): return self.playback_ui.select_path(path)
     def exit_manager(self, *args): return self.playback_ui.exit_manager(*args)

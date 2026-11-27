@@ -11,7 +11,7 @@ sys.path.insert(0, project_root)
 os.chdir(project_root)
 
 from kivy.clock import Clock
-from kivy.uix.screenmanager import SlideTransition, NoTransition
+from kivy.uix.screenmanager import FadeTransition, SlideTransition, NoTransition
 from kivy.utils import get_color_from_hex
 from main import MusicApp
 from models.track_model import TrackModel
@@ -55,7 +55,7 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
         print("[PASS] Test 1: Global mipmapping enabled on FitImage, Image, and AsyncImage")
 
     def test_02_directional_screen_transitions(self):
-        """Verify intelligent directional SlideTransitions (up for player, down on exit, left/right on tabs/details)."""
+        """Verify tab crossfades and directional slides (up for player, down on exit, left/right for drill-down)."""
         sm = self.root.ids.screen_manager
 
         # Temporarily unset KIVY_HEADLESS to test transition direction assignment
@@ -65,20 +65,23 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
             sm.width = 400
             sm.height = 800
 
-            # 1. Switch home -> search: tab forward -> direction 'left'
+            # 1. Switch home -> search: bottom-nav tab -> crossfade (no horizontal slide)
             sm.current = "home"
             self.app.switch_screen("search")
             self.assertEqual(sm.current, "search")
-            self.assertEqual(sm.transition.direction, "left")
+            self.assertIsInstance(sm.transition, FadeTransition)
+            self.assertAlmostEqual(sm.transition.duration, 0.18, places=3)
 
-            # 2. Switch search -> home: tab backward -> direction 'right'
+            # 2. Switch search -> home: bottom-nav tab -> crossfade
             self.app.switch_screen("home")
             self.assertEqual(sm.current, "home")
-            self.assertEqual(sm.transition.direction, "right")
+            self.assertIsInstance(sm.transition, FadeTransition)
+            self.assertAlmostEqual(sm.transition.duration, 0.18, places=3)
 
             # 3. Switch home -> player: opening player expands upward -> direction 'up'
             self.app.switch_screen("player")
             self.assertEqual(sm.current, "player")
+            self.assertIsInstance(sm.transition, SlideTransition)
             self.assertEqual(sm.transition.direction, "up")
 
             # 4. Exit player via go_back -> direction 'down'
@@ -89,6 +92,7 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
             # 5. Open sub-screen (album/settings) -> direction 'left'
             self.app.switch_screen("settings")
             self.assertEqual(sm.current, "settings")
+            self.assertIsInstance(sm.transition, SlideTransition)
             self.assertEqual(sm.transition.direction, "left")
 
             # 6. Exit sub-screen via go_back -> direction 'right'
@@ -101,7 +105,7 @@ class TestSimpMusicUIUXParity(unittest.TestCase):
             sm.width = 0
             sm.height = 0
 
-        print("[PASS] Test 2: Directional SlideTransitions verified (up, down, left, right)")
+        print("[PASS] Test 2: Tab FadeTransitions and directional drill-down Slides verified")
 
     def test_03_mini_player_simpmusic_floating_capsule_geometry(self):
         """Verify MiniPlayer floating capsule pill geometry, radius, and components."""

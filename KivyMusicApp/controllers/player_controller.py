@@ -13,6 +13,7 @@ from services.android_media_lifecycle import AndroidMediaLifecycleCoordinator
 from services.audio_engine import AudioEngine
 from services.discord_rpc_service import DiscordRPCService
 from services.logger import get_logger
+from utils import haptics
 from utils.theme_utils import update_theme_from_image
 
 logger = get_logger("PlayerController")
@@ -68,6 +69,18 @@ class PlayerController(EventDispatcher):
         self.playlist_model = playlist_model
         self.rebuild_queue()
 
+    def enqueue_track(self, track) -> bool:
+        """Insert a track next in the play queue (used by swipe-left on rows)."""
+        if not track or not self.queue:
+            return False
+        if track in self.queue:
+            return False
+        insert_at = min(self.queue_index + 1, len(self.queue))
+        self.queue.insert(insert_at, track)
+        if track not in self.user_ordered_queue:
+            self.user_ordered_queue.append(track)
+        return True
+
     def set_custom_queue(self, tracks: list, start_track=None):
         """Sets an explicit ordered playback queue (e.g. from an active playlist or offline scan)."""
         if not tracks:
@@ -99,6 +112,7 @@ class PlayerController(EventDispatcher):
 
     def toggle_shuffle(self):
         """Toggle playlist shuffle mode preserving non-repeating queue order."""
+        haptics.tick()
         self.is_shuffle = not self.is_shuffle
         if not self.queue:
             self.rebuild_queue()
@@ -124,6 +138,7 @@ class PlayerController(EventDispatcher):
 
     def cycle_repeat_mode(self):
         """Cycles through repeat modes: off -> all -> one -> off."""
+        haptics.tick()
         modes = ["off", "all", "one"]
         self.repeat_mode = modes[(modes.index(self.repeat_mode) + 1) % len(modes)]
         self.is_repeat = (self.repeat_mode in ("all", "one"))
@@ -175,6 +190,7 @@ class PlayerController(EventDispatcher):
             return
         vid = getattr(self.active_track, "video_id", "")
         target_status = not self.is_favorite
+        haptics.confirm()
         # 1. Optimistic UI update in the current frame (<1ms latency)
         self.is_favorite = target_status
         self.active_track.is_favorite = target_status
@@ -289,6 +305,7 @@ class PlayerController(EventDispatcher):
     def toggle_play(self):
         if not self.active_track:
             return
+        haptics.tick()
 
         if self.is_playing:
             self.audio_engine.pause()
@@ -355,6 +372,7 @@ class PlayerController(EventDispatcher):
         return self.queue[prev_idx]
 
     def next_track(self):
+        haptics.tick()
         # Record genuine early-skip behavioral telemetry if user skipped an actively playing track early
         if (
             self.is_playing
@@ -381,6 +399,7 @@ class PlayerController(EventDispatcher):
             app.play_selected_track(self.active_track)
 
     def prev_track(self):
+        haptics.tick()
         prev_t = self.get_prev_track()
         if not prev_t:
             return

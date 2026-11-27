@@ -1,12 +1,14 @@
 import os
 import math
 import random
+import threading
 from kivy.lang import Builder
 from kivy.properties import StringProperty, ObjectProperty, BooleanProperty, ColorProperty, NumericProperty, ListProperty
 from kivymd.uix.list import MDListItem, MDListItemTrailingCheckbox
 from kivymd.uix.card import MDCard
 from kivymd.uix.chip import MDChip
 from kivymd.uix.label import MDLabel
+from kivymd.uix.button import MDIconButton, MDFabButton
 from kivymd.uix.slider import MDSlider
 from kivymd.uix.scrollview import MDScrollView
 from kivy.uix.scrollview import ScrollView
@@ -18,6 +20,57 @@ from kivy.clock import Clock
 from kivy.uix.recycleview import RecycleView
 from kivy.metrics import dp
 from kivy.factory import Factory
+
+# KivyMD 2.0 icon/FAB buttons use a rectangular ripple by default. Give them a
+# radius so their state layer matches the circular/pill geometry everywhere.
+if not hasattr(MDIconButton, "radius"):
+    MDIconButton.radius = ListProperty([dp(24)])
+if not hasattr(MDFabButton, "radius"):
+    MDFabButton.radius = ListProperty([dp(28)])
+
+
+class TouchBlockingFabButton(MDFabButton):
+    """FAB that always consumes its own touch (no pass-through to rows beneath)."""
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos) and not self.disabled:
+            super().on_touch_down(touch)
+            return True
+        return super().on_touch_down(touch)
+
+
+Factory.register("TouchBlockingFabButton", cls=TouchBlockingFabButton)
+
+
+class RoundedSettingsItem(MDListItem):
+    """Settings row whose ripple follows the card's rounded top/bottom corners."""
+
+    def _sync_rounded_radius(self):
+        parent = self.parent
+        if parent is None:
+            return
+        try:
+            siblings = [c for c in parent.children if isinstance(c, MDListItem)]
+            if not siblings:
+                return
+            r = dp(20)
+            if self is siblings[-1]:  # visually first row
+                self.radius = [r, r, 0, 0]
+            elif self is siblings[0]:  # visually last row
+                self.radius = [0, 0, r, r]
+            else:
+                self.radius = [0, 0, 0, 0]
+        except Exception:
+            pass
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            self._sync_rounded_radius()
+        return super().on_touch_down(touch)
+
+
+Factory.register("RoundedSettingsItem", cls=RoundedSettingsItem)
+
 
 class MarqueeLabel(ScrollView):
     """
@@ -334,8 +387,9 @@ class EmbeddedRecycleView(RecycleView):
         pos = getattr(touch, 'pos', None)
         if pos and not self.collide_point(*pos):
             return False
-        if hasattr(self, 'simulate_touch_down'):
-            return self.simulate_touch_down(touch)
+        # Never claim the gesture here: the parent vertical ScrollView must
+        # receive it. Returning False still lets ScrollView dispatch to rows,
+        # so item taps keep working while vertical scrolling stays unlocked.
         return False
 
     def on_scroll_move(self, touch):
@@ -377,8 +431,103 @@ class TrackListItem(RecycleDataViewBehavior, MDListItem):
         Clock.schedule_once(self._sync_containers, 0)
         return res
     
+    # ---- Swipe actions (right = like, left = play next) -----------------
+    SWIPE_THRESHOLD = dp(56)
+
+    def _swipe_reset(self):
+        self._swipe_uid = None
+        self._swipe_start = None
+        self._swipe_claimed = False
+        self._swipe_base_color = None
+
+    def _restore_swipe_color(self):
+        if self._swipe_base_color is not None:
+            self.md_bg_color = self._swipe_base_color
+        self._swipe_base_color = None
+
+    def _commit_swipe(self, dx):
+        from kivymd.app import MDApp
+        from utils import haptics
+        from utils.interaction_state import clear_press_feedback
+
+        app = MDApp.get_running_app()
+        if not app:
+            return
+        track = self.track_obj
+        if dx > 0:
+            # Right swipe -> like/unlike this track.
+            if not track:
+                return
+            target = not bool(getattr(track, "is_favorite", False))
+            track.is_favorite = target
+            if app.player_controller and app.player_controller.active_track == track:
+                app.player_controller.is_favorite = target
+            haptics.confirm()
+            app.show_toast("Added to Favorites" if target else "Removed from Favorites")
+
+            def _persist():
+                try:
+                    from models.database import toggle_favorite
+                    toggle_favorite(getattr(track, "video_id", ""))
+                except Exception:
+                    pass
+
+            threading.Thread(target=_persist, daemon=True).start()
+        else:
+            # Left swipe -> enqueue next.
+            if not track or not app.player_controller:
+                return
+            ok = app.player_controller.enqueue_track(track)
+            haptics.confirm()
+            app.show_toast("Added to Up Next" if ok else "Already in queue")
+        clear_press_feedback(self)
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos) and not self.disabled:
+            self._swipe_uid = touch.uid
+            self._swipe_start = (touch.x, touch.y)
+            self._swipe_claimed = False
+            try:
+                self._swipe_base_color = list(self.md_bg_color)
+            except Exception:
+                self._swipe_base_color = None
+        return super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        if getattr(self, "_swipe_uid", None) == touch.uid and not self._swipe_claimed:
+            dx = touch.x - self._swipe_start[0]
+            dy = touch.y - self._swipe_start[1]
+            if abs(dx) > dp(12) and abs(dx) > abs(dy) * 1.5:
+                self._swipe_claimed = True
+        if self._swipe_claimed:
+            dx = touch.x - self._swipe_start[0]
+            self.md_bg_color = (
+                [1, 0.25, 0.5, 0.28] if dx > 0 else [0.30, 0.55, 1.0, 0.28]
+            )
+            return True
+        return super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        claimed = self._swipe_claimed and getattr(self, "_swipe_uid", None) == touch.uid
+        dx = (touch.x - self._swipe_start[0]) if self._swipe_start else 0.0
+        base_color = self._swipe_base_color
+        self._swipe_uid = None
+        self._swipe_start = None
+        self._swipe_claimed = False
+        self._swipe_base_color = None
+        if claimed:
+            if base_color is not None:
+                self.md_bg_color = base_color
+            if abs(dx) >= self.SWIPE_THRESHOLD:
+                self._commit_swipe(dx)
+            return True
+        return super().on_touch_up(touch)
+
     def on_release(self):
         from kivymd.app import MDApp
+        from utils import haptics
+
+        haptics.tick()
         app = MDApp.get_running_app()
         if self.track_obj:
             app.play_selected_track(self.track_obj)

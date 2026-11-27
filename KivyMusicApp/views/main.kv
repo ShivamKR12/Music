@@ -116,6 +116,7 @@ MDBoxLayout:
                         theme_icon_color: "Custom" if app.player_controller.is_favorite else "Primary"
                         icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else app.theme_cls.onSurfaceVariantColor
                         pos_hint: {"center_y": .5}
+                        on_press: app.pop_icon(self)
                         on_release: app.player_controller.toggle_favorite()
 
                     MDFloatLayout:
@@ -136,6 +137,7 @@ MDBoxLayout:
                             pos_hint: {"center_x": .5, "center_y": .5}
                             opacity: 0 if (app.player_controller and app.player_controller.is_loading) else 1
                             disabled: bool(app.player_controller and app.player_controller.is_loading)
+                            on_press: app.pop_icon(self)
                             on_release: app.player_controller.toggle_play()
 
                         YouTubeLoadingCircle:

@@ -236,6 +236,13 @@ class AppBootstrap:
         import views.components  # noqa: F401
         import views.screens  # noqa: F401
 
+        # Match the Kivy window background to the app theme so the pre-build
+        # frame never reads as a second, separate loading screen.
+        try:
+            Window.clearcolor = list(app.theme_cls.backgroundColor)
+        except Exception:
+            pass
+
         root = Builder.load_file(os.path.join("views", "main.kv"))
         Window.bind(on_keyboard=app.on_keyboard)
         Window.bind(on_request_close=app.on_request_close)

@@ -146,6 +146,7 @@
                             pos_hint: {"center_y": .5}
                             theme_icon_color: "Custom"
                             icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else [1, 1, 1, 0.70]
+                            on_press: app.pop_icon(self)
                             on_release: app.player_controller.toggle_favorite()
 
                     # 4. Timeline Slider & Inline Timestamps (Left Timestamp | Scrubber | Right Timestamp)
@@ -206,6 +207,7 @@
                             pos_hint: {"center_y": .5}
                             theme_icon_color: "Custom"
                             icon_color: [1, 1, 1, 1.0] if app.player_controller.is_shuffle else [1, 1, 1, 0.50]
+                            on_press: app.pop_icon(self)
                             on_release: app.player_controller.toggle_shuffle()
 
                         MDIconButton:
@@ -213,6 +215,7 @@
                             pos_hint: {"center_y": .5}
                             theme_icon_color: "Custom"
                             icon_color: [1, 1, 1, 1.0]
+                            on_press: app.pop_icon(self)
                             on_release: app.player_controller.prev_track()
 
                         MDFloatLayout:
@@ -231,6 +234,7 @@
                                 pos_hint: {"center_x": .5, "center_y": .5}
                                 opacity: 0 if (app.player_controller and app.player_controller.is_loading) else 1
                                 disabled: bool(app.player_controller and app.player_controller.is_loading)
+                                on_press: app.pop_icon(self)
                                 on_release: app.player_controller.toggle_play()
 
                             YouTubeLoadingCircle:
@@ -247,6 +251,7 @@
                             pos_hint: {"center_y": .5}
                             theme_icon_color: "Custom"
                             icon_color: [1, 1, 1, 1.0]
+                            on_press: app.pop_icon(self)
                             on_release: app.player_controller.next_track()
 
                         MDIconButton:
@@ -254,6 +259,7 @@
                             pos_hint: {"center_y": .5}
                             theme_icon_color: "Custom"
                             icon_color: [1, 1, 1, 1.0] if app.player_controller.is_repeat else [1, 1, 1, 0.50]
+                            on_press: app.pop_icon(self)
                             on_release: app.player_controller.toggle_repeat()
 
                     # 6. SimpMusic 5-Icon Action Bar
@@ -275,7 +281,7 @@
                             pos_hint: {"center_y": .5}
                             theme_icon_color: "Custom"
                             icon_color: [1, 1, 1, 0.85]
-                            on_release: app.show_toast(f"Audio Quality: {app.audio_quality.upper()} • High Fidelity")
+                            on_release: app.show_toast(f"Audio Quality: {app.selected_audio_quality.upper()} • High Fidelity")
 
                         MDIconButton:
                             icon: "format-quote-close"
