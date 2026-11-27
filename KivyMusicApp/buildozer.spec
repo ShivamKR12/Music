@@ -22,7 +22,7 @@ source.exclude_dirs = tests, cache, bin, .buildozer, .git, __pycache__, .pytest_
 source.exclude_patterns = tests/*, cache/*, bin/*, *.db, *.db-journal, *.db-wal, *.db-shm, test_tone.wav
 
 # (str) Application versioning (method 1)
-version = 0.1.4
+version = 0.1.5
 
 # (list) Application requirements
 # Pinned to exact system-validated versions to prevent PyPI dependency resolution conflicts
