@@ -116,6 +116,48 @@ def run_test(on_complete=None):
             raise
         print(f"  [WARN] Could not inspect MusicApp methods: {e}")
 
+    # Verify all static icon strings exist in md_icons and zero unsupported emoji/symbol codepoints exist in UI strings
+    from kivymd.icon_definitions import md_icons
+    invalid_icons = []
+    unsupported_glyphs = []
+    icon_expr_pat = re.compile(r"""\b(?:icon|source_icon)\s*[:=]\s*([^\n]+)""")
+    lit_pat = re.compile(r"""['"]([a-z0-9-]+)['"]""")
+    safe_non_ascii = set("•─—–…×÷±°§’")
+    scan_dirs = [os.path.join(app_root, "views"), os.path.join(app_root, "app_core")]
+    for base in scan_dirs:
+        for root, _, files in os.walk(base):
+            for f in files:
+                if not f.endswith((".kv", ".py")):
+                    continue
+                path = os.path.join(root, f)
+                rel_path = os.path.relpath(path, app_root)
+                with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+                    for lineno, line in enumerate(fh, 1):
+                        stripped = line.strip()
+                        if not stripped.startswith("#"):
+                            bad_chars = [
+                                f"{ch}(U+{ord(ch):04X})"
+                                for ch in line
+                                if ord(ch) > 127 and ch not in safe_non_ascii and not ("source" in stripped and ch == "é")
+                            ]
+                            if bad_chars:
+                                unsupported_glyphs.append((rel_path, lineno, bad_chars))
+                        m = icon_expr_pat.search(line)
+                        if m:
+                            rhs = m.group(1)
+                            for lm in lit_pat.finditer(rhs):
+                                cand = lm.group(1)
+                                if cand in ("one", "all", "off", "icon", "blank", "left", "right", "center", "text", "filled", "outlined", "tonal", "elevated", "standard", "small", "medium", "large", "none", "youtube", "jiosaavn", "spotify", "podcast", "default"):
+                                    if cand not in ("youtube", "spotify", "podcast"):
+                                        continue
+                                if cand not in md_icons:
+                                    invalid_icons.append((rel_path, lineno, cand))
+
+    assert not invalid_icons, f"Invalid MDI icon names found: {invalid_icons}"
+    assert not unsupported_glyphs, f"Unsupported non-ASCII UI glyphs found: {unsupported_glyphs}"
+    results["all_icons_and_glyphs_valid"] = True
+    print("  [PASS] 100% of MDI icon names exist in md_icons and zero unsupported emoji/symbol glyphs remain in UI.")
+
     print("  [ALL PASSED] Interactive Widgets Audit Suite Succeeded!")
     if on_complete:
         on_complete(True, results)

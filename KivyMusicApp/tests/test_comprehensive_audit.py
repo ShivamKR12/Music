@@ -534,6 +534,44 @@ class ComprehensiveAuditRunner:
             f"NoLine={slider_no_line}, InlineAligned={inline_aligned}, NonOverlap={inline_non_overlapping}, AtLyrics={at_lyrics}, BarsDisabled={lyrics_bars_disabled}, LyricsInline={lyrics_inline_ok}, Populated={lyrics_populated}, OffsetToggle={offset_toggle_ok}, BackToPlayer={lyrics_back_to_player}, TimersClean={timers_cleaned}",
         )
 
+        print("\n=== TEST SUITE 15: SONG ROW ICONS, AVATAR BOUNDS & QUEUE SHEET ===")
+        from kivymd.icon_definitions import md_icons
+        from views.components import TrackListItem
+        sm.current = "search"
+        pump_events(self.app, 3)
+        search_scr = sm.get_screen("search")
+        sample_entries = [
+            {"video_id": "v1", "title": "Song YT", "artist": "Art1", "source": "youtube", "media_type": "song", "duration": 200},
+            {"video_id": "v2", "title": "Song Jio", "artist": "Art2", "source": "jiosaavn", "media_type": "song", "duration": 180},
+            {"video_id": "v3", "title": "Song Spot", "artist": "Art3", "source": "spotify", "media_type": "song", "duration": 210},
+            {"video_id": "v4", "title": "Pod Show", "artist": "Host", "source": "youtube", "media_type": "podcast", "duration": 600},
+        ]
+        self.app._on_search_results(sample_entries, "test")
+        pump_events(self.app, 6)
+        row_widgets = [w for w in search_scr.ids.search_results_list.walk() if isinstance(w, TrackListItem)]
+        rows_valid = (
+            len(row_widgets) >= 4
+            and all(w.source_icon in md_icons for w in row_widgets)
+            and all("leading_container" in w.ids and w.ids.leading_container.width >= dp(36) for w in row_widgets)
+            and all(all(ord(c) <= 127 or c == "•" for c in (w.artist + w.title)) for w in row_widgets)
+        )
+
+        self.app.show_queue_sheet()
+        pump_events(self.app, 8)
+        queue_rows_ok = False
+        if self.app.queue_box:
+            has_tofu_arrow = any("▶" in getattr(c, "text", "") for row in self.app.queue_box.children for c in row.walk())
+            has_vol_icon = any(getattr(c, "icon", "") == "volume-high" for row in self.app.queue_box.children for c in row.walk())
+            queue_rows_ok = (not has_tofu_arrow) and has_vol_icon
+        self.app.go_back()
+        pump_events(self.app, 4)
+
+        log_test(
+            "Song Row Icons & Queue Row Cleanliness",
+            rows_valid and queue_rows_ok,
+            f"SearchRows={len(row_widgets)}, RowsValid={rows_valid}, QueueClean={queue_rows_ok}",
+        )
+
         all_passed = all(t["passed"] for t in results.values())
         print(f"\n==========================================")
         print(f"COMPREHENSIVE AUDIT: {'PASSED' if all_passed else 'FAILED'}")

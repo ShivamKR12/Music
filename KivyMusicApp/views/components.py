@@ -355,12 +355,27 @@ class TrackListItem(RecycleDataViewBehavior, MDListItem):
     title = StringProperty("")
     artist = StringProperty("")
     artwork = StringProperty("album_art.png")
+    source_icon = StringProperty("")
+    source_icon_color = ColorProperty([0.45, 0.45, 0.50, 1.0])
     track_obj = ObjectProperty(None, allownone=True)
     index = NumericProperty(0)
 
+    def _sync_containers(self, *args):
+        if "leading_container" in self.ids:
+            self.ids.leading_container.width = dp(40)
+        if "trailing_container" in self.ids:
+            self.ids.trailing_container.width = dp(24) if self.source_icon else 0
+
+    def on_source_icon(self, *args):
+        Clock.schedule_once(self._sync_containers, 0)
+
     def refresh_view_attrs(self, rv, index, data):
         self.index = index
-        return super().refresh_view_attrs(rv, index, data)
+        if "source_icon" not in data:
+            self.source_icon = ""
+        res = super().refresh_view_attrs(rv, index, data)
+        Clock.schedule_once(self._sync_containers, 0)
+        return res
     
     def on_release(self):
         from kivymd.app import MDApp
@@ -561,17 +576,28 @@ Builder.load_string('''
     radius: [16, 16, 16, 16]
     md_bg_color: app.theme_cls.surfaceContainerColor
     ripple_behavior: True
-    
+
     MDListItemLeadingAvatar:
         source: root.artwork if root.artwork else "album_art.png"
         radius: [dp(8), dp(8), dp(8), dp(8)]
+        size_hint: None, None
+        size: "40dp", "40dp"
         disabled: True
-        
+
     MDListItemHeadlineText:
         text: root.title
-        
+
     MDListItemSupportingText:
         text: root.artist
+
+    MDListItemTrailingIcon:
+        icon: root.source_icon if root.source_icon else "blank"
+        theme_icon_color: "Custom" if root.source_icon else "Primary"
+        icon_color: root.source_icon_color if root.source_icon else app.theme_cls.onSurfaceVariantColor
+        opacity: 1 if root.source_icon else 0
+        disabled: not bool(root.source_icon)
+        size: (dp(24), dp(24)) if root.source_icon else (0, 0)
+        width: dp(24) if root.source_icon else 0
 
 <SearchHistoryItem>:
     MDListItemLeadingIcon:

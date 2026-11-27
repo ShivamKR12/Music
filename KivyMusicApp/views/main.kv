@@ -104,7 +104,7 @@ MDBoxLayout:
                             touch_pass_through: True
 
                         MarqueeLabel:
-                            text: (("⚡ 320k " if getattr(app.player_controller.active_track, "source", "") == "jiosaavn" else ("🟢 " if getattr(app.player_controller.active_track, "source", "") == "spotify" else "")) + app.player_controller.active_track.artist) if app.player_controller.active_track else "Unknown"
+                            text: (("320k • " if getattr(app.player_controller.active_track, "source", "") == "jiosaavn" else ("Spotify • " if getattr(app.player_controller.active_track, "source", "") == "spotify" else "")) + app.player_controller.active_track.artist) if app.player_controller.active_track else "Unknown"
                             font_style: "Body"
                             role: "small"
                             text_color: app.theme_cls.onSurfaceVariantColor

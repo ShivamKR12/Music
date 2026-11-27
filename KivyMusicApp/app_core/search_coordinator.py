@@ -180,6 +180,8 @@ class SearchCoordinator:
                             "title": t.title,
                             "artist": f"{t.artist} • {t.formatted_duration}",
                             "artwork": t.album_art,
+                            "source_icon": "headphones" if getattr(t, "source", "") == "jiosaavn" else ("spotify" if getattr(t, "source", "") == "spotify" else "youtube"),
+                            "source_icon_color": [0.11, 0.72, 0.33, 1.0] if getattr(t, "source", "") == "spotify" else ([0.90, 0.22, 0.21, 1.0] if getattr(t, "source", "") == "youtube" else [0.35, 0.45, 0.90, 1.0]),
                             "track_obj": t,
                         }
                         for t in local_matches
@@ -265,6 +267,8 @@ class SearchCoordinator:
                         "title": track_obj.title,
                         "artist": f"{track_obj.artist} • {track_obj.formatted_duration}",
                         "artwork": track_obj.album_art,
+                        "source_icon": "youtube",
+                        "source_icon_color": [0.90, 0.22, 0.21, 1.0],
                         "track_obj": track_obj,
                     }
                 ]
@@ -340,15 +344,30 @@ class SearchCoordinator:
                     track_obj.album_art = thumb
 
                 if track_obj.media_type == "podcast":
-                    badge_str = f"🎙️ Podcast • {artist} • {track_obj.formatted_duration}"
+                    badge_str = f"Podcast • {artist} • {track_obj.formatted_duration}"
+                    src_icon = "podcast"
+                    src_color = [0.62, 0.38, 0.92, 1.0]
                 elif source == "jiosaavn":
-                    badge_str = f"⚡ 320kbps HD • {artist} • {track_obj.formatted_duration}"
+                    badge_str = f"320kbps HD • {artist} • {track_obj.formatted_duration}"
+                    src_icon = "high-definition-box"
+                    src_color = [0.15, 0.65, 0.58, 1.0]
                 elif source == "spotify":
-                    badge_str = f"🟢 Spotify • {artist} • {track_obj.formatted_duration}"
+                    badge_str = f"Spotify • {artist} • {track_obj.formatted_duration}"
+                    src_icon = "spotify"
+                    src_color = [0.11, 0.72, 0.33, 1.0]
                 else:
-                    badge_str = f"🔴 YouTube • {artist} • {track_obj.formatted_duration}"
+                    badge_str = f"YouTube • {artist} • {track_obj.formatted_duration}"
+                    src_icon = "youtube"
+                    src_color = [0.90, 0.22, 0.21, 1.0]
 
-                rv_data.append({"title": title, "artist": badge_str, "artwork": track_obj.album_art, "track_obj": track_obj})
+                rv_data.append({
+                    "title": title,
+                    "artist": badge_str,
+                    "artwork": track_obj.album_art,
+                    "source_icon": src_icon,
+                    "source_icon_color": src_color,
+                    "track_obj": track_obj,
+                })
 
             if "search_results_list" in search_screen.ids:
                 search_screen.ids.search_results_list.data = rv_data

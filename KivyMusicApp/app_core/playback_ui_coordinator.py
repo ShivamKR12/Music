@@ -23,6 +23,7 @@ from kivymd.uix.list import (
     MDListItemHeadlineText,
     MDListItemLeadingAvatar,
     MDListItemSupportingText,
+    MDListItemTrailingIcon,
 )
 from kivymd.uix.scrollview import MDScrollView
 
@@ -289,15 +290,26 @@ class PlaybackUICoordinator:
         def build_queue_item(tr):
             is_active = (tr == active)
             art = tr.album_art if (tr.album_art and os.path.exists(tr.album_art)) else "album_art.png"
-            return MDListItem(
+            row_children = [
                 MDListItemLeadingAvatar(source=art, radius=[dp(8)] * 4, disabled=True),
                 MDListItemHeadlineText(
-                    text=f"▶  {tr.title}" if is_active else tr.title,
+                    text=tr.title,
                     bold=is_active,
                     theme_text_color="Custom" if is_active else "Primary",
                     text_color=app.theme_cls.primaryColor if is_active else app.theme_cls.onSurfaceColor,
                 ),
                 MDListItemSupportingText(text=f"{tr.artist} • {tr.formatted_duration}"),
+            ]
+            if is_active:
+                row_children.append(
+                    MDListItemTrailingIcon(
+                        icon="volume-high",
+                        theme_icon_color="Custom",
+                        icon_color=app.theme_cls.primaryColor,
+                    )
+                )
+            return MDListItem(
+                *row_children,
                 on_release=lambda x, t=tr: (app.queue_sheet.set_state("close"), app.play_selected_track(t)),
                 radius=[dp(12)] * 4,
                 md_bg_color=app.theme_cls.surfaceContainerHighestColor if is_active else app.theme_cls.surfaceContainerColor,
