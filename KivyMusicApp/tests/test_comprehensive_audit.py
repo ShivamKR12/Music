@@ -466,6 +466,74 @@ class ComprehensiveAuditRunner:
                  fav_nav_passed,
                  f"Favorites={at_favorites}, Player={at_player}, BackToFav={back_to_favorites}, BackToLib={back_to_library}")
 
+        print("\n=== TEST SUITE 14: INLINE TIMELINE & FULLSCREEN LYRICS SCREEN ===")
+        sm.current = "player"
+        pump_events(self.app, 5)
+        player_scr = sm.get_screen("player")
+        cur_lbl = player_scr.ids.get("player_current_time_label")
+        t_slider = player_scr.ids.get("timeline_slider")
+        dur_lbl = player_scr.ids.get("player_duration_label")
+        slider_no_line = False
+        inline_aligned = False
+        inline_non_overlapping = False
+        if cur_lbl and t_slider and dur_lbl:
+            no_canvas_line = not any(type(ins).__name__ == "Line" for ins in t_slider.canvas.children)
+            no_before_line = not any(type(ins).__name__ == "Line" for ins in t_slider.canvas.before.children)
+            slider_no_line = no_canvas_line and no_before_line
+            inline_aligned = (
+                abs(cur_lbl.center_y - t_slider.center_y) < 1.0
+                and abs(dur_lbl.center_y - t_slider.center_y) < 1.0
+            )
+            inline_non_overlapping = (
+                cur_lbl.right <= t_slider.x + 1.0
+                and t_slider.right <= dur_lbl.x + 1.0
+                and t_slider.width > dp(120)
+            )
+
+        active_track = self.app.player_controller.active_track
+        if active_track and not getattr(active_track, "synced_lyrics", ""):
+            active_track.synced_lyrics = "[00:01.00] First test lyric line\n[00:05.00] Second test lyric line\n"
+        self.app.show_lyrics()
+        pump_events(self.app, 6)
+        at_lyrics = (sm.current == "lyrics")
+        lyrics_scr = sm.get_screen("lyrics") if sm.has_screen("lyrics") else None
+        lyrics_bars_disabled = bool(b_nav.disabled and mini_p.disabled and b_nav.height == 0 and mini_p.height == 0)
+        lyrics_inline_ok = False
+        offset_toggle_ok = False
+        lyrics_populated = False
+        if lyrics_scr:
+            l_cur = lyrics_scr.ids.get("lyrics_current_time_label")
+            l_slider = lyrics_scr.ids.get("lyrics_timeline_slider")
+            l_dur = lyrics_scr.ids.get("lyrics_duration_label")
+            l_trig = lyrics_scr.ids.get("lyrics_offset_trigger")
+            l_pill = lyrics_scr.ids.get("lyrics_offset_pill")
+            l_box = lyrics_scr.ids.get("fullscreen_lyrics_box")
+            if l_cur and l_slider and l_dur:
+                lyrics_inline_ok = (
+                    abs(l_cur.center_y - l_slider.center_y) < 1.0
+                    and abs(l_dur.center_y - l_slider.center_y) < 1.0
+                    and l_cur.right <= l_slider.x + 1.0
+                    and l_slider.right <= l_dur.x + 1.0
+                )
+            lyrics_populated = bool(l_box and len(l_box.children) >= 2)
+            if l_trig and l_pill and lyrics_scr.has_synced_lyrics:
+                initially_collapsed = (not l_trig.disabled) and l_pill.disabled
+                lyrics_scr.toggle_offset_controls()
+                pump_events(self.app, 2)
+                expanded_ok = l_trig.disabled and (not l_pill.disabled)
+                offset_toggle_ok = initially_collapsed and expanded_ok
+
+        self.app.go_back()
+        pump_events(self.app, 5)
+        lyrics_back_to_player = (sm.current == "player")
+        timers_cleaned = (getattr(self.app, "_lyrics_event", None) is None)
+
+        log_test(
+            "Inline Timeline & Fullscreen Lyrics Screen",
+            slider_no_line and inline_aligned and inline_non_overlapping and at_lyrics and lyrics_bars_disabled and lyrics_inline_ok and lyrics_populated and offset_toggle_ok and lyrics_back_to_player and timers_cleaned,
+            f"NoLine={slider_no_line}, InlineAligned={inline_aligned}, NonOverlap={inline_non_overlapping}, AtLyrics={at_lyrics}, BarsDisabled={lyrics_bars_disabled}, LyricsInline={lyrics_inline_ok}, Populated={lyrics_populated}, OffsetToggle={offset_toggle_ok}, BackToPlayer={lyrics_back_to_player}, TimersClean={timers_cleaned}",
+        )
+
         all_passed = all(t["passed"] for t in results.values())
         print(f"\n==========================================")
         print(f"COMPREHENSIVE AUDIT: {'PASSED' if all_passed else 'FAILED'}")

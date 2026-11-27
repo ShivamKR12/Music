@@ -37,6 +37,34 @@ class PlayerScreen(MDScreen):
         if "player_animated_bg" in self.ids:
             self.ids.player_animated_bg.stop_animation()
 
+
+class LyricsScreen(MDScreen):
+    has_synced_lyrics = BooleanProperty(False)
+    show_offset_controls = BooleanProperty(False)
+
+    def toggle_offset_controls(self):
+        self.show_offset_controls = not self.show_offset_controls
+
+    def on_enter(self, *args):
+        super().on_enter(*args)
+        if "lyrics_animated_bg" in self.ids:
+            self.ids.lyrics_animated_bg.start_animation()
+        app = MDApp.get_running_app()
+        if app:
+            if hasattr(app, "update_player_animated_bg"):
+                app.update_player_animated_bg()
+            if hasattr(app, "populate_fullscreen_lyrics"):
+                app.populate_fullscreen_lyrics()
+
+    def on_leave(self, *args):
+        super().on_leave(*args)
+        self.show_offset_controls = False
+        if "lyrics_animated_bg" in self.ids:
+            self.ids.lyrics_animated_bg.stop_animation()
+        app = MDApp.get_running_app()
+        if app and hasattr(app, "lyrics_coord") and app.lyrics_coord:
+            app.lyrics_coord._cleanup_sheet_timers()
+
 class AnalyticsScreen(MDScreen):
     total_tracks_text = StringProperty("0 Tracks")
     total_artists_text = StringProperty("0 Artists")

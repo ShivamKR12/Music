@@ -417,6 +417,7 @@ class MusicApp(MDApp):
     def on_player_time_change(self, instance, current_time): return self.lyrics_coord.on_player_time_change(instance, current_time)
     def show_lyrics_sheet(self): return self.lyrics_coord.show_lyrics_sheet()
     def show_lyrics(self): return self.lyrics_coord.show_lyrics()
+    def populate_fullscreen_lyrics(self, force=False): return self.lyrics_coord.populate_fullscreen_lyrics(force=force)
     def _recenter_active_lyric(self): return self.lyrics_coord.recenter_active_lyric()
     def _populate_lyrics_content(self, track): return self.lyrics_coord.populate_lyrics_content(track)
     def reload_lyrics_for_active_track(self): return self.lyrics_coord.reload_lyrics_for_active_track()

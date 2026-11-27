@@ -42,9 +42,9 @@ class NavigationCoordinator:
                         sm.transition = SlideTransition(duration=0.18)
 
                     tab_indices = {"home": 0, "search": 1, "library": 2, "browse": 3}
-                    if screen_name == "player":
+                    if screen_name in ("player", "lyrics"):
                         sm.transition.direction = "up"
-                    elif old_screen == "player":
+                    elif old_screen in ("player", "lyrics"):
                         sm.transition.direction = "down"
                     elif old_screen in tab_indices and screen_name in tab_indices:
                         sm.transition.direction = "left" if tab_indices[screen_name] > tab_indices[old_screen] else "right"
@@ -55,6 +55,8 @@ class NavigationCoordinator:
                 app.sync_nav_bar(screen_name)
                 if screen_name == "player":
                     app.ensure_player_carousel()
+                elif screen_name == "lyrics":
+                    app.populate_fullscreen_lyrics(force=True)
                 elif screen_name == "recently_played":
                     app.load_recently_played_data()
                 elif screen_name == "analytics":
@@ -129,7 +131,7 @@ class NavigationCoordinator:
 
                 if not isinstance(sm.transition, SlideTransition):
                     sm.transition = SlideTransition(duration=0.22)
-                sm.transition.direction = "down" if old_screen == "player" else "right"
+                sm.transition.direction = "down" if old_screen in ("player", "lyrics") else "right"
                 sm.current = dest
             app.sync_nav_bar(dest)
 

@@ -59,8 +59,11 @@ class PlaybackUICoordinator:
         app.current_lyric_line = "Tap for synchronized lyrics"
         app._current_inline_lyric_index = -1
         app.populate_inline_lyrics()
-        if hasattr(app, "lyrics_sheet") and app.lyrics_sheet and (
-            app.lyrics_sheet.state == "open" or getattr(app.lyrics_sheet, "status", None) == "opening_with_animation"
+        sm = app.root.ids.get("screen_manager") if (hasattr(app, "root") and app.root and hasattr(app.root, "ids")) else None
+        if (sm and sm.current == "lyrics") or (
+            hasattr(app, "lyrics_sheet") and app.lyrics_sheet and (
+                app.lyrics_sheet.state == "open" or getattr(app.lyrics_sheet, "status", None) == "opening_with_animation"
+            )
         ):
             app.reload_lyrics_for_active_track()
         if hasattr(app, "listen_together_service") and app.listen_together_service.is_host and app.listen_together_service.is_connected:

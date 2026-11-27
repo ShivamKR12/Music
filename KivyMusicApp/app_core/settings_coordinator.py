@@ -172,8 +172,12 @@ class SettingsCoordinator:
         app = self.app
         app.lyrics_timing_offset = 0.0 if delta == 0.0 else round(app.lyrics_timing_offset + delta, 2)
         set_setting("lyrics_offset", str(app.lyrics_timing_offset))
-        if hasattr(app, "lyrics_sheet") and app.lyrics_sheet:
+        sm = app.root.ids.get("screen_manager") if (hasattr(app, "root") and app.root and hasattr(app.root, "ids")) else None
+        if (sm and sm.current == "lyrics") or (hasattr(app, "lyrics_sheet") and app.lyrics_sheet):
             app.reload_lyrics_for_active_track()
+        if hasattr(app, "player_controller") and app.player_controller:
+            app._current_inline_lyric_index = -1
+            app.on_player_time_change(None, app.player_controller.current_time)
         lbl = f"{app.lyrics_timing_offset:+.1f}s" if app.lyrics_timing_offset != 0.0 else "Synced (0.0s)"
         app.show_toast(f"Lyrics timing offset: {lbl}")
 
@@ -182,14 +186,16 @@ class SettingsCoordinator:
         try:
             if hasattr(app, "root") and app.root and hasattr(app.root, "ids"):
                 sm = app.root.ids.get("screen_manager")
-                if sm and sm.has_screen("player"):
-                    player_screen = sm.get_screen("player")
-                    bg = player_screen.ids.get("player_animated_bg")
-                    if bg:
-                        bg.is_active = app.animated_bg_enabled
-                        bg.variation = app.animated_bg_variation
-                        bg.speed = app.animated_bg_speed
-                        bg.update_colors_from_theme(app)
+                if sm:
+                    for sname, bg_id in (("player", "player_animated_bg"), ("lyrics", "lyrics_animated_bg")):
+                        if sm.has_screen(sname):
+                            scr = sm.get_screen(sname)
+                            bg = scr.ids.get(bg_id)
+                            if bg:
+                                bg.is_active = app.animated_bg_enabled
+                                bg.variation = app.animated_bg_variation
+                                bg.speed = app.animated_bg_speed
+                                bg.update_colors_from_theme(app)
         except Exception as e:
             app_logger.debug(f"Animated background update notice: {e}")
 

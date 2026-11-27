@@ -1,0 +1,337 @@
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+#:import ButtonBehavior kivy.uix.behaviors.ButtonBehavior
+
+<LyricsArtistTapBox@ButtonBehavior+MDBoxLayout>:
+
+
+<LyricsScreen>:
+    name: "lyrics"
+    canvas.before:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            texture: app.player_background_texture
+            pos: self.pos
+            size: self.size
+
+    MDFloatLayout:
+        AnimatedBackground:
+            id: lyrics_animated_bg
+            size_hint: 1, 1
+            pos_hint: {"x": 0, "y": 0}
+            opacity: 0.14 if app.animated_bg_enabled else 0
+            is_active: app.animated_bg_enabled
+            variation: app.animated_bg_variation
+            speed: app.animated_bg_speed
+
+        # Dark gradient scrim for SimpMusic-style high legibility on fullscreen lyrics
+        Widget:
+            size_hint: 1, 1
+            canvas:
+                Color:
+                    rgba: 0, 0, 0, 0.34
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+        MDBoxLayout:
+            orientation: "vertical"
+            size_hint: (1, 1)
+
+            # 1. Top Header Row (SimpMusic / Apple Music style: dismiss, mini cover, title + artist, favorite, menu)
+            MDBoxLayout:
+                orientation: "horizontal"
+                size_hint_y: None
+                height: "68dp"
+                padding: ["4dp", "10dp", "6dp", "6dp"]
+                spacing: "8dp"
+
+                MDIconButton:
+                    id: lyrics_back_btn
+                    icon: "chevron-down"
+                    pos_hint: {"center_y": .5}
+                    theme_icon_color: "Custom"
+                    icon_color: [1, 1, 1, 0.95]
+                    on_release: app.go_back()
+
+                MDCard:
+                    style: "filled"
+                    size_hint: None, None
+                    size: dp(45), dp(45)
+                    radius: [dp(8)]
+                    pos_hint: {"center_y": .5}
+                    ripple_behavior: True
+                    theme_bg_color: "Custom"
+                    md_bg_color: [1, 1, 1, 0.08]
+                    on_release: app.go_back()
+
+                    FitImage:
+                        id: lyrics_header_art
+                        source: app.player_controller.active_track.album_art if (app.player_controller and app.player_controller.active_track and app.player_controller.active_track.album_art) else "album_art.png"
+                        radius: [dp(8)]
+                        mipmap: True
+
+                MDBoxLayout:
+                    orientation: "vertical"
+                    size_hint_x: 1
+                    adaptive_height: True
+                    pos_hint: {"center_y": .5}
+                    spacing: "1dp"
+
+                    MarqueeLabel:
+                        text: app.player_controller.active_track.title if (app.player_controller and app.player_controller.active_track) else "No Track"
+                        font_style: "Title"
+                        role: "medium"
+                        bold: True
+                        halign: "left"
+                        height: "24dp"
+                        theme_text_color: "Custom"
+                        text_color: [1, 1, 1, 1.0]
+
+                    LyricsArtistTapBox:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "22dp"
+                        on_release: app.show_artist(app.player_controller.active_track.artist if (app.player_controller and app.player_controller.active_track) else "")
+
+                        MarqueeLabel:
+                            text: app.player_controller.active_track.artist if (app.player_controller and app.player_controller.active_track) else "Unknown Artist"
+                            font_style: "Body"
+                            role: "medium"
+                            halign: "left"
+                            height: "20dp"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.72]
+
+                MDIconButton:
+                    id: lyrics_fav_btn
+                    icon: "heart" if (app.player_controller and app.player_controller.is_favorite) else "heart-outline"
+                    pos_hint: {"center_y": .5}
+                    theme_icon_color: "Custom"
+                    icon_color: get_color_from_hex("#FF4081") if (app.player_controller and app.player_controller.is_favorite) else [1, 1, 1, 0.75]
+                    on_release: app.player_controller.toggle_favorite()
+
+                MDIconButton:
+                    id: lyrics_more_btn
+                    icon: "dots-vertical"
+                    pos_hint: {"center_y": .5}
+                    theme_icon_color: "Custom"
+                    icon_color: [1, 1, 1, 0.92]
+                    on_release: app.show_track_options()
+
+            # 2. Full-Height Centered Interactive Lyrics Viewport + Floating Sync Offset Controls
+            MDFloatLayout:
+                size_hint: (1, 1)
+
+                LyricsScrollView:
+                    id: fullscreen_lyrics_scroll
+                    size_hint: (1, 1)
+                    pos_hint: {"x": 0, "y": 0}
+                    do_scroll_x: False
+                    bar_width: 0
+
+                    MDBoxLayout:
+                        id: fullscreen_lyrics_box
+                        orientation: "vertical"
+                        adaptive_height: True
+                        padding: ["16dp", "150dp", "16dp", "150dp"]
+                        spacing: "12dp"
+
+                # Floating Timing Offset Button (visible when synced lyrics are active & pill collapsed)
+                MDCard:
+                    id: lyrics_offset_trigger
+                    style: "filled"
+                    size_hint: None, None
+                    size: dp(48), dp(48)
+                    radius: [dp(24)]
+                    pos_hint: {"right": 0.96, "y": 0.03}
+                    theme_bg_color: "Custom"
+                    md_bg_color: [0.08, 0.08, 0.12, 0.78]
+                    ripple_behavior: True
+                    opacity: 1 if (root.has_synced_lyrics and not root.show_offset_controls) else 0
+                    disabled: not (root.has_synced_lyrics and not root.show_offset_controls)
+                    on_release: root.toggle_offset_controls()
+
+                    MDFloatLayout:
+                        MDIcon:
+                            icon: "av-timer"
+                            adaptive_size: True
+                            pos_hint: {"center_x": .5, "center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 0.92]
+
+                # Expanded Floating Sync Offset Bar (SimpMusic LyricsOffsetFloatingControl)
+                MDCard:
+                    id: lyrics_offset_pill
+                    style: "filled"
+                    size_hint: None, None
+                    size: self.minimum_width, dp(48)
+                    height: "48dp"
+                    radius: [dp(24)]
+                    pos_hint: {"right": 0.96, "y": 0.03}
+                    theme_bg_color: "Custom"
+                    md_bg_color: [0.08, 0.08, 0.12, 0.92]
+                    padding: ["6dp", "0dp", "6dp", "0dp"]
+                    spacing: "2dp"
+                    orientation: "horizontal"
+                    opacity: 1 if (root.has_synced_lyrics and root.show_offset_controls) else 0
+                    disabled: not (root.has_synced_lyrics and root.show_offset_controls)
+
+                    MDButton:
+                        style: "text"
+                        pos_hint: {"center_y": .5}
+                        on_release: app.adjust_lyrics_offset(-0.5)
+                        MDButtonText:
+                            text: "-0.5s"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.95]
+
+                    MDButton:
+                        style: "text"
+                        pos_hint: {"center_y": .5}
+                        on_release: app.adjust_lyrics_offset(0.0)
+                        MDButtonText:
+                            text: f"{app.lyrics_timing_offset:+.1f}s" if app.lyrics_timing_offset != 0.0 else "0.0s"
+                            bold: True
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 1.0]
+
+                    MDButton:
+                        style: "text"
+                        pos_hint: {"center_y": .5}
+                        on_release: app.adjust_lyrics_offset(+0.5)
+                        MDButtonText:
+                            text: "+0.5s"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.95]
+
+                    MDIconButton:
+                        icon: "close"
+                        pos_hint: {"center_y": .5}
+                        theme_icon_color: "Custom"
+                        icon_color: [1, 1, 1, 0.85]
+                        on_release: root.toggle_offset_controls()
+
+            # 3. Bottom Scrubber + Playback Controls (Always visible in SimpMusic fullscreen lyrics)
+            MDBoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                adaptive_height: True
+                padding: ["16dp", "4dp", "16dp", "14dp"]
+                spacing: "2dp"
+
+                MDBoxLayout:
+                    id: lyrics_timeline_row
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "48dp"
+                    spacing: "8dp"
+                    padding: ["4dp", "0dp"]
+
+                    MDLabel:
+                        id: lyrics_current_time_label
+                        text: app.player_controller.formatted_current_time if app.player_controller else "00:00"
+                        font_style: "Label"
+                        role: "small"
+                        theme_text_color: "Custom"
+                        text_color: [1, 1, 1, 0.72]
+                        adaptive_size: True
+                        pos_hint: {"center_y": .5}
+
+                    PlayerTimelineSlider:
+                        id: lyrics_timeline_slider
+                        value: app.player_controller.current_time if (app.player_controller and not self.is_seeking) else self.value
+                        min: 0
+                        max: app.player_controller.duration if (app.player_controller and app.player_controller.duration > 0) else 100
+                        buffer_progress: app.player_controller.buffer_progress if app.player_controller else 0.0
+                        buffer_color: [1, 1, 1, 0.32]
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: "48dp"
+                        padding: dp(8)
+                        track_active_color: [1, 1, 1, 1.0]
+                        track_inactive_color: [1, 1, 1, 0.22]
+                        pos_hint: {"center_y": .5}
+                        handle_anim_duration: 0
+                        handle_anim_transition: "linear"
+
+                    MDLabel:
+                        id: lyrics_duration_label
+                        text: app.player_controller.formatted_duration if app.player_controller else "00:00"
+                        font_style: "Label"
+                        role: "small"
+                        theme_text_color: "Custom"
+                        text_color: [1, 1, 1, 0.72]
+                        adaptive_size: True
+                        pos_hint: {"center_y": .5}
+
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "62dp"
+                    padding: ["0dp", "0dp"]
+
+                    MDIconButton:
+                        icon: "information-outline"
+                        pos_hint: {"center_y": .5}
+                        theme_icon_color: "Custom"
+                        icon_color: [1, 1, 1, 0.85]
+                        on_release: app.show_track_options()
+
+                    Widget:
+
+                    MDBoxLayout:
+                        orientation: "horizontal"
+                        adaptive_size: True
+                        spacing: "18dp"
+                        pos_hint: {"center_y": .5}
+
+                        MDIconButton:
+                            icon: "skip-previous"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 1.0]
+                            on_release: app.player_controller.prev_track()
+
+                        MDFloatLayout:
+                            size_hint: None, None
+                            size: dp(56), dp(56)
+                            pos_hint: {"center_y": .5}
+
+                            MDFabButton:
+                                id: lyrics_play_fab
+                                icon: "pause" if (app.player_controller and app.player_controller.is_playing) else "play"
+                                style: "standard"
+                                theme_bg_color: "Custom"
+                                md_bg_color: [1, 1, 1, 1.0]
+                                theme_icon_color: "Custom"
+                                icon_color: [0, 0, 0, 1.0]
+                                pos_hint: {"center_x": .5, "center_y": .5}
+                                opacity: 0 if (app.player_controller and app.player_controller.is_loading) else 1
+                                disabled: bool(app.player_controller and app.player_controller.is_loading)
+                                on_release: app.player_controller.toggle_play()
+
+                            YouTubeLoadingCircle:
+                                size_hint: None, None
+                                size: dp(42), dp(42)
+                                pos_hint: {"center_x": .5, "center_y": .5}
+                                active: bool(app.player_controller and app.player_controller.is_loading)
+                                opacity: 1 if (app.player_controller and app.player_controller.is_loading) else 0
+                                color: [1, 1, 1, 1.0]
+                                line_width: dp(3.5)
+
+                        MDIconButton:
+                            icon: "skip-next"
+                            pos_hint: {"center_y": .5}
+                            theme_icon_color: "Custom"
+                            icon_color: [1, 1, 1, 1.0]
+                            on_release: app.player_controller.next_track()
+
+                    Widget:
+
+                    MDIconButton:
+                        icon: "playlist-play"
+                        pos_hint: {"center_y": .5}
+                        theme_icon_color: "Custom"
+                        icon_color: [1, 1, 1, 0.85]
+                        on_release: app.show_queue_sheet()
