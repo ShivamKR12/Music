@@ -14,12 +14,6 @@ class NavigationCoordinator:
     def __init__(self, app: Any):
         self.app = app
 
-    def toggle_ui_mode(self) -> None:
-        self.app.show_toast("Modern SimpMusic UI is permanently active")
-
-    def switch_ui_mode(self, mode: str) -> None:
-        self.app.ui_mode = self.app.UI_MODE_NEW
-
     def switch_screen(self, screen_name: str) -> None:
         """Navigate to screen, lazy-instantiating on demand, and push to navigation stack."""
         app = self.app

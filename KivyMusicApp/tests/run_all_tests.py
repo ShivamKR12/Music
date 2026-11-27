@@ -19,7 +19,6 @@ TEST_MODULES = [
     ("SQLite Database Worker, WAL, FK & Unicode", "test_db_worker_wal_fk_unicode.py"),
     ("Android Media Lifecycle & MediaStore Bridges", "test_android_media_lifecycle_and_mediastore.py"),
     ("5-Level Logging System & Kivy Wiring", "test_five_level_logger.py"),
-    ("Interface Style Switch", "test_ui_mode_switch.py"),
     ("Artwork Cleanliness & Geometry", "test_artwork_and_ui_geometry.py"),
     ("Artist & Album Dynamic Invariants", "test_artist_and_album_dynamic.py"),
     ("Podcasts & Trending Invariants", "test_podcasts_and_trending.py"),

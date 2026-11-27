@@ -207,9 +207,6 @@ class MusicApp(MDApp):
     active_playlist_info = StringProperty("0 tracks")
     active_playlist_tracks = ListProperty([])
 
-    UI_MODE_NEW = "new"
-    UI_MODE_CLASSIC = "classic"
-    ui_mode = StringProperty("new")
     library_filter = StringProperty("Library")
 
     search_state = StringProperty("empty")
@@ -342,8 +339,6 @@ class MusicApp(MDApp):
     # =========================================================================
     # Navigation Entrypoints
     # =========================================================================
-    def toggle_ui_mode(self): return self.navigation.toggle_ui_mode()
-    def switch_ui_mode(self, mode): return self.navigation.switch_ui_mode(mode)
     def switch_screen(self, screen_name: str): return self.navigation.switch_screen(screen_name)
     def go_back(self, target=None): return self.navigation.go_back(target=target)
     def on_keyboard(self, window, key, scancode=None, codepoint=None, modifier=None, *args, **kwargs): return self.navigation.on_keyboard(window, key, scancode, codepoint, modifier, *args, **kwargs)

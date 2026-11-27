@@ -2,11 +2,10 @@
 KivyMusicApp — screen performance benchmark (standalone, not part of the test battery).
 
 Measures from the FIRST line of code (imports included) through cold start and
-every screen-to-screen transition, in both interface modes. No audio is played.
+every screen-to-screen transition in the SimpMusic UI. No audio is played.
 
 Usage (from KivyMusicApp/):
     python tests/benchmark_screen_performance.py new
-    python tests/benchmark_screen_performance.py classic
 
 Raw JSON + a Markdown report are written to docs/performance/.
 """
@@ -21,8 +20,8 @@ import statistics
 from datetime import datetime
 
 MODE = sys.argv[1] if len(sys.argv) > 1 else "new"
-if MODE not in ("new", "classic"):
-    raise SystemExit("usage: benchmark_screen_performance.py new|classic [output-tag]")
+if MODE != "new":
+    raise SystemExit("usage: benchmark_screen_performance.py new [output-tag]")
 TAG = sys.argv[2] if len(sys.argv) > 2 else ""
 
 APP_DIR = r"C:\Users\Shivam\Desktop\Music\KivyMusicApp"
@@ -77,10 +76,6 @@ for path in glob.glob(os.path.join(APP_DIR, "views", "screens", "*.kv")):
         SCREEN_NAMES.append(m.group(2))
 SCREEN_NAMES = sorted(set(SCREEN_NAMES + ["splash"]))
 print(f"[bench] discovered {len(SCREEN_NAMES)} screens: {SCREEN_NAMES}", flush=True)
-
-from models.database import get_setting, set_setting
-saved_mode = get_setting("ui_mode", "new")
-set_setting("ui_mode", MODE)
 
 # Instrument main-module data loaders / heavy helpers (main.py imported them by name).
 calls = {}
@@ -263,8 +258,5 @@ suffix = f"_{TAG}" if TAG else ""
 raw_path = os.path.join(OUT_DIR, f"raw_{MODE}_{stamp}{suffix}.json")
 with open(raw_path, "w", encoding="utf-8") as f:
     json.dump(results, f, indent=2, ensure_ascii=False)
-
-# Restore persisted mode
-set_setting("ui_mode", saved_mode if saved_mode in ("new", "classic") else "new")
 
 print(f"[bench] {MODE}: startup {checkpoints[-1]['t_ms']:.0f}ms; raw -> {raw_path}", flush=True)

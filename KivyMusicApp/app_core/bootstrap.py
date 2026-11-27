@@ -17,7 +17,6 @@ from kivy.utils import platform
 
 from app_core.service_container import resolve_symbol
 from app_core.state import SEARCH_PLACEHOLDERS
-from models.database import set_setting
 from services.logger import app_logger
 from services.telemetry_service import get_telemetry
 from utils import media_utils
@@ -200,11 +199,6 @@ class AppBootstrap:
                 if cat != "Icon":
                     for role in app.theme_cls.font_styles[cat]:
                         app.theme_cls.font_styles[cat][role]["font-name"] = app.resolved_unicode_font_name
-
-        app.ui_mode = app.UI_MODE_NEW
-        set_setting("ui_mode", app.UI_MODE_NEW)
-        app._ui_loading_overlay = None
-        app._ui_mode_switching = False
 
         # Register KivyMD 2.0 internal KV rules and custom screens/components before loading main.kv
         from kivymd.uix.bottomsheet import (  # noqa: F401
