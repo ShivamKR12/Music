@@ -844,11 +844,12 @@ class PlayerTimelineSlider(MDSlider):
 
     def __init__(self, **kwargs):
         kwargs.setdefault('size_hint_y', None)
-        kwargs.setdefault('height', dp(44))
+        kwargs.setdefault('height', dp(48))
+        kwargs.setdefault('padding', dp(8))
         kwargs.setdefault('track_active_width', dp(4))
         kwargs.setdefault('track_inactive_width', dp(4))
         kwargs.setdefault('track_active_color', [1, 1, 1, 1.0])
-        kwargs.setdefault('track_inactive_color', [1, 1, 1, 0.20])
+        kwargs.setdefault('track_inactive_color', [1, 1, 1, 0.22])
         kwargs.setdefault('handle_anim_duration', 0)
         kwargs.setdefault('handle_anim_transition', 'linear')
         super().__init__(**kwargs)
@@ -880,6 +881,10 @@ class PlayerTimelineSlider(MDSlider):
         if app and hasattr(app, "player_controller") and app.player_controller:
             app.player_controller.is_seeking = True
         res = super().on_touch_down(touch)
+        if not getattr(touch, "is_mouse_scrolling", False) and self.sensitivity != "handle":
+            from kivy.animation import Animation
+            Animation.stop_all(self, "value_pos")
+            self.value_pos = touch.pos
         if app and hasattr(app, "player_controller") and app.player_controller:
             app.player_controller.current_time = float(self.value)
             sec = max(0, int(self.value or 0))
@@ -986,13 +991,28 @@ Builder.load_string('''
         PopMatrix
 
 <PlayerTimelineSlider>:
-    canvas.before:
+    canvas:
+        Clear
+        Color:
+            rgba: self.track_inactive_color if self.track_inactive_color else [1, 1, 1, 0.22]
+        SmoothRectangle:
+            size: (max(0.0, self.width - self.padding * 2), dp(4)) if self.orientation == "horizontal" else (dp(4), max(0.0, self.height - self.padding * 2))
+            pos: (self.x + self.padding, self.center_y - dp(2)) if self.orientation == "horizontal" else (self.center_x - dp(2), self.y + self.padding)
         Color:
             rgba: root.buffer_color if root.buffer_progress > 0 else [0, 0, 0, 0]
-        Line:
-            points: [root.x, root.center_y, root.x + root.width * min(1.0, max(0.0, root.buffer_progress)), root.center_y] if root.buffer_progress > 0 else []
-            width: dp(4)
-            cap: 'round'
+        SmoothRectangle:
+            size: (max(0.0, (self.width - self.padding * 2) * min(1.0, max(0.0, root.buffer_progress))), dp(4)) if self.orientation == "horizontal" else (dp(4), max(0.0, (self.height - self.padding * 2) * min(1.0, max(0.0, root.buffer_progress))))
+            pos: (self.x + self.padding, self.center_y - dp(2)) if self.orientation == "horizontal" else (self.center_x - dp(2), self.y + self.padding)
+        Color:
+            rgba: self.track_active_color if self.track_active_color else [1, 1, 1, 1.0]
+        SmoothRectangle:
+            size: (max(0.0, (self.width - self.padding * 2) * self.value_normalized), dp(4)) if self.orientation == "horizontal" else (dp(4), max(0.0, (self.height - self.padding * 2) * self.value_normalized))
+            pos: (self.x + self.padding, self.center_y - dp(2)) if self.orientation == "horizontal" else (self.center_x - dp(2), self.y + self.padding)
+        Color:
+            rgba: self.track_active_color if self.track_active_color else [1, 1, 1, 1.0]
+        Ellipse:
+            size: (dp(14), dp(14)) if self.is_seeking else (dp(10), dp(10))
+            pos: (self.x + self.padding + max(0.0, self.width - self.padding * 2) * self.value_normalized - (dp(7) if self.is_seeking else dp(5)), self.center_y - (dp(7) if self.is_seeking else dp(5))) if self.orientation == "horizontal" else (self.center_x - (dp(7) if self.is_seeking else dp(5)), self.y + self.padding + max(0.0, self.height - self.padding * 2) * self.value_normalized - (dp(7) if self.is_seeking else dp(5)))
 ''')
 
 Factory.register('PlayerTimelineSlider', cls=PlayerTimelineSlider)
@@ -1065,7 +1085,7 @@ class AnimatedBackground(Widget):
         app = MDApp.get_running_app()
         is_player_current = False
         if app and hasattr(app, "root") and app.root and hasattr(app.root, "ids") and "screen_manager" in app.root.ids:
-            is_player_current = (app.root.ids.screen_manager.current == "player")
+            is_player_current = (app.root.ids.screen_manager.current in ("player", "lyrics"))
 
         should_run = self.is_active and (self.variation != "off") and is_player_current
         if should_run and self._tick_event is None:
@@ -1156,7 +1176,7 @@ class AnimatedBackground(Widget):
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
         if app and hasattr(app, "root") and app.root and hasattr(app.root, "ids") and "screen_manager" in app.root.ids:
-            if app.root.ids.screen_manager.current != "player":
+            if app.root.ids.screen_manager.current not in ("player", "lyrics"):
                 self.stop_animation()
                 return
         self._t += dt * self.speed

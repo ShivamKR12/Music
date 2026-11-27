@@ -148,12 +148,24 @@
                             icon_color: get_color_from_hex("#FF4081") if app.player_controller.is_favorite else [1, 1, 1, 0.70]
                             on_release: app.player_controller.toggle_favorite()
 
-                    # 4. Timeline Slider & Timestamps (SimpMusic SpotifyPlaybackControls)
+                    # 4. Timeline Slider & Inline Timestamps (Left Timestamp | Scrubber | Right Timestamp)
                     MDBoxLayout:
-                        orientation: "vertical"
-                        adaptive_height: True
-                        spacing: "0dp"
+                        id: timeline_row
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: "48dp"
+                        spacing: "8dp"
                         padding: ["4dp", "0dp"]
+
+                        MDLabel:
+                            id: player_current_time_label
+                            text: app.player_controller.formatted_current_time if app.player_controller else "00:00"
+                            font_style: "Label"
+                            role: "small"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.72]
+                            adaptive_size: True
+                            pos_hint: {"center_y": .5}
 
                         PlayerTimelineSlider:
                             id: timeline_slider
@@ -162,41 +174,25 @@
                             max: app.player_controller.duration if (app.player_controller and app.player_controller.duration > 0) else 100
                             buffer_progress: app.player_controller.buffer_progress if app.player_controller else 0.0
                             buffer_color: [1, 1, 1, 0.32]
+                            size_hint_x: 1
                             size_hint_y: None
-                            height: "32dp"
+                            height: "48dp"
+                            padding: dp(8)
                             track_active_color: [1, 1, 1, 1.0]
-                            track_inactive_color: [1, 1, 1, 0.18]
+                            track_inactive_color: [1, 1, 1, 0.22]
                             pos_hint: {"center_y": .5}
                             handle_anim_duration: 0
                             handle_anim_transition: "linear"
 
-                        MDBoxLayout:
-                            orientation: "horizontal"
-                            size_hint_y: None
-                            height: "14dp"
-                            padding: ["4dp", "0dp"]
-
-                            MDLabel:
-                                id: player_current_time_label
-                                text: app.player_controller.formatted_current_time if app.player_controller else "00:00"
-                                font_style: "Label"
-                                role: "small"
-                                theme_text_color: "Custom"
-                                text_color: [1, 1, 1, 0.65]
-                                adaptive_width: True
-                                pos_hint: {"center_y": .5}
-
-                            Widget:
-
-                            MDLabel:
-                                id: player_duration_label
-                                text: app.player_controller.formatted_duration if app.player_controller else "00:00"
-                                font_style: "Label"
-                                role: "small"
-                                theme_text_color: "Custom"
-                                text_color: [1, 1, 1, 0.65]
-                                adaptive_width: True
-                                pos_hint: {"center_y": .5}
+                        MDLabel:
+                            id: player_duration_label
+                            text: app.player_controller.formatted_duration if app.player_controller else "00:00"
+                            font_style: "Label"
+                            role: "small"
+                            theme_text_color: "Custom"
+                            text_color: [1, 1, 1, 0.72]
+                            adaptive_size: True
+                            pos_hint: {"center_y": .5}
 
                     # 5. Transport Controls (SimpMusic PlayerControlLayout parity)
                     MDBoxLayout:
