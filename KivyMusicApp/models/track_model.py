@@ -63,8 +63,12 @@ class TrackModel(EventDispatcher):
         """Build TrackModel instance from database or dictionary, auto-resolving cached files."""
         vid = data.get("video_id") or data.get("id") or ""
 
-        # Check cache directory for local audio and artwork
-        cache_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
+        # Resolve platform cache directory so Android user_data_dir cache hits accurately
+        try:
+            from utils.media_utils import get_cache_dir
+            cache_dir = get_cache_dir()
+        except Exception:
+            cache_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
         cached_mp3 = os.path.join(cache_dir, f"{vid}.mp3") if vid else ""
         cached_art = os.path.join(cache_dir, f"{vid}.jpg") if vid else ""
 
@@ -73,12 +77,20 @@ class TrackModel(EventDispatcher):
             if cached_mp3 and os.path.exists(cached_mp3):
                 local_path = cached_mp3
 
-        art = data.get("artwork") or data.get("album_art") or ""
-        if not art or not os.path.exists(art) or art == "album_art.png":
-            if cached_art and os.path.exists(cached_art):
+        raw_art = str(data.get("artwork") or data.get("album_art") or "").strip()
+        if cached_art and os.path.exists(cached_art) and os.path.getsize(cached_art) > 0:
+            # Prefer verified cached artwork file over placeholder or remote URL
+            if not raw_art or raw_art == "album_art.png" or raw_art.startswith(("http://", "https://")) or not os.path.exists(raw_art):
                 art = cached_art
-            elif not art or not os.path.exists(art):
-                art = "album_art.png"
+            else:
+                art = raw_art
+        elif raw_art.startswith(("http://", "https://")):
+            # Preserve remote JioSaavn / Spotify / YouTube artwork URLs for async download & display
+            art = raw_art
+        elif raw_art and os.path.exists(raw_art):
+            art = raw_art
+        else:
+            art = "album_art.png"
 
         raw_fav = data.get("is_favorite")
         if raw_fav is not None:

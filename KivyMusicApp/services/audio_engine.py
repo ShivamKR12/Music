@@ -700,6 +700,12 @@ class AudioEngine:
 
             if os.path.exists(target_path) and is_valid_audio_header(target_path):
                 cached_meta = self._load_cached_metadata(meta_path) or clean_info
+                thumb_path = os.path.join(cache_dir, f"{track_id}.jpg")
+                if (not cached_meta.get("artwork") or not os.path.exists(str(cached_meta.get("artwork")))) and clean_info["artwork"].startswith("http"):
+                    if not os.path.exists(thumb_path):
+                        self._download_thumbnail(clean_info["artwork"], thumb_path)
+                    if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+                        cached_meta["artwork"] = thumb_path
                 if cancel_event.is_set():
                     return
                 Clock.schedule_once(lambda dt: self._set_main_thread_info(cached_meta, target_path), 0)
@@ -1358,8 +1364,12 @@ class AudioEngine:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            socket.setdefaulttimeout(10)
-            with urllib.request.urlopen(url, context=ctx) as resp, open(path, "wb") as out_f:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            }
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as resp, open(path, "wb") as out_f:
                 out_f.write(resp.read())
         except Exception:
             pass

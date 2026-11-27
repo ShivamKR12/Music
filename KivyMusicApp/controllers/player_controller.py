@@ -524,6 +524,9 @@ class PlayerController(EventDispatcher):
             app = MDApp.get_running_app()
             if not app or getattr(app, "extract_artwork_colors", True):
                 update_theme_from_image(art_path)
+            if app and hasattr(app, "sync_player_carousel_track"):
+                trk = self.active_track
+                Clock.schedule_once(lambda dt, t=trk: app.sync_player_carousel_track(t), 0)
             self.media_lifecycle.sync_playback_state(
                 self.active_track, self.is_playing, self.current_time, self.duration, force=True
             )

@@ -198,15 +198,23 @@ class TestMultiSourceProviders(unittest.TestCase):
         self.assertEqual(fetched["bitrate"], 320)
         self.assertEqual(fetched["isrc"], "US1234567890")
 
-        # Verify TrackModel serialization
+        # Verify TrackModel serialization & remote artwork URL preservation
         model = TrackModel.from_dict(fetched)
         self.assertEqual(model.source, "jiosaavn")
         self.assertEqual(model.bitrate, 320)
         self.assertEqual(model.isrc, "US1234567890")
+        js_remote = TrackModel.from_dict({
+            "video_id": "js_art_test_99",
+            "title": "Art Test",
+            "artist": "Singer",
+            "artwork": "https://c.saavncdn.com/652/sample-500x500.jpg",
+            "source": "jiosaavn",
+        })
+        self.assertEqual(js_remote.album_art, "https://c.saavncdn.com/652/sample-500x500.jpg")
         m_dict = model.to_dict()
         self.assertEqual(m_dict["source"], "jiosaavn")
         self.assertEqual(m_dict["bitrate"], 320)
-        print(f"\n[PASS] Test 12: TrackModel & SQLite Source Schema (source, source_id, bitrate, isrc) verified")
+        print(f"\n[PASS] Test 12: TrackModel & SQLite Source Schema (source, source_id, bitrate, isrc, remote artwork) verified")
 
     def test_13_audio_header_validation_safety(self):
         """Verifies audio header validation safely detects MP3, MP4/AAC, and rejects corrupt data."""

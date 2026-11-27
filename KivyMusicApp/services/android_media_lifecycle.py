@@ -232,20 +232,19 @@ class AndroidMediaLifecycleCoordinator:
 
             coord = self
 
-            # Attach native Java MediaSession.Callback bridge (compiled via android.add_src)
-            # so lock-screen Now Bar / Quick Settings play, pause, skip, seek, and custom
-            # Heart/Shuffle actions dispatch cleanly on Android 13-17 even when backgrounded.
+            # Attach native Java MediaSession.Callback bridge on Android MainLooper
+            # (Kivy SDLThread has no Looper) so lock-screen Now Bar / Quick Settings play,
+            # pause, skip, seek, and Heart/Shuffle actions dispatch cleanly on Android 13-17.
             try:
                 ms = MediaSession(activity, "KivyMusicSession")
                 ms.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
                 try:
                     MediaSessionBridge = autoclass("org.shivam.music.MediaSessionBridge")
-                    cb = MediaSessionBridge.createCallback(activity)
-                    ms.setCallback(cb)
+                    cb = MediaSessionBridge.attachSession(ms, activity)
                     self._media_session_cb = cb
-                    logger.info("Attached native Java MediaSession.Callback bridge")
+                    logger.info("Attached native Java MediaSession.Callback bridge on MainLooper")
                 except Exception as cb_exc:
-                    logger.debug("Native MediaSession.Callback bridge unavailable: %s", cb_exc)
+                    logger.warning("Native MediaSession.Callback bridge unavailable: %s", cb_exc)
                 ms.setActive(True)
                 self._media_session = ms
                 self._media_token = ms.getSessionToken()
@@ -272,30 +271,63 @@ class AndroidMediaLifecycleCoordinator:
                 except Exception as be:
                     logger.warning("Android broadcast handler error: %s", be)
 
+            registered_java_rx = False
             try:
-                br = BroadcastReceiver(
-                    _on_broadcast,
-                    actions=[
-                        AudioManager.ACTION_AUDIO_BECOMING_NOISY,
-                        "android.intent.action.HEADSET_PLUG",
-                        "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED",
-                        "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED",
-                        ACTION_PLAY,
-                        ACTION_PAUSE,
-                        ACTION_PLAY_PAUSE,
-                        ACTION_NEXT,
-                        ACTION_PREV,
-                        ACTION_STOP,
-                        ACTION_SEEK,
-                        ACTION_FAVORITE,
-                        ACTION_SHUFFLE,
-                        ACTION_REQUEST_MEDIA_TOKEN,
-                    ],
-                )
-                br.start()
-                self._broadcast_receiver = br
-            except Exception as br_exc:
-                logger.warning("Android BroadcastReceiver setup skipped: %s", br_exc)
+                MediaSessionBridge = autoclass("org.shivam.music.MediaSessionBridge")
+
+                class _MediaBridgeListener(PythonJavaClass):
+                    __javainterfaces__ = ["org/shivam/music/MediaSessionBridge$BroadcastListener"]
+                    __javacontext__ = "app"
+
+                    @java_method("(Ljava/lang/String;JI)V")
+                    def onBroadcastAction(self, action, seek_ms, int_extra):
+                        act = str(action or "")
+                        if act == ACTION_SEEK and int(seek_ms) >= 0:
+                            coord.dispatch_transport_action("seek", float(seek_ms) / 1000.0)
+                        elif act == "android.intent.action.HEADSET_PLUG":
+                            if int(int_extra) == 0:
+                                logger.info("Wired headset unplugged -> pausing playback")
+                                Clock.schedule_once(lambda dt: coord._pause_on_route_disconnect(), 0)
+                        elif "bluetooth" in act.lower() and "CONNECTION_STATE_CHANGED" in act:
+                            if int(int_extra) == 0:
+                                logger.info("Bluetooth audio route disconnected -> pausing playback")
+                                Clock.schedule_once(lambda dt: coord._pause_on_route_disconnect(), 0)
+                        else:
+                            coord.on_os_broadcast(act, None)
+
+                listener = _MediaBridgeListener()
+                if bool(MediaSessionBridge.registerLifecycleReceiver(activity, listener)):
+                    self._broadcast_receiver = listener
+                    registered_java_rx = True
+                    logger.info("Registered Java MainLooper lifecycle BroadcastReceiver")
+            except Exception as jbr_exc:
+                logger.debug("Java lifecycle receiver fallback to p4a BroadcastReceiver: %s", jbr_exc)
+
+            if not registered_java_rx:
+                try:
+                    br = BroadcastReceiver(
+                        _on_broadcast,
+                        actions=[
+                            AudioManager.ACTION_AUDIO_BECOMING_NOISY,
+                            "android.intent.action.HEADSET_PLUG",
+                            "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED",
+                            "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED",
+                            ACTION_PLAY,
+                            ACTION_PAUSE,
+                            ACTION_PLAY_PAUSE,
+                            ACTION_NEXT,
+                            ACTION_PREV,
+                            ACTION_STOP,
+                            ACTION_SEEK,
+                            ACTION_FAVORITE,
+                            ACTION_SHUFFLE,
+                            ACTION_REQUEST_MEDIA_TOKEN,
+                        ],
+                    )
+                    br.start()
+                    self._broadcast_receiver = br
+                except Exception as br_exc:
+                    logger.warning("Android BroadcastReceiver setup skipped: %s", br_exc)
 
             self._broadcast_media_token()
 
@@ -317,6 +349,12 @@ class AndroidMediaLifecycleCoordinator:
             activity = PythonActivity.mActivity
             if not activity:
                 return
+            try:
+                MediaSessionBridge = autoclass("org.shivam.music.MediaSessionBridge")
+                MediaSessionBridge.broadcastToken(activity, self._media_token)
+                return
+            except Exception:
+                pass
             Intent = autoclass("android.content.Intent")
             it = Intent(ACTION_SYNC_MEDIA_TOKEN)
             it.setPackage(activity.getPackageName())

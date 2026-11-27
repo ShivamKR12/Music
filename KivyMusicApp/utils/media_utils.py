@@ -196,20 +196,27 @@ def download_artwork(video_id, custom_url=None, cache_dir=None, on_success=None)
 
     # Candidate URLs to attempt in order of resolution quality
     candidates = []
-    if custom_url and custom_url.startswith("http"):
+    if custom_url and str(custom_url).startswith("http"):
         candidates.append(custom_url)
-    candidates.extend([
-        f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
-        f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
-        f"https://i.ytimg.com/vi/{video_id}/default.jpg",
-    ])
+    if not str(video_id).startswith(("js_", "sp_", "loc_", "local_", "ms_")):
+        candidates.extend([
+            f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+            f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
+            f"https://i.ytimg.com/vi/{video_id}/default.jpg",
+        ])
+
+    if not candidates:
+        return "album_art.png"
 
     def _worker():
         import ssl
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        }
 
         for url in candidates:
             try:

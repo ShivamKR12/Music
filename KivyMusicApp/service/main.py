@@ -165,74 +165,34 @@ def run_foreground_loop() -> None:
     except Exception:
         pass
 
-    token_holder = [None]
-    receiver = None
+    bridge = None
     try:
-        from android.broadcast import BroadcastReceiver
-        Intent = autoclass("android.content.Intent")
-
-        def _on_service_broadcast(context, intent):
-            try:
-                act = str(intent.getAction() or "")
-                if act == "org.shivam.music.ACTION_SYNC_MEDIA_TOKEN":
-                    tok = intent.getParcelableExtra("media_token")
-                    if tok is not None:
-                        token_holder[0] = tok
-            except Exception:
-                pass
-
-        receiver = BroadcastReceiver(
-            _on_service_broadcast,
-            actions=["org.shivam.music.ACTION_SYNC_MEDIA_TOKEN"],
-            use_intent_action=True,
-        )
-        receiver.start()
+        bridge = autoclass("org.shivam.music.MediaSessionBridge")
+        bridge.startTokenReceiver(service)
     except Exception:
-        # Some p4a versions do not accept `use_intent_action` kwarg; retry cleanly with positional signature
-        try:
-            from android.broadcast import BroadcastReceiver
-
-            def _on_service_broadcast_compat(context, intent):
-                try:
-                    act = str(intent.getAction() or "")
-                    if act == "org.shivam.music.ACTION_SYNC_MEDIA_TOKEN":
-                        tok = intent.getParcelableExtra("media_token")
-                        if tok is not None:
-                            token_holder[0] = tok
-                except Exception:
-                    pass
-
-            receiver = BroadcastReceiver(
-                _on_service_broadcast_compat,
-                actions=["org.shivam.music.ACTION_SYNC_MEDIA_TOKEN"],
-            )
-            receiver.start()
-        except Exception:
-            receiver = None
-
-    try:
-        Intent = autoclass("android.content.Intent")
-        req = Intent("org.shivam.music.ACTION_REQUEST_MEDIA_TOKEN")
-        req.setPackage(service.getPackageName())
-        service.sendBroadcast(req)
-    except Exception:
-        pass
+        bridge = None
 
     last_sig = None
+    last_token_req_ts = 0.0
     while True:
         state = _read_service_state()
         if state.get("stop_service"):
-            if receiver is not None:
-                try:
-                    receiver.stop()
-                except Exception:
-                    pass
             try:
                 service.stopForeground(True)
                 service.stopSelf()
             except Exception:
                 pass
             break
+
+        has_token = False
+        if bridge is not None:
+            try:
+                has_token = bool(bridge.hasCachedToken())
+                if not has_token and (time.monotonic() - last_token_req_ts) >= 1.5:
+                    bridge.requestToken(service)
+                    last_token_req_ts = time.monotonic()
+            except Exception:
+                has_token = False
 
         sig = (
             state.get("title"),
@@ -242,11 +202,12 @@ def run_foreground_loop() -> None:
             bool(state.get("is_playing")),
             bool(state.get("is_favorite")),
             bool(state.get("is_shuffle")),
-            bool(token_holder[0] is not None),
+            has_token,
         )
         if sig != last_sig:
             try:
-                _build_and_post_notification(service, state, media_token=token_holder[0])
+                tok = bridge.getCachedToken() if (bridge is not None and has_token) else None
+                _build_and_post_notification(service, state, media_token=tok)
                 last_sig = sig
             except Exception:
                 pass
