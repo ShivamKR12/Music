@@ -147,12 +147,19 @@ MDBoxLayout:
                             color: app.theme_cls.primaryColor
                             line_width: dp(2.8)
 
-                MDLinearProgressIndicator:
+                MDBoxLayout:
                     size_hint_y: None
-                    height: "2dp"
-                    value: (app.player_controller.current_time / app.player_controller.duration * 100) if (app.player_controller and app.player_controller.duration > 0) else 0
-                    color: app.theme_cls.primaryColor
-                    track_color: [0, 0, 0, 0]
+                    height: "5dp"
+                    padding: ["22dp", "0dp", "22dp", "3dp"]
+
+                    MDLinearProgressIndicator:
+                        id: mini_progress_bar
+                        size_hint_y: None
+                        height: "2dp"
+                        radius: [dp(1)] if self.value_normalized > 0.01 else [0]
+                        value: (app.player_controller.current_time / app.player_controller.duration * 100) if (app.player_controller and app.player_controller.duration > 0) else 0
+                        indicator_color: app.theme_cls.primaryColor
+                        track_color: app.theme_cls.outlineVariantColor[:-1] + [0.30]
 
     MDNavigationBar:
         id: bottom_nav

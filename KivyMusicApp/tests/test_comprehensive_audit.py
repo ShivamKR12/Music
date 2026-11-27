@@ -536,7 +536,7 @@ class ComprehensiveAuditRunner:
 
         print("\n=== TEST SUITE 15: SONG ROW ICONS, AVATAR BOUNDS & QUEUE SHEET ===")
         from kivymd.icon_definitions import md_icons
-        from views.components import TrackListItem
+        from views.components import TrackListItem, MiniPlayerCard
         sm.current = "search"
         pump_events(self.app, 3)
         search_scr = sm.get_screen("search")
@@ -556,6 +556,19 @@ class ComprehensiveAuditRunner:
             and all(all(ord(c) <= 127 or c == "•" for c in (w.artist + w.title)) for w in row_widgets)
         )
 
+        # Verify mini player progress bar stays inset inside rounded MiniPlayerCard corners
+        mini_cards = [w for w in root.ids.mini_player.walk() if isinstance(w, MiniPlayerCard)]
+        mini_bar = root.ids.get("mini_progress_bar")
+        mini_bar_inset_ok = False
+        if mini_cards and mini_bar and mini_cards[0].width > 0:
+            mc = mini_cards[0]
+            mini_bar_inset_ok = (
+                mini_bar.x >= mc.x + dp(20)
+                and mini_bar.right <= mc.right - dp(20)
+                and mini_bar.y >= mc.y
+                and mini_bar.top <= mc.top
+            )
+
         self.app.show_queue_sheet()
         pump_events(self.app, 8)
         queue_rows_ok = False
@@ -568,8 +581,8 @@ class ComprehensiveAuditRunner:
 
         log_test(
             "Song Row Icons & Queue Row Cleanliness",
-            rows_valid and queue_rows_ok,
-            f"SearchRows={len(row_widgets)}, RowsValid={rows_valid}, QueueClean={queue_rows_ok}",
+            rows_valid and mini_bar_inset_ok and queue_rows_ok,
+            f"SearchRows={len(row_widgets)}, RowsValid={rows_valid}, MiniBarInset={mini_bar_inset_ok}, QueueClean={queue_rows_ok}",
         )
 
         all_passed = all(t["passed"] for t in results.values())
